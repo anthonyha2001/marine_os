@@ -6,6 +6,8 @@ import { listProductsWithStock } from "@/lib/data/inventory";
 import { listPurchaseOrders } from "@/lib/data/purchase-orders";
 import { invoicesWithBalance } from "@/lib/data/ledger";
 import { listOffers } from "@/lib/data/sales";
+import { listTransfers } from "@/lib/data/stock-ops";
+import { listJobCards, listWarranties, warrantyState } from "@/lib/data/workshop";
 import { formatMoney, round2 } from "@/lib/money";
 import { canAccessModule, type CompanySlug } from "@/lib/permissions";
 
@@ -23,6 +25,11 @@ export async function noticesFor(user: SessionUser, slug: CompanySlug): Promise<
   const todayIso = iso(today);
   const weekIso = iso(new Date(today.getTime() + 7 * DAY));
 
+  const [jobs, warranties, transfers] = await Promise.all([
+    can("workshop") ? listJobCards(slug) : [],
+    can("workshop") ? listWarranties(slug) : [],
+    can("inventory") ? listTransfers(slug) : [],
+  ]);
   const [invoices, bills, products, orders, offers] = await Promise.all([
     can("invoices") ? invoicesWithBalance(slug) : [],
     can("accounting") ? listBills(slug) : [],
@@ -75,6 +82,19 @@ export async function noticesFor(user: SessionUser, slug: CompanySlug): Promise<
   const expiring = offers.filter((o) => o.status === "SENT" && iso(o.validUntil) >= todayIso && iso(o.validUntil) <= weekIso);
   if (expiring.length) {
     notices.push({ label: `${plural(expiring.length, "offer")} expire this week`, detail: "Sent offers awaiting the customer’s answer", href: `${base}/offers`, tone: "blue" });
+  }
+
+  const incoming = transfers.filter((t) => t.to.slug === slug && t.status === "SENT");
+  if (incoming.length) {
+    notices.push({ label: `${plural(incoming.length, "transfer")} to receive`, detail: `Goods sent by ${incoming[0].from.name}`, href: `${base}/inventory/transfers`, tone: "blue" });
+  }
+  const lateJobs = jobs.filter((j) => (j.status === "OPEN" || j.status === "IN_PROGRESS") && j.dueDate && iso(j.dueDate) < todayIso);
+  if (lateJobs.length) {
+    notices.push({ label: `${plural(lateJobs.length, "job card")} late`, detail: "Past the promised date", href: `${base}/workshop`, tone: "amber" });
+  }
+  const expiringWarranties = warranties.filter((w) => warrantyState(w, todayIso) === "EXPIRING");
+  if (expiringWarranties.length) {
+    notices.push({ label: `${expiringWarranties.length} ${expiringWarranties.length === 1 ? "warranty" : "warranties"} expiring soon`, detail: "Within 30 days: a chance to offer a service", href: `${base}/warranties`, tone: "blue" });
   }
 
   return notices;

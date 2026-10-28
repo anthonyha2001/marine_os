@@ -20,7 +20,9 @@ export type SourceType =
   | "POS_SALE"
   | "POS_REFUND"
   | "POS_SHIFT"
-  | "PAYROLL";
+  | "PAYROLL"
+  | "TRANSFER_OUT"
+  | "TRANSFER_IN";
 
 export type PostingLine = {
   accountId: string;
@@ -460,5 +462,38 @@ export async function postPayroll(
       { accountId: a.STAFF_ADVANCES, credit: advances, description: `Advances paid back · ${run.label}` },
       { accountId: run.moneyAccountId, credit: net, description: memo },
     ],
+  });
+}
+
+/**
+ * Goods moved to / from the sister company, valued at cost (purchases are expensed when
+ * bought, so the cost moves out of one company's purchases and into the other's).
+ * Sender: Dr Sister company account (458) / Cr Purchases (601).
+ * Receiver: Dr Purchases (601) / Cr Sister company account (458).
+ */
+export async function postTransfer(
+  tx: Tx,
+  t: { id: string; companyId: string; number: string; date: Date; direction: "OUT" | "IN"; otherCompany: string; amount: number; createdById: string },
+) {
+  if (t.amount <= 0) return null;
+  const a = await systemAccounts(t.companyId, tx);
+  const memo = `${t.direction === "OUT" ? "Goods sent to" : "Goods received from"} ${t.otherCompany} · ${t.number}`;
+  return postEntry(tx, {
+    companyId: t.companyId,
+    date: t.date,
+    memo,
+    sourceType: t.direction === "OUT" ? "TRANSFER_OUT" : "TRANSFER_IN",
+    sourceId: t.id,
+    createdById: t.createdById,
+    lines:
+      t.direction === "OUT"
+        ? [
+            { accountId: a.INTERCOMPANY, debit: t.amount, description: memo },
+            { accountId: a.PURCHASES, credit: t.amount, description: memo },
+          ]
+        : [
+            { accountId: a.PURCHASES, debit: t.amount, description: memo },
+            { accountId: a.INTERCOMPANY, credit: t.amount, description: memo },
+          ],
   });
 }

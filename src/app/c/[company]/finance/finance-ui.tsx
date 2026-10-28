@@ -84,6 +84,9 @@ export function sourceHref(slug: string, sourceType: string, sourceId: string | 
       return `/c/${slug}/finance/credit-notes/${sourceId}`;
     case "POS_SALE":
       return `/c/${slug}/pos/sales/${sourceId}`;
+    case "TRANSFER_OUT":
+    case "TRANSFER_IN":
+      return `/c/${slug}/inventory/transfers?t=${sourceId}`;
     case "PAYROLL":
       return `/c/${slug}/payroll/${sourceId}`;
     case "POS_SHIFT":
@@ -112,4 +115,6 @@ export const SOURCE_LABELS: Record<string, string> = {
   POS_REFUND: "Counter refund",
   POS_SHIFT: "Till difference",
   PAYROLL: "Payroll",
+  TRANSFER_OUT: "Transfer to sister company",
+  TRANSFER_IN: "Transfer from sister company",
 };
