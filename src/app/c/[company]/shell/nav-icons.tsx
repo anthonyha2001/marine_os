@@ -1,4 +1,7 @@
 import {
+  CalendarDays,
+  CheckCheck,
+  FileCheck2,
   Hash,
   TrendingUp,
   ArrowLeftRight,
@@ -55,6 +58,9 @@ export const NAV_ICONS: Record<NavIcon, LucideIcon> = {
   journal: BookOpen,
   chart: ListTree,
   profit: TrendingUp,
+  cheques: FileCheck2,
+  reconcile: CheckCheck,
+  appointments: CalendarDays,
   pos: ScanBarcode,
   vessels: Sailboat,
   jobCards: Hammer,

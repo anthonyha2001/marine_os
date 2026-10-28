@@ -102,6 +102,7 @@ export async function deleteSupplierPayment(companySlug: string, paymentId: stri
   const companyId = await companyIdFor(slug);
   const payment = await prisma.supplierPayment.findFirst({ where: { id: paymentId, companyId }, select: { id: true } });
   if (!payment) return { error: "This payment no longer exists." };
+  if (await prisma.cheque.count({ where: { supplierPaymentId: paymentId } })) return { error: "This payment is a cheque. On the Cheques page, mark it as bounced or cancelled instead." };
   await prisma.$transaction(async (tx) => {
     await removeEntries(tx, "SUPPLIER_PAYMENT", paymentId);
     await tx.supplierPayment.delete({ where: { id: paymentId } });

@@ -115,6 +115,7 @@ export const SOURCE_LABELS: Record<string, string> = {
   POS_REFUND: "Counter refund",
   POS_SHIFT: "Till difference",
   PAYROLL: "Payroll",
+  CHEQUE: "Cheque cleared",
   TRANSFER_OUT: "Transfer to sister company",
   TRANSFER_IN: "Transfer from sister company",
 };

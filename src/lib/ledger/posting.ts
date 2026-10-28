@@ -22,7 +22,8 @@ export type SourceType =
   | "POS_SHIFT"
   | "PAYROLL"
   | "TRANSFER_OUT"
-  | "TRANSFER_IN";
+  | "TRANSFER_IN"
+  | "CHEQUE";
 
 export type PostingLine = {
   accountId: string;
@@ -494,6 +495,36 @@ export async function postTransfer(
         : [
             { accountId: a.PURCHASES, debit: t.amount, description: memo },
             { accountId: a.INTERCOMPANY, credit: t.amount, description: memo },
+          ],
+  });
+}
+
+/**
+ * A cheque paid by the bank. Received: Dr Bank / Cr Cheques to collect (5113).
+ * Issued: Dr Cheques issued (403) / Cr Bank.
+ */
+export async function postChequeCleared(
+  tx: Tx,
+  c: { id: string; companyId: string; number: string; chequeNumber: string; direction: "RECEIVED" | "ISSUED"; partyName: string; amount: number; date: Date; bankAccountId: string; createdById: string },
+) {
+  const a = await systemAccounts(c.companyId, tx);
+  const memo = `Cheque ${c.chequeNumber} ${c.direction === "RECEIVED" ? "from" : "to"} ${c.partyName} cleared · ${c.number}`;
+  return postEntry(tx, {
+    companyId: c.companyId,
+    date: c.date,
+    memo,
+    sourceType: "CHEQUE",
+    sourceId: c.id,
+    createdById: c.createdById,
+    lines:
+      c.direction === "RECEIVED"
+        ? [
+            { accountId: c.bankAccountId, debit: c.amount, description: memo },
+            { accountId: a.CHEQUES_IN, credit: c.amount, description: memo },
+          ]
+        : [
+            { accountId: a.CHEQUES_OUT, debit: c.amount, description: memo },
+            { accountId: c.bankAccountId, credit: c.amount, description: memo },
           ],
   });
 }

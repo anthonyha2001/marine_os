@@ -23,6 +23,9 @@ export type NavIcon =
   | "journal"
   | "chart"
   | "profit"
+  | "cheques"
+  | "reconcile"
+  | "appointments"
   | "pos"
   | "vessels"
   | "jobCards"
@@ -105,6 +108,7 @@ export const NAV: NavGroup[] = [
       { label: "Cash & bank", path: "finance/cash", module: "accounting", icon: "cash" },
       { label: "Receipts", path: "finance/receipts", module: "invoices", icon: "receipts" },
       { label: "Vouchers", path: "finance/vouchers", module: "accounting", icon: "vouchers" },
+      { label: "Cheques", path: "finance/cheques", module: "accounting", icon: "cheques" },
       { label: "Credit notes", path: "finance/credit-notes", module: "invoices", icon: "creditNotes" },
       { label: "Statements", path: "finance/statements", module: "accounting", icon: "statements" },
       { label: "Reports", path: "finance/reports", module: "accounting", icon: "reports" },

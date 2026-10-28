@@ -129,6 +129,7 @@ export async function deleteReceipt(companySlug: string, receiptId: string): Pro
   const companyId = await companyIdFor(slug);
   const receipt = await prisma.customerReceipt.findFirst({ where: { id: receiptId, companyId }, select: { invoiceId: true } });
   if (!receipt) return { error: "This receipt no longer exists." };
+  if (await prisma.cheque.count({ where: { receiptId } })) return { error: "This receipt is a cheque. On the Cheques page, mark it as bounced or cancelled instead." };
   await prisma.$transaction(async (tx) => {
     await removeEntries(tx, "RECEIPT", receiptId);
     await tx.customerReceipt.delete({ where: { id: receiptId } });
