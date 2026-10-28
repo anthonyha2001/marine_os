@@ -21,6 +21,7 @@ const productSchema = z.object({
   priceHT: z.coerce.number({ message: "Enter a price" }).min(0, "Price can't be negative").max(10_000_000),
   minQuantity: z.coerce.number().int("Minimum quantity must be a whole number").min(0).default(0),
   barcodes: z.string().default(""),
+  trackSerials: z.boolean().default(false),
 });
 
 const BARCODE_PATTERN = /^[A-Za-z0-9-]{4,32}$/;
@@ -51,6 +52,7 @@ export async function saveProduct(
     priceHT: formData.get("priceHT"),
     minQuantity: formData.get("minQuantity") || 0,
     barcodes: formData.get("barcodes") ?? "",
+    trackSerials: formData.get("trackSerials") === "on",
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const data = parsed.data;
@@ -92,6 +94,7 @@ export async function saveProduct(
     supplierId: data.supplierId ?? null,
     priceHT: data.priceHT,
     minQuantity: data.minQuantity,
+    trackSerials: data.trackSerials,
     imageUrl,
   };
 
@@ -197,6 +200,7 @@ export async function quickCreateProduct(
           supplierId: data.supplierId ?? null,
           priceHT: data.priceHT,
           minQuantity: data.minQuantity,
+          trackSerials: data.trackSerials,
           barcodes: { create: codes.map((c) => ({ code: c })) },
         },
       });

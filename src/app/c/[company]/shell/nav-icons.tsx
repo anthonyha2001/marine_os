@@ -1,4 +1,5 @@
 import {
+  Hash,
   TrendingUp,
   ArrowLeftRight,
   ClipboardCheck,
@@ -59,6 +60,7 @@ export const NAV_ICONS: Record<NavIcon, LucideIcon> = {
   jobCards: Hammer,
   warranties: ShieldPlus,
   stockCounts: ClipboardCheck,
+  serials: Hash,
   transfers: ArrowLeftRight,
   staff: IdCard,
   payroll: Banknote,

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { deleteLandedCost } from "@/lib/actions/purchases";
 import { formatMoney, round2 } from "@/lib/money";
@@ -12,7 +13,7 @@ const fmt4 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD"
 export async function LandedCostsSection({ slug, purchaseId }: { slug: CompanySlug; purchaseId: string }) {
   const purchase = await prisma.purchase.findUnique({
     where: { id: purchaseId },
-    include: { landedCosts: { orderBy: { createdAt: "asc" } }, items: { include: { product: { select: { code: true, name: true } } } } },
+    include: { landedCosts: { orderBy: { createdAt: "asc" } }, items: { include: { product: { select: { code: true, name: true, trackSerials: true } } } }, serials: { select: { productId: true } } },
   });
   if (!purchase) return null;
   const total = round2(purchase.landedCosts.reduce((s, c) => s + Number(c.amount), 0));
@@ -57,6 +58,11 @@ export async function LandedCostsSection({ slug, purchaseId }: { slug: CompanySl
             <tr key={i.id}>
               <td className="py-2">
                 <span className="font-mono text-xs text-muted">{i.product.code}</span> {i.product.name}
+                {i.product.trackSerials && (
+                  <Link href={`/c/${slug}/inventory/serials?new=1&product=${i.productId}&purchase=${purchaseId}`} className="ml-2 text-xs text-brand hover:underline">
+                    Serial numbers ({purchase.serials.filter((x) => x.productId === i.productId).length}/{i.quantity})
+                  </Link>
+                )}
               </td>
               <td className="tabular py-2 text-right text-muted">{formatMoney(Number(i.unitPriceHT))}</td>
               <td className="tabular py-2 text-right font-semibold text-navy">{i.unitCost === null ? "—" : fmt4.format(Number(i.unitCost))}</td>

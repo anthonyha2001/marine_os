@@ -15,6 +15,7 @@ type ProductInput = {
   supplierId: string | null;
   priceHT: number;
   minQuantity: number;
+  trackSerials?: boolean;
   imageUrl: string | null;
   barcodes: string[];
 };
@@ -152,6 +153,13 @@ export function ProductForm({
               defaultValue={product?.minQuantity ?? 0}
               className={inputClass}
             />
+          </label>
+          <label className="flex items-start gap-2 pt-6 text-sm">
+            <input type="checkbox" name="trackSerials" defaultChecked={product?.trackSerials ?? false} className="mt-0.5 size-4 accent-brand" />
+            <span>
+              <span className="font-medium text-navy">Track serial numbers</span>
+              <span className="block text-xs text-muted">For engines, outboards… each unit is followed from purchase to customer.</span>
+            </span>
           </label>
         </div>
 

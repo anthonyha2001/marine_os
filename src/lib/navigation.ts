@@ -28,6 +28,7 @@ export type NavIcon =
   | "jobCards"
   | "warranties"
   | "stockCounts"
+  | "serials"
   | "transfers"
   | "staff"
   | "payroll"
@@ -89,6 +90,7 @@ export const NAV: NavGroup[] = [
     items: [
       { label: "Stock", path: "inventory", module: "inventory", icon: "stock", shortcut: "F6" },
       { label: "Services", path: "services", module: "services", icon: "services", shortcut: "F10" },
+      { label: "Serial numbers", path: "inventory/serials", module: "inventory", icon: "serials" },
       { label: "Stock counts", path: "inventory/counts", module: "inventory", icon: "stockCounts" },
       { label: "Transfers", path: "inventory/transfers", module: "inventory", icon: "transfers" },
       // New product / New service open a pop-up on their list page.

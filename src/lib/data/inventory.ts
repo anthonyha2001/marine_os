@@ -45,6 +45,7 @@ export type CatalogueProduct = {
   priceHT: number;
   minQuantity: number;
   active: boolean;
+  trackSerials: boolean;
   barcodes: string[];
 };
 
@@ -71,6 +72,7 @@ export async function getCatalogue(): Promise<CatalogueProduct[]> {
     priceHT: Number(p.priceHT),
     minQuantity: p.minQuantity,
     active: p.active,
+    trackSerials: p.trackSerials,
     barcodes: p.barcodes.map((b) => b.code),
   }));
 }
