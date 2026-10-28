@@ -7,6 +7,8 @@ const PUBLIC_PATHS = ["/login"];
 
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+  // Customer portal and shared offers: private links (a secret token in the URL), no login.
+  if (pathname.startsWith("/p/")) return NextResponse.next();
   const loggedIn = Boolean(await verifySession(request.cookies.get(SESSION_COOKIE)?.value));
   const isPublic = PUBLIC_PATHS.includes(pathname);
 

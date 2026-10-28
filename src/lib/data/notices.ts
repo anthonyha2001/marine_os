@@ -8,6 +8,7 @@ import { invoicesWithBalance } from "@/lib/data/ledger";
 import { listOffers } from "@/lib/data/sales";
 import { listTransfers } from "@/lib/data/stock-ops";
 import { isOpenCheque, listCheques } from "@/lib/data/cheques";
+import { listAppointments } from "@/lib/data/appointments";
 import { listJobCards, listWarranties, warrantyState } from "@/lib/data/workshop";
 import { formatMoney, round2 } from "@/lib/money";
 import { canAccessModule, type CompanySlug } from "@/lib/permissions";
@@ -26,11 +27,12 @@ export async function noticesFor(user: SessionUser, slug: CompanySlug): Promise<
   const todayIso = iso(today);
   const weekIso = iso(new Date(today.getTime() + 7 * DAY));
 
-  const [jobs, warranties, transfers, cheques] = await Promise.all([
+  const [jobs, warranties, transfers, cheques, appointments] = await Promise.all([
     can("workshop") ? listJobCards(slug) : [],
     can("workshop") ? listWarranties(slug) : [],
     can("inventory") ? listTransfers(slug) : [],
     can("accounting") ? listCheques(slug) : [],
+    can("workshop") ? listAppointments(slug) : [],
   ]);
   const [invoices, bills, products, orders, offers] = await Promise.all([
     can("invoices") ? invoicesWithBalance(slug) : [],
@@ -86,6 +88,10 @@ export async function noticesFor(user: SessionUser, slug: CompanySlug): Promise<
     notices.push({ label: `${plural(expiring.length, "offer")} expire this week`, detail: "Sent offers awaiting the customer’s answer", href: `${base}/offers`, tone: "blue" });
   }
 
+  const requested = appointments.filter((a) => a.status === "REQUESTED");
+  if (requested.length) {
+    notices.push({ label: `${plural(requested.length, "appointment request")} to confirm`, detail: "Booked online by customers", href: `${base}/appointments`, tone: "blue" });
+  }
   const chequesDue = cheques.filter((c) => isOpenCheque(c) && iso(c.dueDate) <= weekIso);
   if (chequesDue.length) {
     notices.push({ label: `${plural(chequesDue.length, "cheque")} due this week`, detail: `${formatMoney(round2(chequesDue.reduce((n, c) => n + c.amount, 0)))} to deposit or to be paid`, href: `${base}/finance/cheques`, tone: "amber" });

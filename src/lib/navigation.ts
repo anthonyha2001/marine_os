@@ -67,6 +67,7 @@ export const NAV: NavGroup[] = [
   {
     title: "Workshop",
     items: [
+      { label: "Appointments", path: "appointments", module: "workshop", icon: "appointments" },
       { label: "Job cards", path: "workshop", module: "workshop", icon: "jobCards" },
       { label: "Warranties", path: "warranties", module: "workshop", icon: "warranties" },
     ],
