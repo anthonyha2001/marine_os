@@ -95,5 +95,5 @@ export async function cancelMyAppointment(portalToken: string, appointmentId: st
   if (!a || (a.status !== "REQUESTED" && a.status !== "CONFIRMED")) return { error: "This appointment can't be cancelled." };
   await prisma.appointment.update({ where: { id: a.id }, data: { status: "CANCELLED", customerNote: "Cancelled by the customer" } });
   updateTag(appointmentsTag(a.companyId));
-  return {};
+  redirect(`/p/${portalToken}?cancelled=1`);
 }

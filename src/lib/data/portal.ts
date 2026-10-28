@@ -39,7 +39,7 @@ export async function portalData(customerId: string) {
   return {
     vessels,
     offers: offers.map((o) => ({ ...o, company: o.company.slug as CompanySlug, totalTTC: Number(o.totalTTC) })),
-    appointments: appointments.map((a) => ({ ...a, company: a.company.slug as CompanySlug })),
+    appointments: appointments.map((a) => ({ ...a, status: a.status as AppointmentStatus, company: a.company.slug as CompanySlug })),
     invoices,
     companies: companies.map((c) => ({ ...c, name: COMPANIES[c.slug as CompanySlug].name })),
   };

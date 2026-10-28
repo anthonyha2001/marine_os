@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Hammer } from "lucide-react";
 import { requireModule } from "@/lib/auth";
 import { createJobCardFromOffer } from "@/lib/actions/workshop";
+import { ShareOfferButton } from "@/components/share-link";
 import { listJobCards } from "@/lib/data/workshop";
 import { getOffer } from "@/lib/data/sales";
 import { OFFER_STATUSES } from "@/lib/offers";
@@ -44,6 +45,7 @@ async function OfferPage({
         action={
           <div className="flex flex-wrap gap-2">
             <OfferToolbar companySlug={slug} offerId={offer.id} />
+            {offer.status !== "REJECTED" && <ShareOfferButton companySlug={slug} offerId={offer.id} />}
             {canWorkshop && offer.status === "ACCEPTED" && (
               <form action={createJobCardFromOffer.bind(null, slug, offer.id)}>
                 <button type="submit" className={secondaryButton}>
@@ -62,6 +64,12 @@ async function OfferPage({
           </div>
         }
       />
+      {offer.respondedAt && (
+        <p className={`mt-4 rounded-lg px-3 py-2 text-sm ${offer.status === "ACCEPTED" ? "bg-green-50 text-success" : "bg-surface-2 text-navy"}`}>
+          {offer.status === "ACCEPTED" ? "Accepted" : "Declined"} online by {offer.respondedName} on {offer.respondedAt.toLocaleDateString("en-GB")}
+          {offer.customerNote && <span className="block text-muted">“{offer.customerNote}”</span>}
+        </p>
+      )}
       {offerJobs.length > 0 && (
         <p className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted">
           Job cards for this offer:

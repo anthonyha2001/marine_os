@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { Plus } from "lucide-react";
 import Link from "next/link";
+import { PortalLinkButton } from "@/components/share-link";
 import { requireModule } from "@/lib/auth";
 import { customerBalances, type CustomerBalance } from "@/lib/data/ledger";
 import { listCustomers } from "@/lib/data/sales";
@@ -125,6 +126,15 @@ async function CustomersContent({
               </span>
             </summary>
             <div className="max-w-2xl border-t border-border bg-background/40 p-5">
+              <div className="mb-4 flex flex-wrap items-center gap-4 text-sm">
+                <span className="flex items-center gap-1 text-muted">
+                  Customer portal: <PortalLinkButton companySlug={slug} customerId={c.id} hasLink={!!c.portalToken} token={c.portalToken} />
+                  <span className="text-xs">{c.portalToken ? "link active" : "no link yet"}</span>
+                </span>
+                <Link href={`/c/${slug}/vessels?q=${encodeURIComponent(c.name)}`} className="text-brand hover:underline">
+                  Boats →
+                </Link>
+              </div>
               <CustomerForm companySlug={slug} customer={c} />
             </div>
           </details>
