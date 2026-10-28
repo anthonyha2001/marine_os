@@ -50,6 +50,7 @@ export type CustomerOption = {
 export type OfferEditorValue = {
   id: string;
   customerId: string | null;
+  vesselId: string | null;
   customerName: string;
   customerAttention: string | null;
   customerAddress: string | null;
@@ -115,7 +116,9 @@ export function OfferEditor({
   defaultIntro,
   defaultTerms,
   offer,
+  vessels = [],
 }: {
+  vessels?: { id: string; customerId: string | null; label: string }[];
   companySlug: string;
   companyName: string;
   catalogue: CatalogueOption[];
@@ -143,6 +146,7 @@ export function OfferEditor({
   const today = new Date();
   const [header, setHeader] = useState({
     customerId: offer?.customerId ?? "",
+    vesselId: offer?.vesselId ?? "",
     customerName: offer?.customerName ?? "",
     customerAttention: offer?.customerAttention ?? "",
     customerAddress: offer?.customerAddress ?? "",
@@ -432,6 +436,19 @@ export function OfferEditor({
           <label className={labelClass}>
             Address
             <textarea rows={2} value={header.customerAddress} onChange={(e) => set("customerAddress", e.target.value)} className={inputClass} />
+          </label>
+          <label className={labelClass}>
+            Vessel
+            <select value={header.vesselId} onChange={(e) => set("vesselId", e.target.value)} className={inputClass} aria-label="Vessel">
+              <option value="">— No vessel —</option>
+              {vessels
+                .filter((v) => !header.customerId || v.customerId === header.customerId || v.id === header.vesselId)
+                .map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.label}
+                  </option>
+                ))}
+            </select>
           </label>
           {!header.customerId && (
             <label className="flex items-center gap-2 text-sm text-muted">

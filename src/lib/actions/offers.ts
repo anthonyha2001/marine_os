@@ -32,6 +32,7 @@ const offerSchema = z
   .object({
     customerId: z.string().optional().transform((v) => v || null),
     saveCustomer: z.boolean().default(true),
+    vesselId: z.string().optional().transform((v) => v || null),
     customerName: z.string().trim().min(2, "Enter the customer's name").max(200),
     customerAttention: text(200),
     customerAddress: text(1000),
@@ -86,6 +87,7 @@ function offerData(data: OfferInput, customerId: string | null) {
   const totals = offerTotals(data.lines, data.discountType, data.discountValue, data.applyVat);
   return {
     customerId,
+    vesselId: data.vesselId,
     customerName: data.customerName,
     customerAttention: data.customerAttention,
     customerAddress: data.customerAddress,

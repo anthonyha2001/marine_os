@@ -1,6 +1,10 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import { Hammer } from "lucide-react";
 import { requireModule } from "@/lib/auth";
+import { createJobCardFromOffer } from "@/lib/actions/workshop";
+import { listJobCards } from "@/lib/data/workshop";
 import { getOffer } from "@/lib/data/sales";
 import { OFFER_STATUSES } from "@/lib/offers";
 import { COMPANIES, canAccessModule } from "@/lib/permissions";
@@ -9,7 +13,7 @@ import { DeleteButton } from "@/components/delete-button";
 import { Modal } from "@/components/modal";
 import { round2 } from "@/lib/money";
 import { CustomInvoiceForm } from "../../invoices/custom-invoice-form";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, secondaryButton } from "@/components/ui";
 import { OfferEditor } from "../offer-editor";
 import { offerEditorData } from "../editor-data";
 import { InvoicingPanel } from "./invoicing-panel";
@@ -26,8 +30,10 @@ async function OfferPage({
 }) {
   const [{ company, offerId }, { saved, invoiced, invoice }] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "offers");
-  const [offer, data] = await Promise.all([getOffer(slug, offerId), offerEditorData(slug)]);
+  const canWorkshop = canAccessModule(user, slug, "workshop");
+  const [offer, data, jobs] = await Promise.all([getOffer(slug, offerId), offerEditorData(slug), canWorkshop ? listJobCards(slug) : []]);
   if (!offer) notFound();
+  const offerJobs = jobs.filter((j) => j.offer?.id === offer.id);
 
   return (
     <>
@@ -38,6 +44,13 @@ async function OfferPage({
         action={
           <div className="flex flex-wrap gap-2">
             <OfferToolbar companySlug={slug} offerId={offer.id} />
+            {canWorkshop && offer.status === "ACCEPTED" && (
+              <form action={createJobCardFromOffer.bind(null, slug, offer.id)}>
+                <button type="submit" className={secondaryButton}>
+                  <Hammer className="size-4" aria-hidden /> Start job card
+                </button>
+              </form>
+            )}
             {offer.invoiceCount === 0 && (
               <DeleteButton
                 bordered
@@ -49,6 +62,16 @@ async function OfferPage({
           </div>
         }
       />
+      {offerJobs.length > 0 && (
+        <p className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted">
+          Job cards for this offer:
+          {offerJobs.map((j) => (
+            <Link key={j.id} href={`/c/${slug}/workshop/${j.id}`} className="font-mono text-xs text-brand hover:underline">
+              {j.number}
+            </Link>
+          ))}
+        </p>
+      )}
       {invoiced && (
         <p role="status" className="mt-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-success">
           {invoiced === "1" ? "Invoice created." : `${invoiced} invoices created.`} The offer is now marked as accepted.
@@ -91,6 +114,7 @@ async function OfferPage({
         companyName={data.company.legalName || COMPANIES[slug].name}
         catalogue={data.catalogue}
         customers={data.customers}
+        vessels={data.vessels}
         defaultIntro={data.defaultIntro}
         defaultTerms={data.defaultTerms}
         offer={{

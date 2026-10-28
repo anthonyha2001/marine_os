@@ -122,6 +122,7 @@ async function loadOffer(companyId: string, id: string) {
     id: o.id,
     number: o.number,
     customerId: o.customerId,
+    vesselId: o.vesselId,
     customerName: o.customerName,
     customerAttention: o.customerAttention,
     customerAddress: o.customerAddress,

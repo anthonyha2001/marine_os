@@ -1,10 +1,9 @@
 "use server";
 
-import { Prisma } from "@prisma/client";
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { prisma, type Tx } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { requireModule } from "@/lib/auth";
 import { companyIdFor } from "@/lib/data/inventory";
 import { salesTags } from "@/lib/data/sales";
@@ -14,22 +13,12 @@ import { invoiceVatSplit, projectedPayments } from "@/lib/offers";
 import { postInvoice, reverseEntries } from "@/lib/ledger/posting";
 import { payablesTag } from "@/lib/data/accounting";
 import { ledgerTag } from "@/lib/data/ledger";
-import type { CompanySlug } from "@/lib/permissions";
 import { businessToday } from "@/lib/dates";
+import { nextInvoiceNumber, withNumberRetry } from "@/lib/invoice-numbers";
+import { createInvoiceWithLines } from "@/lib/invoicing";
 
-const NUMBER_PREFIX: Record<CompanySlug, string> = { "xpert-marine": "XM", "eliche-radice": "ER" };
 const longDate = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-
-async function nextInvoiceNumber(tx: Tx, slug: CompanySlug, year: number) {
-  const prefix = `${NUMBER_PREFIX[slug]}-INV-${year}-`;
-  const last = await tx.invoice.findFirst({
-    where: { number: { startsWith: prefix } },
-    orderBy: { number: "desc" },
-    select: { number: true },
-  });
-  return prefix + String((last ? Number(last.number.slice(prefix.length)) : 0) + 1).padStart(4, "0");
-}
 
 /** Today (Beirut date) as midnight UTC, the way document dates are stored. */
 function todayUtc() {
@@ -76,18 +65,6 @@ function fromOffer(offer: LoadedOffer) {
 
 function offerReference(offer: LoadedOffer) {
   return `As per our offer ${offer.number} dated ${longDate.format(offer.offerDate)}${offer.subject ? ` – ${offer.subject}` : ""}. Offer total ${money.format(Number(offer.totalTTC))} incl. VAT.`;
-}
-
-/** Run invoice creation, retrying if two people race for the same number. */
-async function withNumberRetry<T>(fn: () => Promise<T>) {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await fn();
-    } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002" && attempt < 3) continue;
-      throw e;
-    }
-  }
 }
 
 /**
@@ -268,3 +245,73 @@ export async function cancelInvoice(companySlug: string, invoiceId: string): Pro
   return {};
 }
 
+
+const standaloneSchema = z.object({
+  customerId: z.string().nullable().optional(),
+  customerName: z.string().trim().max(200).optional(),
+  customerAddress: z.string().trim().max(500).optional(),
+  customerTaxNumber: z.string().trim().max(100).optional(),
+  vesselId: z.string().nullable().optional(),
+  subject: z.string().trim().max(300).optional(),
+  reference: z.string().trim().max(200).optional(),
+  notes: z.string().trim().max(2000).optional(),
+  applyVat: z.boolean(),
+  dueDays: z.number().int().min(0).max(365),
+  lines: z
+    .array(
+      z.object({
+        title: z.string().trim().min(1, "Every line needs a description").max(300),
+        description: z.string().trim().max(1000).optional(),
+        quantity: z.number().positive("Quantities must be more than 0"),
+        unitPrice: z.number().min(0, "Prices can't be negative"),
+      }),
+    )
+    .min(1, "Add at least one line"),
+});
+
+/** An invoice with neither an offer nor a job card: any customer, any lines. */
+export async function createStandaloneInvoice(companySlug: string, _prev: CustomInvoiceState, formData: FormData): Promise<CustomInvoiceState> {
+  const { user, slug } = await requireModule(companySlug, "invoices");
+  let raw: unknown;
+  try {
+    raw = JSON.parse(String(formData.get("payload") ?? ""));
+  } catch {
+    return { error: "The form couldn't be read. Please try again." };
+  }
+  const parsed = standaloneSchema.safeParse(raw);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const data = parsed.data;
+  const saved = data.customerId ? await prisma.customer.findUnique({ where: { id: data.customerId } }) : null;
+  if (data.customerId && !saved) return { error: "That customer no longer exists." };
+  if (!saved && (data.customerName ?? "").length < 2) return { error: "Choose a customer or type the customer's name." };
+  const total = data.lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
+  if (total <= 0) return { error: "The invoice total must be more than 0." };
+
+  const companyId = await companyIdFor(slug);
+  const today = todayUtc();
+  const invoice = await withNumberRetry(() =>
+    prisma.$transaction(
+      (tx) =>
+        createInvoiceWithLines(tx, {
+          slug,
+          companyId,
+          createdById: user.id,
+          invoiceDate: today,
+          dueDate: new Date(today.getTime() + data.dueDays * 86400000),
+          customer: saved
+            ? { id: saved.id, name: saved.name, address: saved.address, email: saved.email, phone: saved.phone, taxNumber: saved.taxNumber, attention: saved.contactName }
+            : { id: null, name: data.customerName!, address: data.customerAddress || null, taxNumber: data.customerTaxNumber || null },
+          subject: data.subject || null,
+          reference: data.reference || null,
+          notes: data.notes || null,
+          applyVat: data.applyVat,
+          lines: data.lines,
+          vesselId: data.vesselId || null,
+        }),
+      TRANSACTION_OPTIONS,
+    ),
+  );
+  updateTag(salesTags.invoices(companyId));
+  updateTag(ledgerTag(companyId));
+  redirect(`/c/${slug}/invoices/${invoice.id}`);
+}

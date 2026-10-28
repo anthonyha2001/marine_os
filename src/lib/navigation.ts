@@ -23,6 +23,11 @@ export type NavIcon =
   | "journal"
   | "chart"
   | "pos"
+  | "vessels"
+  | "jobCards"
+  | "warranties"
+  | "stockCounts"
+  | "transfers"
   | "staff"
   | "payroll"
   | "posSales"
@@ -50,7 +55,15 @@ export const NAV: NavGroup[] = [
       { label: "Offers", path: "offers", module: "offers", icon: "offers", shortcut: "Shift+F6" },
       { label: "Invoices", path: "invoices", module: "invoices", icon: "invoices", shortcut: "Shift+F7" },
       { label: "Customers", path: "customers", module: "customers", icon: "customers", shortcut: "Shift+F4" },
+      { label: "Vessels", path: "vessels", module: "customers", icon: "vessels" },
       { label: "New offer", path: "offers/new", module: "offers", shortcut: "Shift+F2", hidden: true },
+    ],
+  },
+  {
+    title: "Workshop",
+    items: [
+      { label: "Job cards", path: "workshop", module: "workshop", icon: "jobCards" },
+      { label: "Warranties", path: "warranties", module: "workshop", icon: "warranties" },
     ],
   },
   {
@@ -75,6 +88,8 @@ export const NAV: NavGroup[] = [
     items: [
       { label: "Stock", path: "inventory", module: "inventory", icon: "stock", shortcut: "F6" },
       { label: "Services", path: "services", module: "services", icon: "services", shortcut: "F10" },
+      { label: "Stock counts", path: "inventory/counts", module: "inventory", icon: "stockCounts" },
+      { label: "Transfers", path: "inventory/transfers", module: "inventory", icon: "transfers" },
       // New product / New service open a pop-up on their list page.
       { label: "New product", path: "inventory?new=1", module: "inventory", shortcut: "F2", hidden: true },
       { label: "New service", path: "services?new=1", module: "services", shortcut: "F9", hidden: true },

@@ -33,6 +33,8 @@ export const DEFAULT_CHART: Seed[] = [
   { code: "425", name: "Staff advances", type: "ASSET", kind: "OTHER", system: true },
   { code: "4427", name: "VAT collected", type: "LIABILITY", kind: "VAT_OUT", system: true },
   { code: "455", name: "Partners' current accounts", type: "LIABILITY", kind: "OTHER" },
+  // Goods sent to / received from the sister company (debit: they owe us; credit: we owe them).
+  { code: "458", name: "Sister company account", type: "ASSET", kind: "OTHER", system: true },
   // Assets
   { code: "411", name: "Customers", type: "ASSET", kind: "RECEIVABLE", system: true },
   { code: "4426", name: "VAT recoverable", type: "ASSET", kind: "VAT_IN", system: true },
@@ -80,7 +82,7 @@ export async function ensureChart(companyId: string, db: Tx | typeof prisma = pr
   });
 }
 
-export type SystemAccounts = Record<"CASH" | "CASH_LBP" | "BANK" | "RECEIVABLE" | "PAYABLE" | "SALARIES" | "STAFF_ADVANCES" | "VAT_IN" | "VAT_OUT" | "SALES" | "PURCHASES", string>;
+export type SystemAccounts = Record<"CASH" | "CASH_LBP" | "BANK" | "RECEIVABLE" | "PAYABLE" | "INTERCOMPANY" | "SALARIES" | "STAFF_ADVANCES" | "VAT_IN" | "VAT_OUT" | "SALES" | "PURCHASES", string>;
 
 const SYSTEM_CODES: Record<keyof SystemAccounts, string> = {
   CASH: "530",
@@ -88,6 +90,7 @@ const SYSTEM_CODES: Record<keyof SystemAccounts, string> = {
   BANK: "512",
   RECEIVABLE: "411",
   PAYABLE: "401",
+  INTERCOMPANY: "458",
   SALARIES: "641",
   STAFF_ADVANCES: "425",
   VAT_IN: "4426",

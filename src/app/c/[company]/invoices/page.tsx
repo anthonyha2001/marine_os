@@ -3,12 +3,16 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { requireModule } from "@/lib/auth";
 import { invoiceSettlements } from "@/lib/data/ledger";
-import { listInvoices, listOffers } from "@/lib/data/sales";
+import { getCatalogue } from "@/lib/data/inventory";
+import { listCustomers, listInvoices, listOffers } from "@/lib/data/sales";
+import { vesselOptions } from "@/lib/data/vessels";
 import { formatMoney, round2 } from "@/lib/money";
 import { Modal } from "@/components/modal";
 import { COMPANIES } from "@/lib/permissions";
 import { cardClass, PageHeader, ButtonLink, ProgressBar, SearchBar } from "@/components/ui";
 import { CustomInvoiceForm } from "./custom-invoice-form";
+import { StandaloneInvoiceForm } from "./standalone-invoice-form";
+import { LinkTabs } from "../finance/finance-ui";
 import { InvoiceStatusBadge } from "./status-badge";
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "UTC" });
@@ -23,7 +27,15 @@ async function InvoicesContent({
   const [{ company }, { q = "", new: creating }] = await Promise.all([params, searchParams]);
   const { slug } = await requireModule(company, "invoices");
   const needle = q.trim().toLowerCase();
-  const [raw, offers, settled] = await Promise.all([listInvoices(slug), creating ? listOffers(slug) : [], invoiceSettlements(slug)]);
+  const custom = creating === "custom";
+  const [raw, offers, settled, customers, vessels, catalogue] = await Promise.all([
+    listInvoices(slug),
+    creating && !custom ? listOffers(slug) : [],
+    invoiceSettlements(slug),
+    custom ? listCustomers() : [],
+    custom ? vesselOptions() : [],
+    custom ? getCatalogue() : [],
+  ]);
   const all = raw.map((i) => {
     const s = settled.get(i.id) ?? { paid: 0, credited: 0 };
     const done = round2(s.paid + s.credited);
@@ -46,12 +58,30 @@ async function InvoicesContent({
       <PageHeader
         eyebrow={COMPANIES[slug].name}
         title="Invoices"
-        description="Created from offers: one per scheduled payment, or a custom amount."
+        description="Three ways to invoice: from an offer (its payment plan), from a workshop job card, or a custom invoice with any lines."
         action={<ButtonLink icon={Plus} href={`${base}?new=1`}>New invoice</ButtonLink>}
       />
 
       {creating && (
-        <Modal title="New invoice" closeHref={base} size="md">
+        <Modal title="New invoice" closeHref={base} size={custom ? "xl" : "md"}>
+          <div className="mb-4">
+            <LinkTabs
+              active={custom ? "custom" : "offer"}
+              tabs={[
+                { key: "offer", label: "From an offer", href: `${base}?new=offer` },
+                { key: "custom", label: "Custom invoice", href: `${base}?new=custom` },
+              ]}
+            />
+          </div>
+          {custom ? (
+            <StandaloneInvoiceForm
+              key={crypto.randomUUID()}
+              companySlug={slug}
+              customers={customers.map((c) => ({ id: c.id, name: c.name }))}
+              vessels={vessels}
+              catalogue={catalogue.filter((c) => c.active).map((c) => ({ id: c.id, code: c.code, name: c.name, type: c.type, priceHT: c.priceHT }))}
+            />
+          ) : (
           <CustomInvoiceForm
             key={crypto.randomUUID()}
             companySlug={slug}
@@ -68,6 +98,7 @@ async function InvoicesContent({
                 remaining: round2(o.totalTTC - o.invoicedTTC),
               }))}
           />
+          )}
         </Modal>
       )}
 

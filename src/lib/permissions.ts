@@ -64,6 +64,7 @@ export const MODULES = {
   marketing: { label: "Marketing", path: "marketing" },
   accounting: { label: "Accounting", path: "accounting" },
   payroll: { label: "Payroll", path: "payroll" },
+  workshop: { label: "Workshop", path: "workshop" },
   tasks: { label: "Tasks", path: "tasks" },
   team: { label: "Team & roles", path: "team" },
   settings: { label: "Company details", path: "settings" },
@@ -75,11 +76,11 @@ const ALL_MODULES = Object.keys(MODULES) as ModuleKey[];
 export const ROLE_MODULES: Record<Role, ModuleKey[]> = {
   ADMIN: ALL_MODULES,
   MANAGER: ALL_MODULES,
-  STOCK_WORKER: ["dashboard", "inventory", "services", "purchases", "suppliers", "tasks"],
-  REGULAR_WORKER: ["dashboard", "tasks"],
+  STOCK_WORKER: ["dashboard", "inventory", "services", "purchases", "suppliers", "workshop", "tasks"],
+  REGULAR_WORKER: ["dashboard", "workshop", "tasks"],
   MARKETING_MANAGER: ["dashboard", "offers", "customers", "marketing", "tasks"],
   CASHIER: ["dashboard", "sales", "tasks"],
-  ACCOUNTANT: ["dashboard", "purchases", "suppliers", "offers", "customers", "invoices", "accounting", "payroll", "sales", "tasks"],
+  ACCOUNTANT: ["dashboard", "purchases", "suppliers", "offers", "customers", "invoices", "accounting", "payroll", "workshop", "sales", "tasks"],
 };
 
 type Actor = { role: Role; companySlug: CompanySlug | null };
