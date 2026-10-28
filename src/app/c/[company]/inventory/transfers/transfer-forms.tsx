@@ -37,7 +37,7 @@ export function SendTransferForm({ companySlug, toCompany, products }: { company
       className="space-y-4"
     >
       <p className="rounded-lg bg-background p-3 text-sm">
-        To <span className="font-semibold text-navy">{toCompany.name}</span>. The goods leave your stock now and arrive in theirs when they confirm receipt. Valued at the last purchase price.
+        To <span className="font-semibold text-navy">{toCompany.name}</span>. The goods leave your stock now and arrive in theirs when they confirm receipt. Valued at your average cost (purchases incl. landed costs).
       </p>
       <div className="relative">
         <input

@@ -13,6 +13,7 @@ import { ledgerTag } from "@/lib/data/ledger";
 import { TRANSACTION_OPTIONS } from "@/lib/item-codes";
 import { purchaseTotals, round2 } from "@/lib/money";
 import { postPurchase } from "@/lib/ledger/posting";
+import { recomputePurchaseCosts } from "@/lib/costing";
 
 export type PurchaseFormState = { error?: string };
 
@@ -113,6 +114,7 @@ export async function createPurchase(
       purchaseId = await prisma.$transaction(async (tx) => {
         const purchase = await tx.purchase.create({ select: { id: true }, data: purchaseData });
         await postPurchase(tx, { id: purchase.id, ...ledgerFields });
+        await recomputePurchaseCosts(tx, purchase.id);
         const updated = await tx.purchaseOrder.updateMany({
           where: { id: orderId, companyId, status: { in: ["DRAFT", "SENT"] }, purchaseId: null },
           data: { status: "RECEIVED", purchaseId: purchase.id },
@@ -125,6 +127,7 @@ export async function createPurchase(
       purchaseId = await prisma.$transaction(async (tx) => {
         const purchase = await tx.purchase.create({ select: { id: true }, data: purchaseData });
         await postPurchase(tx, { id: purchase.id, ...ledgerFields });
+        await recomputePurchaseCosts(tx, purchase.id);
         return purchase.id;
       }, TRANSACTION_OPTIONS);
     }
@@ -147,4 +150,37 @@ export async function createPurchase(
   updateTag(ledgerTag(companyId));
   if (data.purchaseOrderId) updateTag(poTag(companyId));
   redirect(`/c/${slug}/purchases/${purchaseId}`);
+}
+
+export type LandedCostState = { error?: string };
+
+/** Add freight / customs / clearing to a purchase; item costs are recalculated. */
+export async function addLandedCost(companySlug: string, purchaseId: string, _prev: LandedCostState, formData: FormData): Promise<LandedCostState> {
+  const { slug } = await requireModule(companySlug, "purchases");
+  const companyId = await companyIdFor(slug);
+  const description = String(formData.get("description") ?? "").trim().slice(0, 200);
+  const amount = round2(Number(formData.get("amount")));
+  if (description.length < 2) return { error: "Describe the cost (e.g. Sea freight, Customs duty)." };
+  if (!Number.isFinite(amount) || amount <= 0) return { error: "Enter the amount excl. VAT." };
+  const purchase = await prisma.purchase.findFirst({ where: { id: purchaseId, companyId }, select: { id: true } });
+  if (!purchase) return { error: "This purchase no longer exists." };
+  await prisma.$transaction(async (tx) => {
+    await tx.landedCost.create({ data: { purchaseId, description, amount } });
+    await recomputePurchaseCosts(tx, purchaseId);
+  }, TRANSACTION_OPTIONS);
+  updateTag(tags.purchases(companyId));
+  redirect(`/c/${slug}/purchases/${purchaseId}?landed=1`);
+}
+
+export async function deleteLandedCost(companySlug: string, purchaseId: string, landedCostId: string): Promise<{ error?: string }> {
+  const { slug } = await requireModule(companySlug, "purchases");
+  const companyId = await companyIdFor(slug);
+  const found = await prisma.landedCost.findFirst({ where: { id: landedCostId, purchase: { id: purchaseId, companyId } }, select: { id: true } });
+  if (!found) return { error: "This cost no longer exists." };
+  await prisma.$transaction(async (tx) => {
+    await tx.landedCost.delete({ where: { id: landedCostId } });
+    await recomputePurchaseCosts(tx, purchaseId);
+  }, TRANSACTION_OPTIONS);
+  updateTag(tags.purchases(companyId));
+  return {};
 }

@@ -1,4 +1,5 @@
 import {
+  TrendingUp,
   ArrowLeftRight,
   ClipboardCheck,
   Sailboat,
@@ -52,6 +53,7 @@ export const NAV_ICONS: Record<NavIcon, LucideIcon> = {
   reports: BarChart3,
   journal: BookOpen,
   chart: ListTree,
+  profit: TrendingUp,
   pos: ScanBarcode,
   vessels: Sailboat,
   jobCards: Hammer,

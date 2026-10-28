@@ -5,7 +5,10 @@ import { FileText, ReceiptText, ShieldPlus } from "lucide-react";
 import { requireModule } from "@/lib/auth";
 import { dayFormat } from "@/lib/dates";
 import { getCatalogue } from "@/lib/data/inventory";
-import { listCustomers } from "@/lib/data/sales";
+import { averageCosts } from "@/lib/costing";
+import { companyIdFor } from "@/lib/data/inventory";
+import { jobProfit } from "@/lib/data/profit";
+import { getCompanyProfile, listCustomers } from "@/lib/data/sales";
 import { vesselOptions } from "@/lib/data/vessels";
 import { JOB_STATUS, JOB_TONE, getJobCard } from "@/lib/data/workshop";
 import { VAT_RATE, formatMoney, round2 } from "@/lib/money";
@@ -27,6 +30,11 @@ async function JobDetail({ params, searchParams }: { params: Promise<{ company: 
   const canInvoice = canAccessModule(user, slug, "invoices");
   const billTTC = round2(job.toInvoiceHT * (job.applyVat ? 1 + VAT_RATE : 1));
   const [vessels, customers, catalogue] = editable ? await Promise.all([vesselOptions(), listCustomers(), getCatalogue()]) : [[], [], []];
+  // Profit is for managers and accountants, not the workshop.
+  const showProfit = canAccessModule(user, slug, "accounting");
+  const profit = showProfit
+    ? jobProfit(job, await averageCosts(await companyIdFor(slug)), (await getCompanyProfile(slug)).labourCostPerHour)
+    : null;
 
   return (
     <>
@@ -78,6 +86,25 @@ async function JobDetail({ params, searchParams }: { params: Promise<{ company: 
           </Link>
         ))}
       </div>
+
+      {profit && (
+        <div className={`${cardClass} mt-4 grid gap-4 p-4 text-sm sm:grid-cols-5`}>
+          {(
+            [
+              ["Work billed (excl. VAT)", formatMoney(profit.revenue)],
+              ["Parts at cost", formatMoney(profit.parts)],
+              [`Labour ${profit.hours} h at cost`, formatMoney(profit.labour)],
+              ["Profit", formatMoney(profit.profit)],
+              ["Margin", profit.margin === null ? "—" : `${profit.margin}%`],
+            ] as [string, string][]
+          ).map(([label, value], i) => (
+            <div key={label}>
+              <p className="text-xs uppercase tracking-wider text-muted">{label}</p>
+              <p className={`tabular mt-0.5 font-semibold ${i === 3 && profit.profit < 0 ? "text-danger" : "text-navy"}`}>{value}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="mt-6">
         {editable ? (

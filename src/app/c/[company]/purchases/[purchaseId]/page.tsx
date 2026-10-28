@@ -4,6 +4,7 @@ import { requireModule } from "@/lib/auth";
 import { getPurchase } from "@/lib/data/inventory";
 import { formatMoney, VAT_RATE } from "@/lib/money";
 import { COMPANIES, canAccessModule } from "@/lib/permissions";
+import { LandedCostsSection } from "./landed-costs";
 import { PaymentsSection } from "./payments-section";
 import Link from "next/link";
 import { ButtonLink, PageHeader, cardClass } from "@/components/ui";
@@ -72,6 +73,8 @@ async function PurchaseDetail({
         canRecord={canAccessModule(user, slug, "accounting")}
         paying={pay === "1"}
       />
+
+      <LandedCostsSection slug={slug} purchaseId={purchase.id} />
 
       <div className={`${cardClass} mt-6 overflow-x-auto`}>
         <table className="w-full min-w-[40rem] text-left text-sm">

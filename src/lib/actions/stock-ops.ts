@@ -9,6 +9,7 @@ import { businessToday } from "@/lib/dates";
 import { companyIdFor, tags } from "@/lib/data/inventory";
 import { ledgerTag } from "@/lib/data/ledger";
 import { stockOpsTag } from "@/lib/data/stock-ops";
+import { averageCosts } from "@/lib/costing";
 import { TRANSACTION_OPTIONS } from "@/lib/item-codes";
 import { nextNumber } from "@/lib/ledger/numbering";
 import { postTransfer, removeEntries } from "@/lib/ledger/posting";
@@ -132,18 +133,6 @@ const transferSchema = z.object({
   lines: z.array(z.object({ productId: z.string().min(1), quantity: z.number().int().positive("Quantities must be whole numbers above 0") })).min(1, "Add at least one product"),
 });
 
-/** Last purchase price of each product (any company); the catalogue price if never bought. */
-async function unitCosts(productIds: string[]) {
-  const [items, products] = await Promise.all([
-    prisma.purchaseItem.findMany({ where: { productId: { in: productIds } }, orderBy: { purchase: { purchaseDate: "desc" } }, select: { productId: true, unitPriceHT: true } }),
-    prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, priceHT: true } }),
-  ]);
-  const cost = new Map<string, number>();
-  for (const i of items) if (!cost.has(i.productId)) cost.set(i.productId, Number(i.unitPriceHT));
-  for (const p of products) if (!cost.has(p.id)) cost.set(p.id, Number(p.priceHT));
-  return cost;
-}
-
 /** Send goods to the sister company: stock leaves now, arrives when they receive it. */
 export async function sendTransfer(companySlug: string, _prev: StockFormState, formData: FormData): Promise<StockFormState> {
   const { user, slug, companyId } = await ctx(companySlug);
@@ -161,7 +150,7 @@ export async function sendTransfer(companySlug: string, _prev: StockFormState, f
   if (!to) return { error: "That company doesn't exist." };
   const ids = [...new Set(data.lines.map((l) => l.productId))];
   if (ids.length !== data.lines.length) return { error: "Each product can appear only once." };
-  const [stock, cost] = await Promise.all([stockOf(companyId, ids), unitCosts(ids)]);
+  const [stock, cost] = await Promise.all([stockOf(companyId, ids), averageCosts(companyId)]);
   const products = await prisma.product.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } });
   const name = new Map(products.map((p) => [p.id, p.name]));
   for (const l of data.lines) {

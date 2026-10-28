@@ -32,6 +32,7 @@ export type CompanyProfile = {
   registrationNumber: string | null;
   bankDetails: string | null;
   offerTerms: string | null;
+  labourCostPerHour: number;
 };
 
 async function loadCompanyProfile(companyId: string): Promise<CompanyProfile> {
@@ -51,6 +52,7 @@ async function loadCompanyProfile(companyId: string): Promise<CompanyProfile> {
     registrationNumber: c.registrationNumber,
     bankDetails: c.bankDetails,
     offerTerms: c.offerTerms,
+    labourCostPerHour: Number(c.labourCostPerHour),
   };
 }
 

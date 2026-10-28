@@ -9,6 +9,7 @@ import { businessToday } from "@/lib/dates";
 import { companyIdFor, tags } from "@/lib/data/inventory";
 import { ledgerTag } from "@/lib/data/ledger";
 import { posTag } from "@/lib/data/pos";
+import { averageCosts } from "@/lib/costing";
 import { TRANSACTION_OPTIONS } from "@/lib/item-codes";
 import { nextNumber } from "@/lib/ledger/numbering";
 import { postPosRefund, postPosSale, postShiftDifference } from "@/lib/ledger/posting";
@@ -176,11 +177,12 @@ export async function completeSale(companySlug: string, payload: unknown): Promi
   if (Math.abs(rate - data.rate) > 0.001) return { error: "The exchange rate was just changed. Check the amounts and try again.", };
 
   const byId = new Map(products.map((p) => [p.id, p]));
+  const costs = await averageCosts(companyId);
   if (data.lines.some((l) => !byId.has(l.productId))) return { error: "One of the products no longer exists. Remove it and scan again." };
   const lines = data.lines.map((l, position) => {
     const p = byId.get(l.productId)!;
     const unitPriceHT = Number(p.priceHT);
-    return { position, productId: p.id, code: p.code, name: p.name, quantity: l.quantity, unitPriceHT, lineTotalHT: round2(unitPriceHT * l.quantity) };
+    return { position, productId: p.id, code: p.code, name: p.name, quantity: l.quantity, unitPriceHT, lineTotalHT: round2(unitPriceHT * l.quantity), unitCost: costs.get(p.id) ?? 0 };
   });
   const totals = saleTotals(lines, data.discountPct);
   const pay = settle({ totalTTC: totals.totalTTC, rate, paidUsd: data.paidUsd, paidLbp: data.paidLbp, paidCard: data.paidCard, changeCurrency: data.changeCurrency });

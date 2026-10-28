@@ -30,6 +30,7 @@ const companySchema = z.object({
   registrationNumber: text(100),
   bankDetails: text(1000),
   offerTerms: text(5000),
+  labourCostPerHour: z.coerce.number({ message: "Enter the labour cost per hour" }).min(0, "The labour cost can't be negative").max(10000),
 });
 
 const FIELDS = Object.keys(companySchema.shape);

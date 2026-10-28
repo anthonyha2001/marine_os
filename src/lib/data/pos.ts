@@ -113,6 +113,7 @@ async function loadSales(companyId: string) {
       quantity: l.quantity,
       unitPriceHT: Number(l.unitPriceHT),
       lineTotalHT: Number(l.lineTotalHT),
+      unitCost: Number(l.unitCost),
       refunded: l.refundLines.reduce((n, r) => n + r.quantity, 0),
     })),
     refunds: s.refunds.map((r) => ({

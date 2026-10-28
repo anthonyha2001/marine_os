@@ -22,6 +22,7 @@ export type NavIcon =
   | "reports"
   | "journal"
   | "chart"
+  | "profit"
   | "pos"
   | "vessels"
   | "jobCards"
@@ -105,6 +106,7 @@ export const NAV: NavGroup[] = [
       { label: "Credit notes", path: "finance/credit-notes", module: "invoices", icon: "creditNotes" },
       { label: "Statements", path: "finance/statements", module: "accounting", icon: "statements" },
       { label: "Reports", path: "finance/reports", module: "accounting", icon: "reports" },
+      { label: "Profit", path: "finance/profit", module: "accounting", icon: "profit" },
       { label: "Journal", path: "finance/journal", module: "accounting", icon: "journal" },
       { label: "Chart of accounts", path: "finance/accounts", module: "accounting", icon: "chart" },
     ],

@@ -13,6 +13,7 @@ import { vesselsTag } from "@/lib/data/vessels";
 import { workshopTag } from "@/lib/data/workshop";
 import { withNumberRetry } from "@/lib/invoice-numbers";
 import { createInvoiceWithLines } from "@/lib/invoicing";
+import { averageCosts } from "@/lib/costing";
 import { TRANSACTION_OPTIONS } from "@/lib/item-codes";
 import { nextNumber } from "@/lib/ledger/numbering";
 import { round2 } from "@/lib/money";
@@ -226,6 +227,8 @@ export async function saveJobCard(companySlug: string, jobId: string, _prev: Wor
 async function stockOut(tx: Tx, companyId: string, jobId: string) {
   const parts = await tx.jobCardLine.findMany({ where: { jobCardId: jobId, kind: "PART", productId: { not: null } }, include: { product: { select: { type: true } } } });
   const moves = parts.filter((l) => l.product?.type === "PRODUCT" && Number(l.quantity) > 0);
+  const costs = await averageCosts(companyId, tx);
+  for (const l of moves) await tx.jobCardLine.update({ where: { id: l.id }, data: { unitCost: costs.get(l.productId!) ?? 0 } });
   if (moves.length) {
     await tx.stockMovement.createMany({
       data: moves.map((l) => ({ companyId, productId: l.productId!, quantity: -Math.round(Number(l.quantity)), type: "JOB_CARD", jobCardId: jobId })),

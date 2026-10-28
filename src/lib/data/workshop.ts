@@ -37,6 +37,7 @@ async function loadJobCards(companyId: string) {
       quantity: Number(l.quantity),
       unitPrice: Number(l.unitPrice),
       lineTotal: Number(l.lineTotal),
+      unitCost: Number(l.unitCost),
       billable: l.billable,
       invoice: l.invoice && l.invoice.status !== "CANCELLED" ? { id: l.invoice.id, number: l.invoice.number } : null,
     }));

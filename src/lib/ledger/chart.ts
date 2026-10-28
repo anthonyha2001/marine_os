@@ -28,6 +28,8 @@ export const DEFAULT_CHART: Seed[] = [
   // Liabilities
   { code: "164", name: "Bank loans", type: "LIABILITY", kind: "OTHER" },
   { code: "401", name: "Suppliers", type: "LIABILITY", kind: "PAYABLE", system: true },
+  // Cheques we gave to suppliers that the bank has not paid yet.
+  { code: "403", name: "Cheques issued", type: "LIABILITY", kind: "OTHER", system: true },
   { code: "421", name: "Salaries payable", type: "LIABILITY", kind: "OTHER" },
   // Money advanced to staff, paid back through payroll.
   { code: "425", name: "Staff advances", type: "ASSET", kind: "OTHER", system: true },
@@ -38,6 +40,8 @@ export const DEFAULT_CHART: Seed[] = [
   // Assets
   { code: "411", name: "Customers", type: "ASSET", kind: "RECEIVABLE", system: true },
   { code: "4426", name: "VAT recoverable", type: "ASSET", kind: "VAT_IN", system: true },
+  // Customer cheques held or deposited, not yet cleared by the bank.
+  { code: "5113", name: "Cheques to collect", type: "ASSET", kind: "OTHER", system: true },
   { code: "512", name: "Bank", type: "ASSET", kind: "BANK", system: true },
   { code: "530", name: "Cash", type: "ASSET", kind: "CASH", system: true },
   // LBP notes in the till, kept at their USD value on the day they were taken.
@@ -82,7 +86,7 @@ export async function ensureChart(companyId: string, db: Tx | typeof prisma = pr
   });
 }
 
-export type SystemAccounts = Record<"CASH" | "CASH_LBP" | "BANK" | "RECEIVABLE" | "PAYABLE" | "INTERCOMPANY" | "SALARIES" | "STAFF_ADVANCES" | "VAT_IN" | "VAT_OUT" | "SALES" | "PURCHASES", string>;
+export type SystemAccounts = Record<"CASH" | "CASH_LBP" | "BANK" | "RECEIVABLE" | "PAYABLE" | "CHEQUES_IN" | "CHEQUES_OUT" | "INTERCOMPANY" | "SALARIES" | "STAFF_ADVANCES" | "VAT_IN" | "VAT_OUT" | "SALES" | "PURCHASES", string>;
 
 const SYSTEM_CODES: Record<keyof SystemAccounts, string> = {
   CASH: "530",
@@ -90,6 +94,8 @@ const SYSTEM_CODES: Record<keyof SystemAccounts, string> = {
   BANK: "512",
   RECEIVABLE: "411",
   PAYABLE: "401",
+  CHEQUES_IN: "5113",
+  CHEQUES_OUT: "403",
   INTERCOMPANY: "458",
   SALARIES: "641",
   STAFF_ADVANCES: "425",
