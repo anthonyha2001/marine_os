@@ -1,0 +1,838 @@
+// One shared database for both sister companies.
+// Every company-owned record carries a companyId so data stays separated.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // Supabase Postgres
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  slug      String   @unique // "xpert-marine" | "eliche-radice"
+  name      String
+  createdAt DateTime @default(now())
+
+  // Letterhead details printed on offers (edited on the Company details page).
+  legalName          String?
+  address            String?
+  phone              String?
+  email              String?
+  website            String?
+  taxNumber          String? // VAT / MOF number
+  registrationNumber String? // commercial register
+  bankDetails        String?
+  offerTerms         String? // default terms & conditions for new offers
+
+  users            User[]
+  purchases        Purchase[]
+  stockMovements   StockMovement[]
+  offers           Offer[]
+  invoices         Invoice[]
+  purchaseOrders   PurchaseOrder[]
+  supplierPayments SupplierPayment[]
+  ledgerAccounts   LedgerAccount[]
+  journalEntries   JournalEntry[]
+  receipts         CustomerReceipt[]
+  vouchers         Voucher[]
+  creditNotes      CreditNote[]
+  exchangeRates    ExchangeRate[]
+  posShifts        PosShift[]
+  posSales         PosSale[]
+  posRefunds       PosRefund[]
+  employees        Employee[]
+  payrollRuns      PayrollRun[]
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String
+  // See src/lib/permissions.ts for the list of roles.
+  role         String
+  // null only for ADMIN (group-wide). Everyone else belongs to exactly one company.
+  companyId    String?
+  company      Company?  @relation(fields: [companyId], references: [id])
+  active       Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  purchases        Purchase[]
+  offers           Offer[]
+  invoices         Invoice[]
+  purchaseOrders   PurchaseOrder[]
+  supplierPayments SupplierPayment[]
+  journalEntries   JournalEntry[]
+  receipts         CustomerReceipt[]
+  vouchers         Voucher[]
+  creditNotes      CreditNote[]
+  exchangeRates    ExchangeRate[]
+  posShifts        PosShift[]
+  posSales         PosSale[]
+  posRefunds       PosRefund[]
+  payrollRuns      PayrollRun[]
+
+  @@index([companyId])
+}
+
+// ─── Sales: customers and offers ───────────────────────────
+// Customers are shared by both companies; offers belong to one company.
+
+model Customer {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  contactName String?
+  email       String?
+  phone       String?
+  address     String?
+  taxNumber   String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  offers       Offer[]
+  invoices     Invoice[]
+  receipts     CustomerReceipt[]
+  creditNotes  CreditNote[]
+  journalLines JournalLine[]
+  posSales     PosSale[]
+}
+
+model Offer {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+  number    String  @unique // e.g. XM-OF-2026-0001
+
+  // Customer details are copied onto the offer so a sent offer never changes.
+  customerId        String?
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName      String
+  customerAttention String?
+  customerAddress   String?
+  customerEmail     String?
+  customerPhone     String?
+
+  subject    String?
+  reference  String? // customer's RFQ / tender reference
+  offerDate  DateTime @db.Date
+  validUntil DateTime @db.Date
+  status     String   @default("DRAFT") // DRAFT | SENT | ACCEPTED | REJECTED
+  marking    String? // e.g. "COMMERCIAL IN CONFIDENCE", printed on every page
+  intro      String?
+  terms      String?
+  notes      String? // internal, never printed
+
+  discountType  String  @default("PERCENT") // PERCENT | AMOUNT
+  discountValue Decimal @default(0) @db.Decimal(12, 2)
+  applyVat      Boolean @default(true)
+
+  // How the payment schedule is defined: FULL (one payment), PERCENT (e.g. 60 / 40)
+  // or INSTALLMENTS (N equal payments, calculated).
+  paymentPlan String @default("FULL")
+
+  subtotal      Decimal @db.Decimal(12, 2) // lines after line discounts
+  discountTotal Decimal @db.Decimal(12, 2) // overall discount amount
+  totalHT       Decimal @db.Decimal(12, 2)
+  vatAmount     Decimal @db.Decimal(12, 2)
+  totalTTC      Decimal @db.Decimal(12, 2)
+
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lines        OfferLine[]
+  paymentTerms OfferPaymentTerm[]
+  invoices     Invoice[]
+
+  @@index([companyId, offerDate])
+}
+
+model OfferLine {
+  id              String   @id @default(cuid())
+  offerId         String
+  offer           Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  position        Int
+  kind            String // ITEM | SECTION (a heading row)
+  productId       String? // catalogue item it came from, if any
+  product         Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  code            String?
+  title           String
+  description     String?
+  quantity        Decimal  @default(0) @db.Decimal(12, 2)
+  unit            String?
+  unitPrice       Decimal  @default(0) @db.Decimal(12, 2)
+  discountPercent Decimal  @default(0) @db.Decimal(5, 2)
+  lineTotal       Decimal  @default(0) @db.Decimal(12, 2)
+
+  @@index([offerId])
+}
+
+// ─── Inventory ─────────────────────────────────────────────
+// Suppliers and products are shared by both companies.
+// Purchases and stock belong to one company.
+
+model Supplier {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  accountNumber String? // the supplier's account / reference in our books
+  phone         String?
+  email         String?
+  address       String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  products       Product[]
+  purchases      Purchase[]
+  purchaseOrders PurchaseOrder[]
+  journalLines   JournalLine[]
+}
+
+// Catalogue item: a stocked product or a service (labour, repair…).
+// Both share the 4-digit code sequence so a code never means two things.
+// Services have no stock, barcodes or minimum quantity.
+model Product {
+  id          String    @id @default(cuid())
+  code        String    @unique // 4 digits, generated
+  type        String    @default("PRODUCT") // "PRODUCT" | "SERVICE"
+  unit        String? // services: "HOUR" | "FIXED" | "DAY" | "UNIT"
+  name        String
+  description String?
+  imageUrl    String?
+  supplierId  String?
+  supplier    Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  // Price without VAT. The TTC price is derived (see src/lib/money.ts).
+  priceHT     Decimal   @db.Decimal(12, 2)
+  minQuantity Int       @default(0)
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  barcodes           ProductBarcode[]
+  purchaseItems      PurchaseItem[]
+  stockMovements     StockMovement[]
+  offerLines         OfferLine[]
+  purchaseOrderLines PurchaseOrderLine[]
+  posSaleLines       PosSaleLine[]
+
+  @@index([name])
+  @@index([type])
+}
+
+model ProductBarcode {
+  id        String  @id @default(cuid())
+  code      String  @unique
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model Purchase {
+  id            String    @id @default(cuid())
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id])
+  supplierId    String
+  supplier      Supplier  @relation(fields: [supplierId], references: [id])
+  invoiceNumber String
+  reference     String?
+  purchaseDate  DateTime  @db.Date
+  dueDate       DateTime? @db.Date // when the supplier must be paid (defaults to the invoice date)
+  subtotalHT    Decimal   @db.Decimal(12, 2) // sum of lines, before discount
+  discount      Decimal   @default(0) @db.Decimal(12, 2) // amount, without VAT
+  totalHT       Decimal   @db.Decimal(12, 2) // after discount
+  vatAmount     Decimal   @db.Decimal(12, 2)
+  totalTTC      Decimal   @db.Decimal(12, 2)
+  notes         String?
+  createdById   String
+  createdBy     User      @relation(fields: [createdById], references: [id])
+  createdAt     DateTime  @default(now())
+
+  items          PurchaseItem[]
+  stockMovements StockMovement[]
+  purchaseOrder  PurchaseOrder?
+  payments       SupplierPayment[]
+
+  @@unique([companyId, supplierId, invoiceNumber])
+  @@index([companyId, purchaseDate])
+}
+
+model PurchaseItem {
+  id          String   @id @default(cuid())
+  purchaseId  String
+  purchase    Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  quantity    Int
+  unitPriceHT Decimal  @db.Decimal(12, 2)
+  lineTotalHT Decimal  @db.Decimal(12, 2)
+
+  @@index([purchaseId])
+  @@index([productId])
+}
+
+// Every stock change is a row; current stock = sum of quantity per company + product.
+// Purchases add stock now; sales will subtract it later.
+model StockMovement {
+  id         String    @id @default(cuid())
+  companyId  String
+  company    Company   @relation(fields: [companyId], references: [id])
+  productId  String
+  product    Product   @relation(fields: [productId], references: [id])
+  quantity   Int // positive = in, negative = out
+  type       String // "PURCHASE" | "POS_SALE" | "POS_RETURN"
+  purchaseId String?
+  purchase   Purchase? @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  posSaleId   String?
+  posSale     PosSale?   @relation(fields: [posSaleId], references: [id], onDelete: Cascade)
+  posRefundId String?
+  posRefund   PosRefund? @relation(fields: [posRefundId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+
+  @@index([companyId, productId])
+}
+
+// One row of an offer payment schedule. Amounts include VAT (what the customer pays).
+model OfferPaymentTerm {
+  id       String  @id @default(cuid())
+  offerId  String
+  offer    Offer   @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  position Int
+  label    String
+  mode     String // PERCENT | BALANCE (remainder: last of N equal payments)
+  value    Decimal @db.Decimal(14, 4) // the % typed in (or 100 / N)
+  percent  Decimal @db.Decimal(9, 4) // calculated share of the offer total
+  amount   Decimal @db.Decimal(12, 2) // calculated amount incl. VAT
+  dueDays  Int     @default(0) // payment due N days after the invoice date
+
+  invoices Invoice[]
+
+  @@index([offerId])
+}
+
+model Invoice {
+  id            String            @id @default(cuid())
+  companyId     String
+  company       Company           @relation(fields: [companyId], references: [id])
+  number        String            @unique // e.g. XM-INV-2026-0001
+  offerId       String?
+  offer         Offer?            @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  paymentTermId String?
+  paymentTerm   OfferPaymentTerm? @relation(fields: [paymentTermId], references: [id], onDelete: SetNull)
+
+  customerId        String?
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName      String
+  customerAttention String?
+  customerAddress   String?
+  customerEmail     String?
+  customerPhone     String?
+  customerTaxNumber String?
+
+  subject     String?
+  reference   String? // customer PO / reference
+  invoiceDate DateTime  @db.Date
+  dueDate     DateTime  @db.Date
+  status      String    @default("ISSUED") // ISSUED | PAID | CANCELLED
+  paidAt      DateTime?
+  marking     String?
+  notes       String? // printed under the lines
+
+  applyVat  Boolean
+  totalHT   Decimal @db.Decimal(12, 2)
+  vatAmount Decimal @db.Decimal(12, 2)
+  totalTTC  Decimal @db.Decimal(12, 2)
+
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lines       InvoiceLine[]
+  receipts    CustomerReceipt[]
+  creditNotes CreditNote[]
+
+  @@index([companyId, invoiceDate])
+  @@index([offerId])
+}
+
+model InvoiceLine {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  position    Int
+  title       String
+  description String?
+  quantity    Decimal @db.Decimal(12, 2)
+  unitPrice   Decimal @db.Decimal(12, 2) // excl. VAT
+  lineTotal   Decimal @db.Decimal(12, 2) // excl. VAT
+
+  @@index([invoiceId])
+}
+
+// ─── Purchase orders ───────────────────────────────────────
+// Sent to a supplier before the goods arrive. Receiving one creates a Purchase (stock in).
+
+model PurchaseOrder {
+  id           String    @id @default(cuid())
+  companyId    String
+  company      Company   @relation(fields: [companyId], references: [id])
+  number       String    @unique // e.g. XM-PO-2026-0001
+  supplierId   String
+  supplier     Supplier  @relation(fields: [supplierId], references: [id])
+  orderDate    DateTime  @db.Date
+  expectedDate DateTime? @db.Date // expected delivery
+  status       String    @default("DRAFT") // DRAFT | SENT | RECEIVED | CANCELLED
+  reference    String?
+  terms        String? // delivery / payment terms printed on the PDF
+  notes        String? // internal, never printed
+  subtotalHT   Decimal   @db.Decimal(12, 2)
+  discount     Decimal   @default(0) @db.Decimal(12, 2)
+  totalHT      Decimal   @db.Decimal(12, 2)
+  vatAmount    Decimal   @db.Decimal(12, 2)
+  totalTTC     Decimal   @db.Decimal(12, 2)
+
+  // The purchase created when the goods were received.
+  purchaseId String?   @unique
+  purchase   Purchase? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lines PurchaseOrderLine[]
+
+  @@index([companyId, orderDate])
+}
+
+model PurchaseOrderLine {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  position        Int
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id])
+  quantity        Int
+  unitPriceHT     Decimal       @db.Decimal(12, 2)
+  lineTotalHT     Decimal       @db.Decimal(12, 2)
+
+  @@index([purchaseOrderId])
+  @@index([productId])
+}
+
+// ─── Accounting ────────────────────────────────────────────
+// A payment made to a supplier against a purchase (several per purchase = partial payments).
+model SupplierPayment {
+  id             String         @id @default(cuid())
+  companyId      String
+  company        Company        @relation(fields: [companyId], references: [id])
+  purchaseId     String
+  purchase       Purchase       @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  amount         Decimal        @db.Decimal(12, 2)
+  paidAt         DateTime       @db.Date
+  method         String // CASH | BANK_TRANSFER | CHEQUE | CARD | OTHER
+  // Cash box or bank account it was paid from (null only for payments made before the ledger).
+  moneyAccountId String?
+  moneyAccount   LedgerAccount? @relation(fields: [moneyAccountId], references: [id])
+  reference      String? // transfer / cheque number
+  notes          String?
+  createdById    String
+  createdBy      User           @relation(fields: [createdById], references: [id])
+  createdAt      DateTime       @default(now())
+
+  @@index([companyId, paidAt])
+  @@index([purchaseId])
+}
+
+// ─── General ledger (double entry) ─────────────────────────
+// Every document posts a journal entry; reports read the journal lines.
+
+model LedgerAccount {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  code      String // e.g. 530 Cash, 411 Customers (Lebanese chart numbering)
+  name      String
+  type      String // ASSET | LIABILITY | EQUITY | INCOME | EXPENSE
+  kind      String // CASH | BANK | RECEIVABLE | PAYABLE | VAT_IN | VAT_OUT | SALES | PURCHASES | EXPENSE | INCOME | CAPITAL | OTHER
+  isSystem  Boolean  @default(false) // used by automatic postings, so it cannot be deleted
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  lines              JournalLine[]
+  receipts           CustomerReceipt[]
+  supplierPayments   SupplierPayment[]
+  voucherMoney       Voucher[]         @relation("VoucherMoneyAccount")
+  voucherCounterpart Voucher[]         @relation("VoucherCounterAccount")
+  payrollRuns        PayrollRun[]
+
+  @@unique([companyId, code])
+  @@index([companyId, kind])
+}
+
+model JournalEntry {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  number      String // JV-2026-00001
+  date        DateTime @db.Date
+  memo        String
+  sourceType  String // INVOICE | CREDIT_NOTE | PURCHASE | SUPPLIER_PAYMENT | RECEIPT | VOUCHER | MANUAL | REVERSAL
+  sourceId    String?
+  reversalOf  String? // entry id this one reverses
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  lines JournalLine[]
+
+  @@unique([companyId, number])
+  @@index([companyId, date])
+  @@index([sourceType, sourceId])
+}
+
+model JournalLine {
+  id           String        @id @default(cuid())
+  entryId      String
+  entry        JournalEntry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  accountId    String
+  account      LedgerAccount @relation(fields: [accountId], references: [id])
+  debit        Decimal       @default(0) @db.Decimal(14, 2)
+  credit       Decimal       @default(0) @db.Decimal(14, 2)
+  description  String?
+  // Partner tags for statements of account.
+  customerId   String?
+  customer     Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName String?
+  supplierId   String?
+  supplier     Supplier?     @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  @@index([entryId])
+  @@index([accountId])
+  @@index([customerId])
+  @@index([supplierId])
+}
+
+// Money received from a customer, usually against an invoice (partial allowed).
+model CustomerReceipt {
+  id             String        @id @default(cuid())
+  companyId      String
+  company        Company       @relation(fields: [companyId], references: [id])
+  number         String // RC-2026-0001
+  invoiceId      String?
+  invoice        Invoice?      @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  customerId     String?
+  customer       Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName   String
+  amount         Decimal       @db.Decimal(12, 2)
+  receivedAt     DateTime      @db.Date
+  method         String // CASH | BANK_TRANSFER | CHEQUE | CARD | OTHER
+  moneyAccountId String
+  moneyAccount   LedgerAccount @relation(fields: [moneyAccountId], references: [id])
+  reference      String?
+  notes          String?
+  createdById    String
+  createdBy      User          @relation(fields: [createdById], references: [id])
+  createdAt      DateTime      @default(now())
+
+  @@unique([companyId, number])
+  @@index([companyId, receivedAt])
+  @@index([invoiceId])
+}
+
+// PV (money out: expenses, other payments), RV (money in: capital, loans, other income),
+// TR (transfer between cash/bank accounts).
+model Voucher {
+  id               String        @id @default(cuid())
+  companyId        String
+  company          Company       @relation(fields: [companyId], references: [id])
+  number           String // PV-2026-0001 | RV-2026-0001 | TR-2026-0001
+  kind             String // PAYMENT | RECEIPT | TRANSFER
+  date             DateTime      @db.Date
+  moneyAccountId   String // cash/bank paid from (PV, TR source) or received into (RV)
+  moneyAccount     LedgerAccount @relation("VoucherMoneyAccount", fields: [moneyAccountId], references: [id])
+  counterAccountId String // expense / income / capital account, or TR destination
+  counterAccount   LedgerAccount @relation("VoucherCounterAccount", fields: [counterAccountId], references: [id])
+  partyName        String? // paid to / received from
+  description      String
+  amountHT         Decimal       @db.Decimal(12, 2)
+  vatAmount        Decimal       @default(0) @db.Decimal(12, 2) // recoverable VAT on an expense
+  amount           Decimal       @db.Decimal(12, 2) // total moved
+  method           String
+  reference        String?
+  createdById      String
+  createdBy        User          @relation(fields: [createdById], references: [id])
+  createdAt        DateTime      @default(now())
+
+  @@unique([companyId, number])
+  @@index([companyId, date])
+}
+
+model CreditNote {
+  id                String    @id @default(cuid())
+  companyId         String
+  company           Company   @relation(fields: [companyId], references: [id])
+  number            String // CN-2026-0001
+  invoiceId         String?
+  invoice           Invoice?  @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  customerId        String?
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName      String
+  customerAddress   String?
+  customerTaxNumber String?
+  date              DateTime  @db.Date
+  reason            String
+  status            String    @default("ISSUED") // ISSUED | CANCELLED
+  applyVat          Boolean
+  totalHT           Decimal   @db.Decimal(12, 2)
+  vatAmount         Decimal   @db.Decimal(12, 2)
+  totalTTC          Decimal   @db.Decimal(12, 2)
+  createdById       String
+  createdBy         User      @relation(fields: [createdById], references: [id])
+  createdAt         DateTime  @default(now())
+
+  lines CreditNoteLine[]
+
+  @@unique([companyId, number])
+  @@index([companyId, date])
+  @@index([invoiceId])
+}
+
+model CreditNoteLine {
+  id           String     @id @default(cuid())
+  creditNoteId String
+  creditNote   CreditNote @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
+  position     Int
+  title        String
+  quantity     Decimal    @db.Decimal(12, 2)
+  unitPrice    Decimal    @db.Decimal(12, 2) // excl. VAT
+  lineTotal    Decimal    @db.Decimal(12, 2) // excl. VAT
+
+  @@index([creditNoteId])
+}
+
+// Gap-free document numbers per company and series (e.g. "PV-2026").
+model DocumentCounter {
+  companyId String
+  series    String
+  value     Int    @default(0)
+
+  @@id([companyId, series])
+}
+
+// ── Point of sale (retail counter) ──
+
+/** LBP per USD set by a manager; the POS uses the latest one. */
+model ExchangeRate {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  lbpPerUsd Decimal  @db.Decimal(14, 2)
+  setById   String
+  setBy     User     @relation(fields: [setById], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([companyId, createdAt])
+}
+
+/** A cashier's session at the till: opening float, then counted cash at closing. */
+model PosShift {
+  id          String    @id @default(cuid())
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id])
+  number      String // SH-2026-0001
+  cashierId   String
+  cashier     User      @relation(fields: [cashierId], references: [id])
+  status      String    @default("OPEN") // OPEN | CLOSED
+  openedAt    DateTime  @default(now())
+  closedAt    DateTime?
+  openingUsd  Decimal   @db.Decimal(12, 2)
+  openingLbp  Decimal   @db.Decimal(16, 0)
+  expectedUsd Decimal?  @db.Decimal(12, 2)
+  expectedLbp Decimal?  @db.Decimal(16, 0)
+  countedUsd  Decimal?  @db.Decimal(12, 2)
+  countedLbp  Decimal?  @db.Decimal(16, 0)
+  closeRate   Decimal?  @db.Decimal(14, 2)
+  notes       String?
+
+  sales   PosSale[]
+  refunds PosRefund[]
+
+  @@unique([companyId, number])
+  @@index([companyId, status])
+}
+
+/** A counter sale. Amounts are USD; cash may be paid in USD and/or LBP at the sale's rate. */
+model PosSale {
+  id                String    @id @default(cuid())
+  companyId         String
+  company           Company   @relation(fields: [companyId], references: [id])
+  number            String // POS-2026-00001
+  shiftId           String
+  shift             PosShift  @relation(fields: [shiftId], references: [id])
+  cashierId         String
+  cashier           User      @relation(fields: [cashierId], references: [id])
+  saleDate          DateTime  @db.Date
+  createdAt         DateTime  @default(now())
+  customerId        String?
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName      String    @default("Walk-in customer")
+  customerAddress   String?
+  customerTaxNumber String?
+  subtotalHT        Decimal   @db.Decimal(12, 2)
+  discountPct       Decimal   @default(0) @db.Decimal(5, 2)
+  discountHT        Decimal   @default(0) @db.Decimal(12, 2)
+  totalHT           Decimal   @db.Decimal(12, 2)
+  vatAmount         Decimal   @db.Decimal(12, 2)
+  totalTTC          Decimal   @db.Decimal(12, 2)
+  rate              Decimal   @db.Decimal(14, 2) // LBP per USD
+  paidUsd           Decimal   @default(0) @db.Decimal(12, 2)
+  paidLbp           Decimal   @default(0) @db.Decimal(16, 0)
+  paidCard          Decimal   @default(0) @db.Decimal(12, 2)
+  changeUsd         Decimal   @default(0) @db.Decimal(12, 2)
+  changeLbp         Decimal   @default(0) @db.Decimal(16, 0)
+  status            String    @default("COMPLETED") // COMPLETED | PARTLY_REFUNDED | REFUNDED
+
+  lines          PosSaleLine[]
+  refunds        PosRefund[]
+  stockMovements StockMovement[]
+
+  @@unique([companyId, number])
+  @@index([companyId, saleDate])
+  @@index([shiftId])
+}
+
+model PosSaleLine {
+  id          String          @id @default(cuid())
+  saleId      String
+  sale        PosSale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  position    Int
+  productId   String
+  product     Product         @relation(fields: [productId], references: [id])
+  code        String
+  name        String
+  quantity    Int
+  unitPriceHT Decimal         @db.Decimal(12, 2)
+  lineTotalHT Decimal         @db.Decimal(12, 2) // before the sale discount
+  refundLines PosRefundLine[]
+
+  @@index([saleId])
+}
+
+/** Goods brought back: stock goes back in and money goes out of the till (or card). */
+model PosRefund {
+  id        String    @id @default(cuid())
+  companyId String
+  company   Company   @relation(fields: [companyId], references: [id])
+  number    String // RF-2026-0001
+  saleId    String
+  sale      PosSale   @relation(fields: [saleId], references: [id])
+  shiftId   String
+  shift     PosShift  @relation(fields: [shiftId], references: [id])
+  cashierId String
+  cashier   User      @relation(fields: [cashierId], references: [id])
+  date      DateTime  @db.Date
+  createdAt DateTime  @default(now())
+  reason    String
+  totalHT   Decimal   @db.Decimal(12, 2)
+  vatAmount Decimal   @db.Decimal(12, 2)
+  totalTTC  Decimal   @db.Decimal(12, 2)
+  method    String // CASH_USD | CASH_LBP | CARD
+  rate      Decimal   @db.Decimal(14, 2)
+  amountLbp Decimal   @default(0) @db.Decimal(16, 0) // LBP handed back (CASH_LBP)
+
+  lines          PosRefundLine[]
+  stockMovements StockMovement[]
+
+  @@unique([companyId, number])
+  @@index([saleId])
+}
+
+model PosRefundLine {
+  id         String      @id @default(cuid())
+  refundId   String
+  refund     PosRefund   @relation(fields: [refundId], references: [id], onDelete: Cascade)
+  saleLineId String
+  saleLine   PosSaleLine @relation(fields: [saleLineId], references: [id])
+  quantity   Int
+  amountHT   Decimal     @db.Decimal(12, 2)
+
+  @@index([refundId])
+}
+
+// ── Staff & payroll ──
+
+/** Someone on the payroll (doesn't need a login). */
+model Employee {
+  id           String        @id @default(cuid())
+  companyId    String
+  company      Company       @relation(fields: [companyId], references: [id])
+  name         String
+  position     String?
+  phone        String?
+  idNumber     String? // ID / NSSF number, printed on the payslip
+  startDate    DateTime?     @db.Date
+  payFrequency String // MONTHLY | WEEKLY
+  baseSalary   Decimal       @db.Decimal(12, 2) // per month or per week, USD
+  active       Boolean       @default(true)
+  notes        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  payrollLines PayrollLine[]
+
+  @@index([companyId, active])
+}
+
+/** One pay period (a month or a week): a line per employee, then approved and paid. */
+model PayrollRun {
+  id             String         @id @default(cuid())
+  companyId      String
+  company        Company        @relation(fields: [companyId], references: [id])
+  number         String // PR-2026-0001
+  frequency      String // MONTHLY | WEEKLY
+  periodStart    DateTime       @db.Date
+  periodEnd      DateTime       @db.Date
+  label          String // "October 2026" | "Week of 19 Oct 2026"
+  status         String         @default("DRAFT") // DRAFT | APPROVED | PAID
+  payDate        DateTime?      @db.Date
+  moneyAccountId String?
+  moneyAccount   LedgerAccount? @relation(fields: [moneyAccountId], references: [id])
+  notes          String?
+  createdById    String
+  createdBy      User           @relation(fields: [createdById], references: [id])
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  lines          PayrollLine[]
+
+  @@unique([companyId, number])
+  @@unique([companyId, frequency, periodStart])
+}
+
+model PayrollLine {
+  id         String     @id @default(cuid())
+  runId      String
+  run        PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  employeeId String
+  employee   Employee   @relation(fields: [employeeId], references: [id])
+  name       String // snapshot at the time of the run
+  position   String?
+  baseSalary Decimal    @db.Decimal(12, 2)
+  bonus      Decimal    @default(0) @db.Decimal(12, 2)
+  overtime   Decimal    @default(0) @db.Decimal(12, 2)
+  deductions Decimal    @default(0) @db.Decimal(12, 2) // absence, penalties: lower the salary cost
+  advance    Decimal    @default(0) @db.Decimal(12, 2) // advance already given, paid back now
+  net        Decimal    @db.Decimal(12, 2)
+  note       String?
+
+  @@unique([runId, employeeId])
+}

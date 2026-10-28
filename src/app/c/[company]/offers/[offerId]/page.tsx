@@ -1,0 +1,112 @@
+import { Suspense } from "react";
+import { notFound } from "next/navigation";
+import { requireModule } from "@/lib/auth";
+import { getOffer } from "@/lib/data/sales";
+import { OFFER_STATUSES } from "@/lib/offers";
+import { COMPANIES, canAccessModule } from "@/lib/permissions";
+import { deleteOffer } from "@/lib/actions/offers";
+import { DeleteButton } from "@/components/delete-button";
+import { Modal } from "@/components/modal";
+import { round2 } from "@/lib/money";
+import { CustomInvoiceForm } from "../../invoices/custom-invoice-form";
+import { PageHeader } from "@/components/ui";
+import { OfferEditor } from "../offer-editor";
+import { offerEditorData } from "../editor-data";
+import { InvoicingPanel } from "./invoicing-panel";
+import { OfferToolbar } from "./offer-toolbar";
+
+const iso = (d: Date) => d.toISOString().slice(0, 10);
+
+async function OfferPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ company: string; offerId: string }>;
+  searchParams: Promise<{ saved?: string; invoiced?: string; invoice?: string }>;
+}) {
+  const [{ company, offerId }, { saved, invoiced, invoice }] = await Promise.all([params, searchParams]);
+  const { user, slug } = await requireModule(company, "offers");
+  const [offer, data] = await Promise.all([getOffer(slug, offerId), offerEditorData(slug)]);
+  if (!offer) notFound();
+
+  return (
+    <>
+      <PageHeader
+        eyebrow={`${COMPANIES[slug].name} · ${OFFER_STATUSES[offer.status]}`}
+        title={offer.number}
+        description={[offer.customerName, offer.subject].filter(Boolean).join(" · ")}
+        action={
+          <div className="flex flex-wrap gap-2">
+            <OfferToolbar companySlug={slug} offerId={offer.id} />
+            {offer.invoiceCount === 0 && (
+              <DeleteButton
+                bordered
+                action={deleteOffer.bind(null, slug, offer.id)}
+                confirmText={`Delete offer ${offer.number}? This can't be undone.`}
+                title="Delete offer"
+              />
+            )}
+          </div>
+        }
+      />
+      {invoiced && (
+        <p role="status" className="mt-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-success">
+          {invoiced === "1" ? "Invoice created." : `${invoiced} invoices created.`} The offer is now marked as accepted.
+        </p>
+      )}
+      {saved && (
+        <p role="status" className="mt-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-success">
+          {saved === "copy" ? "Copy created as a new draft. Edit and save it." : "Offer saved."}
+        </p>
+      )}
+      {canAccessModule(user, slug, "invoices") && (
+        <>
+          <InvoicingPanel companySlug={slug} offer={offer} />
+          {invoice === "custom" && (
+            <Modal title={`Custom invoice for ${offer.number}`} closeHref={`/c/${slug}/offers/${offer.id}`} size="md">
+              <CustomInvoiceForm
+                key={crypto.randomUUID()}
+                companySlug={slug}
+                returnTo="offer"
+                offers={[
+                  {
+                    id: offer.id,
+                    number: offer.number,
+                    customerName: offer.customerName,
+                    subject: offer.subject,
+                    totalHT: offer.totalHT,
+                    totalTTC: offer.totalTTC,
+                    remaining: round2(offer.totalTTC - offer.invoicedTTC),
+                  },
+                ]}
+              />
+            </Modal>
+          )}
+        </>
+      )}
+      {/* New key per render so the editor always shows what was just saved. */}
+      <OfferEditor
+        key={crypto.randomUUID()}
+        companySlug={slug}
+        companyName={data.company.legalName || COMPANIES[slug].name}
+        catalogue={data.catalogue}
+        customers={data.customers}
+        defaultIntro={data.defaultIntro}
+        defaultTerms={data.defaultTerms}
+        offer={{
+          ...offer,
+          offerDate: iso(offer.offerDate),
+          validUntil: iso(offer.validUntil),
+        }}
+      />
+    </>
+  );
+}
+
+export default function OfferDetailPage({ params, searchParams }: PageProps<"/c/[company]/offers/[offerId]">) {
+  return (
+    <Suspense fallback={<p className="text-muted">Loading…</p>}>
+      <OfferPage params={params} searchParams={searchParams as Promise<{ saved?: string; invoiced?: string; invoice?: string }>} />
+    </Suspense>
+  );
+}
