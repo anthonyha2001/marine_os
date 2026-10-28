@@ -4,18 +4,21 @@ import { CheckCircle2, TriangleAlert } from "lucide-react";
 import { requireModule } from "@/lib/auth";
 import { dayFormat } from "@/lib/dates";
 import { getLedger, type Ledger } from "@/lib/data/ledger";
+import { getRate } from "@/lib/data/pos";
+import { VatLbp } from "./vat-lbp";
 import { accountLedger, balanceSheet, profitAndLoss, trialBalance, vatReport, type AccountTotal, type Period } from "@/lib/ledger/reports";
 import { formatMoney } from "@/lib/money";
 import { COMPANIES, type CompanySlug } from "@/lib/permissions";
 import { PageHeader, cardClass, inputClass, tdClass, thClass } from "@/components/ui";
 import { Amount, LinkTabs, PeriodFilter, SOURCE_LABELS, periodFrom, sourceHref, type PeriodParams } from "../finance-ui";
 
-type Search = PeriodParams & { r?: string; account?: string };
+type Search = PeriodParams & { r?: string; account?: string; rate?: string };
 const REPORTS = [
   { key: "pl", label: "Profit & loss" },
   { key: "bs", label: "Balance sheet" },
   { key: "trial", label: "Trial balance" },
   { key: "vat", label: "VAT" },
+  { key: "vatlbp", label: "VAT return (LBP)" },
   { key: "gl", label: "General ledger" },
 ] as const;
 type ReportKey = (typeof REPORTS)[number]["key"];
@@ -348,6 +351,9 @@ async function ReportsContent({ params, searchParams }: { params: Promise<{ comp
         {report === "bs" && <BalanceSheet ledger={ledger} asOf={period.to ?? new Date()} glHref={glHref} />}
         {report === "trial" && <Trial ledger={ledger} period={period} glHref={glHref} />}
         {report === "vat" && <Vat ledger={ledger} period={period} />}
+        {report === "vatlbp" && (
+          <VatLbp ledger={ledger} period={period} rate={search.rate ? Number(search.rate) || null : ((await getRate(slug))?.lbpPerUsd ?? null)} base={base} fromStr={fromStr} toStr={toStr} />
+        )}
         {report === "gl" && <GeneralLedger ledger={ledger} period={period} accountId={search.account} slug={slug} base={base} fromStr={fromStr} toStr={toStr} />}
       </div>
     </>
