@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import type { NavGroup } from "@/lib/navigation";
 import { FeedbackProvider } from "@/components/feedback";
+import { InstallApp } from "@/components/install-app";
 import { KeyboardShortcuts } from "../keyboard-shortcuts";
 import { CommandPalette } from "./command-palette";
 import { Sidebar } from "./sidebar";
@@ -72,6 +73,7 @@ export function AppShell({
 
       <CommandPalette companySlug={company.slug} base={base} groups={allGroups} />
       <KeyboardShortcuts base={base} groups={allGroups} />
+      <InstallApp />
     </FeedbackProvider>
     </div>
   );

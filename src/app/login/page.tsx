@@ -1,5 +1,6 @@
 import { BarChart3, FileCheck2, PackageSearch, ShieldCheck } from "lucide-react";
 import { COMPANIES } from "@/lib/permissions";
+import { InstallApp } from "@/components/install-app";
 import { LoginForm } from "./login-form";
 
 export const metadata = { title: "Sign in · Marine OS" };
@@ -14,6 +15,7 @@ const FEATURES = [
 export default function LoginPage() {
   return (
     <main className="grid min-h-screen bg-background lg:grid-cols-[1.1fr_1fr]">
+      <InstallApp />
       {/* Brand panel */}
       <section className="relative hidden overflow-hidden bg-[#071429] p-12 text-white lg:flex lg:flex-col">
         {/* Soft light + sea waves */}
