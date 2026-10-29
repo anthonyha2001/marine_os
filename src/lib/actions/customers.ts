@@ -28,6 +28,7 @@ const customerSchema = z.object({
   address: optional,
   taxNumber: optional,
   notes: optional,
+  pdfLanguage: z.enum(["EN", "EN_AR"]).catch("EN"),
 });
 
 /** Create (customerId = null) or update a shared customer. */
@@ -41,7 +42,7 @@ export async function saveCustomer(
 
   const parsed = customerSchema.safeParse(
     Object.fromEntries(
-      ["name", "contactName", "phone", "email", "address", "taxNumber", "notes"].map((k) => [k, formData.get(k) ?? ""]),
+      ["name", "contactName", "phone", "email", "address", "taxNumber", "notes", "pdfLanguage"].map((k) => [k, formData.get(k) ?? ""]),
     ),
   );
   if (!parsed.success) return { error: parsed.error.issues[0].message };

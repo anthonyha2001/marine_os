@@ -3,6 +3,8 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { requireModule } from "@/lib/auth";
 import { getCompanyProfile, getInvoice } from "@/lib/data/sales";
 import { InvoicePdf } from "@/lib/pdf/invoice-pdf";
+import { prisma } from "@/lib/prisma";
+import { isBilingual } from "@/lib/pdf-language";
 
 /** The invoice as a PDF. ?download=1 saves it instead of opening it in the browser. */
 export async function GET(request: Request, ctx: RouteContext<"/c/[company]/invoices/[invoiceId]/pdf">) {
@@ -11,7 +13,8 @@ export async function GET(request: Request, ctx: RouteContext<"/c/[company]/invo
   const [invoice, profile] = await Promise.all([getInvoice(slug, invoiceId), getCompanyProfile(slug)]);
   if (!invoice) return new Response("Invoice not found", { status: 404 });
 
-  const element = createElement(InvoicePdf, { slug, invoice, company: profile }) as Parameters<typeof renderToBuffer>[0];
+  const owner = await prisma.invoice.findUnique({ where: { id: invoice.id }, select: { customerId: true } });
+  const element = createElement(InvoicePdf, { slug, invoice, company: profile, bilingual: await isBilingual(owner?.customerId) }) as Parameters<typeof renderToBuffer>[0];
   const pdf = await renderToBuffer(element);
   const download = new URL(request.url).searchParams.has("download");
 

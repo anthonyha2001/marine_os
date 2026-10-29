@@ -6,6 +6,8 @@ import { VAT_RATE } from "@/lib/money";
 import type { CompanySlug } from "@/lib/permissions";
 import {
   BRAND,
+  BilingualContext,
+  T,
   BankDetails,
   Letterhead,
   MUTED,
@@ -21,7 +23,7 @@ import {
   s,
 } from "./shared";
 
-export function OfferPdf({ slug, offer, company }: { slug: CompanySlug; offer: OfferDetail; company: CompanyProfile }) {
+export function OfferPdf({ slug, offer, company, bilingual = false }: { slug: CompanySlug; offer: OfferDetail; company: CompanyProfile; bilingual?: boolean }) {
   const brand = BRAND[slug];
   const companyName = companyDisplayName(company);
   const showDiscountCol = offer.lines.some((l) => l.kind === "ITEM" && l.discountPercent > 0);
@@ -36,6 +38,7 @@ export function OfferPdf({ slug, offer, company }: { slug: CompanySlug; offer: O
       creator="Marine OS"
       producer="Marine OS"
     >
+      <BilingualContext.Provider value={bilingual}>
       <Page size="A4" style={s.page} wrap>
         <PageChrome brand={brand} company={company} docLabel="Commercial offer" number={offer.number} marking={offer.marking} />
         <Letterhead brand={brand} company={company} />
@@ -55,7 +58,7 @@ export function OfferPdf({ slug, offer, company }: { slug: CompanySlug; offer: O
         {/* Parties */}
         <View style={s.parties}>
           <View style={[s.party, { backgroundColor: brand.tint }]}>
-            <Text style={[s.partyLabel, { color: brand.accent }]}>PREPARED FOR</Text>
+            <T en="PREPARED FOR" style={[s.partyLabel, { color: brand.accent }]} />
             <Text style={s.partyName}>{offer.customerName}</Text>
             {offer.customerAttention && <Text style={s.partyLine}>Attn: {offer.customerAttention}</Text>}
             {lines(offer.customerAddress).map((l) => (
@@ -65,7 +68,7 @@ export function OfferPdf({ slug, offer, company }: { slug: CompanySlug; offer: O
             {offer.customerEmail && <Text style={s.partyLine}>{offer.customerEmail}</Text>}
           </View>
           <View style={[s.party, { backgroundColor: "#f5f6f8" }]}>
-            <Text style={[s.partyLabel, { color: MUTED }]}>PREPARED BY</Text>
+            <T en="PREPARED BY" style={[s.partyLabel, { color: MUTED }]} />
             <Text style={s.partyName}>{companyName}</Text>
             <Text style={s.partyLine}>{offer.createdByName}</Text>
             <Text style={s.partyLine}>{company.email ?? offer.createdByEmail}</Text>
@@ -84,13 +87,13 @@ export function OfferPdf({ slug, offer, company }: { slug: CompanySlug; offer: O
         {/* Lines */}
         <View>
           <View style={[s.th, { backgroundColor: brand.navy }]} fixed>
-            <Text style={s.cNo}>No.</Text>
-            <Text style={s.cDesc}>Description</Text>
-            <Text style={s.cQty}>Qty</Text>
-            <Text style={s.cUnit}>Unit</Text>
-            <Text style={s.cPrice}>Unit price</Text>
-            {showDiscountCol && <Text style={s.cDisc}>Disc.</Text>}
-            <Text style={s.cAmt}>Amount (USD)</Text>
+            <T en="No." style={s.cNo} />
+            <T en="Description" style={s.cDesc} />
+            <T en="Qty" style={s.cQty} />
+            <T en="Unit" style={s.cUnit} />
+            <T en="Unit price" style={s.cPrice} />
+            {showDiscountCol && <T en="Disc." style={s.cDisc} />}
+            <T en="Amount (USD)" style={s.cAmt} />
           </View>
           {offer.lines.map((line, index) => {
             if (line.kind === "SECTION") {
@@ -126,7 +129,7 @@ export function OfferPdf({ slug, offer, company }: { slug: CompanySlug; offer: O
           <View style={s.totalsWrap}>
             <View style={s.totals}>
               <View style={s.totalRow}>
-                <Text style={{ color: MUTED }}>Subtotal</Text>
+                <T en="Subtotal" style={{ color: MUTED }} />
                 <Text>{money.format(offer.subtotal)}</Text>
               </View>
               {offer.discountTotal > 0 && (
@@ -138,7 +141,7 @@ export function OfferPdf({ slug, offer, company }: { slug: CompanySlug; offer: O
                 </View>
               )}
               <View style={[s.totalRow, { borderTopWidth: 0.6, borderTopColor: RULE, marginTop: 2, paddingTop: 5 }]}>
-                <Text style={{ fontFamily: "Helvetica-Bold" }}>Total excl. VAT</Text>
+                <T en="Total excl. VAT" style={{ fontFamily: "Helvetica-Bold" }} />
                 <Text style={{ fontFamily: "Helvetica-Bold" }}>{money.format(offer.totalHT)}</Text>
               </View>
               <View style={s.totalRow}>
@@ -146,7 +149,7 @@ export function OfferPdf({ slug, offer, company }: { slug: CompanySlug; offer: O
                 <Text>{offer.applyVat ? money.format(offer.vatAmount) : "Exempt"}</Text>
               </View>
               <View style={[s.grandRow, { backgroundColor: brand.navy }]}>
-                <Text>TOTAL (USD)</Text>
+                <T en="TOTAL (USD)" />
                 <Text>{money.format(offer.totalTTC)}</Text>
               </View>
             </View>
@@ -159,11 +162,11 @@ export function OfferPdf({ slug, offer, company }: { slug: CompanySlug; offer: O
           <View wrap={false}>
             <SectionHeading brand={brand}>Payment schedule</SectionHeading>
             <View style={[s.th, { backgroundColor: brand.navy }]}>
-              <Text style={s.cNo}>No.</Text>
-              <Text style={s.cDesc}>Payment</Text>
-              <Text style={{ width: 110 }}>Due</Text>
-              <Text style={{ width: 52, textAlign: "right" }}>Share</Text>
-              <Text style={s.cAmt}>Amount (USD)</Text>
+              <T en="No." style={s.cNo} />
+              <T en="Payment" style={s.cDesc} />
+              <T en="Due" style={{ width: 110 }} />
+              <T en="Share" style={{ width: 52, textAlign: "right" }} />
+              <T en="Amount (USD)" style={s.cAmt} />
             </View>
             {offer.paymentTerms.map((t, i) => (
               <View key={t.id} style={s.tr}>
@@ -198,22 +201,23 @@ export function OfferPdf({ slug, offer, company }: { slug: CompanySlug; offer: O
         <View style={s.signatures} wrap={false}>
           <View style={s.signBox}>
             <Text style={[s.signLabel, { color: brand.navy }]}>For {companyName}</Text>
-            <Text style={s.signLine}>Authorised signature</Text>
-            <Text style={s.signLine}>Name and title</Text>
+            <T en="Authorised signature" style={s.signLine} />
+            <T en="Name and title" style={s.signLine} />
             <View style={s.stamp}>
-              <Text>COMPANY STAMP</Text>
+              <T en="COMPANY STAMP" />
             </View>
           </View>
           <View style={s.signBox}>
-            <Text style={[s.signLabel, { color: brand.navy }]}>Accepted by the customer</Text>
-            <Text style={s.signLine}>Signature and date</Text>
-            <Text style={s.signLine}>Name and title</Text>
+            <T en="Accepted by the customer" style={[s.signLabel, { color: brand.navy }]} />
+            <T en="Signature and date" style={s.signLine} />
+            <T en="Name and title" style={s.signLine} />
             <View style={s.stamp}>
-              <Text>CUSTOMER STAMP</Text>
+              <T en="CUSTOMER STAMP" />
             </View>
           </View>
         </View>
       </Page>
+      </BilingualContext.Provider>
     </Document>
   );
 }

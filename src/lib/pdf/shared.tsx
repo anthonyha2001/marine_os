@@ -1,7 +1,9 @@
 import "server-only";
 import fs from "fs";
 import path from "path";
+import { createContext, useContext } from "react";
 import { Font, Image, StyleSheet, Text, View } from "@react-pdf/renderer";
+import type { Style } from "@react-pdf/types";
 import type { CompanyProfile } from "@/lib/data/sales";
 import type { CompanySlug } from "@/lib/permissions";
 
@@ -198,12 +200,13 @@ export function TitleBlock({
       {/* flex + padding: a long subtitle wraps instead of running into the reference table */}
       <View style={{ flex: 1, paddingRight: 18 }}>
         <Text style={[s.title, { color: brand.navy }]}>{title}</Text>
+        <TitleArabic title={title} color={brand.navy} />
         <Text style={s.titleSub}>{subtitle}</Text>
       </View>
       <View style={s.meta}>
         {meta.map(([label, value]) => (
           <View key={label} style={s.metaRow}>
-            <Text style={s.metaLabel}>{label}</Text>
+            <T en={label} style={s.metaLabel} />
             <Text style={s.metaValue}>{value}</Text>
           </View>
         ))}
@@ -212,10 +215,18 @@ export function TitleBlock({
   );
 }
 
+function TitleArabic({ title, color }: { title: string; color: string }) {
+  const bilingual = useContext(BilingualContext);
+  if (!bilingual || !AR[title]) return null;
+  return <Text style={{ fontFamily: "Cairo", fontWeight: "bold", fontSize: 15, color, marginTop: 2 }}>{AR[title]}</Text>;
+}
+
 export function SectionHeading({ brand, children }: { brand: Brand; children: string }) {
+  const bilingual = useContext(BilingualContext);
   return (
     <Text style={[s.h2, { color: brand.navy, borderBottomColor: brand.accent }]} minPresenceAhead={40}>
       {children}
+      {bilingual && AR[children] ? <Text style={{ fontFamily: "Cairo", fontWeight: "bold", letterSpacing: 0 }}>{"   " + AR[children]}</Text> : null}
     </Text>
   );
 }
@@ -228,6 +239,80 @@ export function BankDetails({ brand, company }: { brand: Brand; company: Company
       {lines(company.bankDetails).map((l) => (
         <Text key={l} style={{ fontSize: 8.6 }}>{l}</Text>
       ))}
+    </View>
+  );
+}
+
+// ── Bilingual (English + Arabic) documents ──
+// Customers can get documents with Arabic under every English label (Customer → Documents
+// language). Cairo is used for Arabic: it renders correctly in react-pdf (letters joined, dots kept).
+
+Font.register({
+  family: "Cairo",
+  fonts: [
+    { src: path.join(process.cwd(), "public", "fonts", "Cairo-Regular.ttf") },
+    { src: path.join(process.cwd(), "public", "fonts", "Cairo-Bold.ttf"), fontWeight: "bold" },
+  ],
+});
+
+export const AR: Record<string, string> = {
+  "TAX INVOICE": "فاتورة ضريبية",
+  INVOICE: "فاتورة",
+  "COMMERCIAL OFFER": "عرض أسعار",
+  "Invoice No.": "رقم الفاتورة",
+  "Offer No.": "رقم العرض",
+  Date: "التاريخ",
+  "Invoice date": "تاريخ الفاتورة",
+  "Due date": "تاريخ الاستحقاق",
+  "Valid until": "صالح حتى",
+  "Your ref.": "مرجعكم",
+  "BILL TO": "فاتورة إلى",
+  FROM: "من",
+  "PREPARED FOR": "مُعدّ لـ",
+  "PREPARED BY": "مُعدّ من",
+  "No.": "رقم",
+  Description: "البيان",
+  Qty: "الكمية",
+  Unit: "الوحدة",
+  "Unit price": "سعر الوحدة",
+  "Disc.": "حسم",
+  "Amount (USD)": "المبلغ (دولار)",
+  Subtotal: "المجموع الفرعي",
+  Discount: "الحسم",
+  "Total excl. VAT": "المجموع قبل الضريبة",
+  "TOTAL (USD)": "المجموع (دولار)",
+  "TOTAL DUE (USD)": "المبلغ المستحق (دولار)",
+  "TOTAL PAID (USD)": "المبلغ المدفوع (دولار)",
+  Payment: "الدفعة",
+  Due: "الاستحقاق",
+  Share: "النسبة",
+  "Payment schedule": "جدول الدفعات",
+  "Terms and conditions": "الشروط والأحكام",
+  "Bank details": "التفاصيل المصرفية",
+  "Authorised signature and stamp": "التوقيع والختم",
+  "Authorised signature": "التوقيع المعتمد",
+  "Accepted by the customer": "موافقة الزبون",
+  "Signature and date": "التوقيع والتاريخ",
+  "Name and title": "الاسم والصفة",
+  "COMPANY STAMP": "ختم الشركة",
+  "CUSTOMER STAMP": "ختم الزبون",
+};
+
+/** Whether the document being rendered is bilingual (set once at the top of each PDF). */
+export const BilingualContext = createContext(false);
+
+/**
+ * A label: the English text, plus the Arabic translation underneath on bilingual documents.
+ * `style` sets the cell (width, alignment, colour…); the Arabic line is smaller and in Cairo.
+ */
+export function T({ en, ar, style }: { en: string; ar?: string; style?: Style | Style[] }) {
+  const bilingual = useContext(BilingualContext);
+  const arabic = ar ?? AR[en];
+  if (!bilingual || !arabic) return <Text style={style}>{en}</Text>;
+  return (
+    <View style={style}>
+      <Text>{en}</Text>
+      <Text style={{ fontFamily: "Cairo", fontWeight: "normal", fontSize: 7.4, letterSpacing: 0, textTransform: "none", lineHeight: 1.3 }}>{arabic}</Text>
     </View>
   );
 }

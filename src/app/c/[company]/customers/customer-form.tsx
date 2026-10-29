@@ -13,6 +13,7 @@ type CustomerInput = {
   email: string | null;
   address: string | null;
   taxNumber: string | null;
+  pdfLanguage?: string;
   notes: string | null;
 };
 
@@ -55,6 +56,13 @@ export function CustomerForm({ companySlug, customer }: { companySlug: string; c
       <label className={labelClass}>
         VAT / tax number
         <input name="taxNumber" defaultValue={customer?.taxNumber ?? ""} className={inputClass} />
+      </label>
+      <label className={labelClass}>
+        Documents language (offers and invoices)
+        <select name="pdfLanguage" defaultValue={customer?.pdfLanguage ?? "EN"} className={inputClass}>
+          <option value="EN">English</option>
+          <option value="EN_AR">English + Arabic (عربي)</option>
+        </select>
       </label>
       <label className={labelClass}>
         Notes

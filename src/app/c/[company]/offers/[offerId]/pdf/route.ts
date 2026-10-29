@@ -3,6 +3,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { requireModule } from "@/lib/auth";
 import { getCompanyProfile, getOffer } from "@/lib/data/sales";
 import { OfferPdf } from "@/lib/pdf/offer-pdf";
+import { isBilingual } from "@/lib/pdf-language";
 
 /** The offer as a PDF. ?download=1 saves it instead of opening it in the browser. */
 export async function GET(request: Request, ctx: RouteContext<"/c/[company]/offers/[offerId]/pdf">) {
@@ -12,7 +13,7 @@ export async function GET(request: Request, ctx: RouteContext<"/c/[company]/offe
   if (!offer) return new Response("Offer not found", { status: 404 });
 
   // OfferPdf renders a <Document>, which is what renderToBuffer expects.
-  const element = createElement(OfferPdf, { slug, offer, company: profile }) as Parameters<typeof renderToBuffer>[0];
+  const element = createElement(OfferPdf, { slug, offer, company: profile, bilingual: await isBilingual(offer.customerId) }) as Parameters<typeof renderToBuffer>[0];
   const pdf = await renderToBuffer(element);
   const download = new URL(request.url).searchParams.has("download");
   const filename = `${offer.number}.pdf`;
