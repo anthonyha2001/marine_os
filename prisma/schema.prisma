@@ -60,6 +60,12 @@ model Company {
   payrollSettings  PayrollSettings?
   offerClauses     OfferClause[]
   posSettings      PosSettings?
+  websiteSettings  WebsiteSettings?
+  websiteServices  WebsiteService[]
+  websiteGallery   WebsiteGalleryItem[]
+  websiteListings  WebsiteListing[]
+  websiteImages    WebsiteImage[]
+  websiteMessages  WebsiteMessage[]
 }
 
 model User {
@@ -278,6 +284,7 @@ model Product {
   warranties         Warranty[]
   stockCountLines    StockCountLine[]
   transferLines      StockTransferLine[]
+  websiteListings    WebsiteListing[]
 
   @@index([name])
   @@index([type])
@@ -1395,4 +1402,119 @@ model RecycleBinItem {
   restoredByName String?
 
   @@index([companyId, deletedAt])
+}
+
+// ── Public website (Marketing → Website), one per company ──
+
+model WebsiteSettings {
+  id             String   @id @default(cuid())
+  companyId      String   @unique
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  published      Boolean  @default(false) // off: the public site shows "coming soon"
+  tagline        String?
+  heroTitle      String?
+  heroText       String?
+  heroImageId    String?
+  aboutTitle     String?
+  aboutText      String?
+  aboutImageId   String?
+  highlights     String? // one per line: "Title | short text"
+  phone          String?
+  whatsapp       String?
+  email          String?
+  address        String?
+  mapQuery       String? // what to show on the map, e.g. "Jounieh marina, Lebanon"
+  openingHours   String? // one per line
+  facebook       String?
+  instagram      String?
+  linkedin       String?
+  seoTitle       String?
+  seoDescription String?
+  showCatalogue  Boolean  @default(true)
+  showGallery    Boolean  @default(true)
+  showBooking    Boolean  @default(true)
+  updatedAt      DateTime @updatedAt
+}
+
+model WebsiteService {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title       String
+  description String
+  imageId     String?
+  position    Int      @default(0)
+  published   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@index([companyId, position])
+}
+
+model WebsiteGalleryItem {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title     String
+  caption   String?
+  imageId   String
+  position  Int      @default(0)
+  published Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([companyId, position])
+}
+
+// Website settings for one product of a company's catalogue. Products appear on the website
+// automatically (those the company stocks or bought); this row only hides, features or adds a
+// website photo / description. No prices are shown ("Ask for a quote").
+model WebsiteListing {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  hidden      Boolean  @default(false)
+  featured    Boolean  @default(false)
+  description String? // website text; empty = the product's description
+  imageId     String?
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@unique([companyId, productId])
+}
+
+// Pictures for the websites, kept in the database (resized in the browser before upload).
+model WebsiteImage {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contentType String
+  data        Bytes
+  width       Int?
+  height      Int?
+  createdAt   DateTime @default(now())
+
+  @@index([companyId])
+}
+
+// Contact messages, quote requests and booking requests sent from the website.
+model WebsiteMessage {
+  id            String    @id @default(cuid())
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  kind          String // CONTACT | QUOTE | BOOKING
+  name          String
+  email         String?
+  phone         String?
+  message       String
+  productId     String?
+  productName   String?
+  appointmentId String?
+  status        String    @default("NEW") // NEW | HANDLED
+  handledAt     DateTime?
+  handledByName String?
+  ipHash        String? // to slow down spam (never the address itself)
+  createdAt     DateTime  @default(now())
+
+  @@index([companyId, createdAt])
 }

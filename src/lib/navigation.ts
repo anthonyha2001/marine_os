@@ -8,6 +8,8 @@ export type NavIcon =
   | "owner"
   | "audit"
   | "recycleBin"
+  | "marketing"
+  | "website"
   | "offers"
   | "invoices"
   | "customers"
@@ -132,6 +134,13 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
+    title: "Marketing",
+    items: [
+      { label: "Marketing", path: "marketing", module: "marketing", icon: "marketing" },
+      { label: "Website", path: "marketing/website", module: "marketing", icon: "website" },
+    ],
+  },
+  {
     title: "People",
     items: [
       { label: "Staff", path: "staff", module: "payroll", icon: "staff" },
@@ -147,7 +156,7 @@ export const NAV: NavGroup[] = [
       { label: "Company details", path: "settings", module: "settings", icon: "company" },
     ],
   },
-  // Marketing and Tasks stay hidden until they are built.
+  // Tasks stay hidden until they are built.
 ];
 
 /** Items this person may open (including shortcut-only ones), with no empty groups. */

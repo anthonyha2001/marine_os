@@ -36,7 +36,7 @@ import {
   Truck,
   Users,
   Wrench,
-  type LucideIcon, SlidersHorizontal, Tags, ArchiveRestore } from "lucide-react";
+  type LucideIcon, SlidersHorizontal, Tags, ArchiveRestore, Globe, Megaphone } from "lucide-react";
 import type { NavIcon } from "@/lib/navigation";
 
 export const NAV_ICONS: Record<NavIcon, LucideIcon> = {
@@ -44,6 +44,8 @@ export const NAV_ICONS: Record<NavIcon, LucideIcon> = {
   owner: Gauge,
   audit: History,
   recycleBin: ArchiveRestore,
+  marketing: Megaphone,
+  website: Globe,
   offers: FileText,
   invoices: Receipt,
   customers: Users,
