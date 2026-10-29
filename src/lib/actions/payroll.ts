@@ -5,6 +5,8 @@ import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { toRecycleBin } from "@/lib/recycle-bin";
+import { deleteRefusal } from "@/lib/delete-rules";
 import { requireModule } from "@/lib/auth";
 import { companyIdFor } from "@/lib/data/inventory";
 import { ledgerTag } from "@/lib/data/ledger";
@@ -266,11 +268,16 @@ export async function undoPayrollPayment(companySlug: string, runId: string): Pr
 }
 
 export async function deletePayrollRun(companySlug: string, runId: string): Promise<{ error?: string }> {
-  const { slug, companyId } = await ctx(companySlug);
-  const run = await prisma.payrollRun.findFirst({ where: { id: runId, companyId }, select: { status: true } });
+  const { user, slug, companyId } = await ctx(companySlug);
+  const run = await prisma.payrollRun.findFirst({ where: { id: runId, companyId }, select: { status: true, number: true, label: true } });
   if (!run) return { error: "This payroll no longer exists." };
   if (run.status === "PAID") return { error: "A paid payroll can't be deleted. Undo the payment first." };
-  await prisma.payrollRun.delete({ where: { id: runId } });
+  const refused = deleteRefusal(user, run.status === "DRAFT" ? "draft" : "posted");
+  if (refused) return { error: refused };
+  await prisma.$transaction(async (tx) => {
+    await toRecycleBin(tx, { model: "PayrollRun", id: runId, companyId, label: `Payroll ${run.number} · ${run.label}`, deletedByName: user.name });
+    await tx.payrollRun.delete({ where: { id: runId } });
+  }, TRANSACTION_OPTIONS);
   updateTag(payrollTag(companyId));
   redirect(`/c/${slug}/payroll`);
 }

@@ -1,13 +1,14 @@
 import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { DATA_TAG } from "@/lib/cache-tag";
 
 // Vessels are shared by both companies (like customers). Their history is gathered per company.
 export const vesselsTag = "vessels";
 
 async function loadVessels() {
   "use cache";
-  cacheTag(vesselsTag);
+  cacheTag(DATA_TAG, vesselsTag);
   cacheLife("hours");
   const rows = await prisma.vessel.findMany({
     include: { customer: { select: { id: true, name: true } }, engines: { orderBy: { position: "asc" } } },

@@ -10,10 +10,13 @@ import {
   canAccessModule,
   isCompanySlug,
   isRole,
+  parseAccess,
   type CompanySlug,
+  type CustomAccess,
   type ModuleKey,
   type Role,
 } from "@/lib/permissions";
+import { DATA_TAG } from "@/lib/cache-tag";
 
 export type SessionUser = {
   id: string;
@@ -21,6 +24,8 @@ export type SessionUser = {
   email: string;
   role: Role;
   companySlug: CompanySlug | null;
+  /** Custom permissions set on the Team page (null = the role's defaults). */
+  access: CustomAccess;
 };
 
 export async function createSession(userId: string) {
@@ -47,7 +52,7 @@ export const userTag = (userId: string) => `user:${userId}`;
  */
 async function loadUser(userId: string): Promise<SessionUser | null> {
   "use cache";
-  cacheTag(userTag(userId));
+  cacheTag(DATA_TAG, userTag(userId));
   cacheLife({ stale: 60, revalidate: 60, expire: 300 });
 
   const user = await prisma.user.findUnique({
@@ -63,6 +68,7 @@ async function loadUser(userId: string): Promise<SessionUser | null> {
     email: user.email,
     role: user.role,
     companySlug: slug && isCompanySlug(slug) ? slug : null,
+    access: parseAccess(user.permissions),
   };
 }
 

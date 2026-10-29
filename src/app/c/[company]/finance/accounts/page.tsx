@@ -5,7 +5,7 @@ import { requireModule } from "@/lib/auth";
 import { deleteLedgerAccount } from "@/lib/actions/finance";
 import { getLedger } from "@/lib/data/ledger";
 import { accountTotals } from "@/lib/ledger/reports";
-import { COMPANIES } from "@/lib/permissions";
+import { COMPANIES, isAdmin } from "@/lib/permissions";
 import { DeleteButton } from "@/components/delete-button";
 import { Modal } from "@/components/modal";
 import { Badge, ButtonLink, PageHeader, cardClass, tdClass, thClass } from "@/components/ui";
@@ -36,7 +36,7 @@ const KIND_LABELS: Record<string, string> = {
 
 async function AccountsContent({ params, searchParams }: { params: Promise<{ company: string }>; searchParams: Promise<Search> }) {
   const [{ company }, search] = await Promise.all([params, searchParams]);
-  const { slug } = await requireModule(company, "accounting");
+  const { user, slug } = await requireModule(company, "accounting");
   const base = `/c/${slug}/finance/accounts`;
   const ledger = await getLedger(slug);
   const totals = accountTotals(ledger).filter((a) => a.active || search.inactive);
@@ -113,7 +113,7 @@ async function AccountsContent({ params, searchParams }: { params: Promise<{ com
                         >
                           <Pencil className="size-4" aria-hidden />
                         </Link>
-                        {!a.isSystem && a.active && (
+                        {!a.isSystem && a.active && isAdmin(user) && (
                           <DeleteButton
                             action={deleteLedgerAccount.bind(null, slug, a.id)}
                             confirmText={`Delete account ${a.code} ${a.name}? If it already has entries it is deactivated instead, so history is kept.`}

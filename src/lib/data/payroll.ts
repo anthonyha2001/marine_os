@@ -5,13 +5,14 @@ import { companyIdFor } from "@/lib/data/inventory";
 import { lineGross, lineNet, parseBrackets, type PayFrequency, type PayrollRules, type RunStatus } from "@/lib/payroll";
 import { round2 } from "@/lib/money";
 import type { CompanySlug } from "@/lib/permissions";
+import { DATA_TAG } from "@/lib/cache-tag";
 
 // Staff and payroll, cached per company. Every payroll action calls updateTag(payrollTag(companyId)).
 export const payrollTag = (companyId: string) => `payroll:${companyId}`;
 
 async function loadEmployees(companyId: string) {
   "use cache";
-  cacheTag(payrollTag(companyId));
+  cacheTag(DATA_TAG, payrollTag(companyId));
   cacheLife("hours");
   const rows = await prisma.employee.findMany({ where: { companyId }, orderBy: [{ active: "desc" }, { name: "asc" }] });
   return rows.map((e) => ({
@@ -37,7 +38,7 @@ export type EmployeeRow = Awaited<ReturnType<typeof loadEmployees>>[number];
 
 async function loadRuns(companyId: string) {
   "use cache";
-  cacheTag(payrollTag(companyId));
+  cacheTag(DATA_TAG, payrollTag(companyId));
   cacheLife("hours");
   const rows = await prisma.payrollRun.findMany({
     where: { companyId },
@@ -102,7 +103,7 @@ export async function outstandingAdvances(slug: CompanySlug) {
   const companyId = await companyIdFor(slug);
   const [given, repaid] = await Promise.all([
     prisma.voucher.findMany({
-      where: { companyId, kind: "PAYMENT", counterAccount: { code: "425" } },
+      where: { companyId, status: "POSTED", kind: "PAYMENT", counterAccount: { code: "425" } },
       select: { partyName: true, amount: true },
     }),
     prisma.payrollLine.groupBy({ by: ["employeeId"], where: { run: { companyId, status: "PAID" } }, _sum: { advance: true } }),
@@ -122,7 +123,7 @@ export async function getPayrollRules(slug: CompanySlug): Promise<PayrollRules &
 
 async function loadRules(companyId: string) {
   "use cache";
-  cacheTag(payrollTag(companyId));
+  cacheTag(DATA_TAG, payrollTag(companyId));
   cacheLife("hours");
   const r = await prisma.payrollSettings.findUnique({ where: { companyId } });
   const n = (v: unknown, d: number) => (v === undefined || v === null ? d : Number(v));

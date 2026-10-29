@@ -12,7 +12,7 @@ export async function refreshInvoiceStatus(tx: Tx, invoiceId: string) {
     select: {
       status: true,
       totalTTC: true,
-      receipts: { select: { amount: true, receivedAt: true } },
+      receipts: { where: { status: "POSTED" }, select: { amount: true, receivedAt: true } },
       creditNotes: { where: { status: "ISSUED" }, select: { totalTTC: true } },
     },
   });
@@ -36,7 +36,7 @@ export async function invoiceBalance(tx: Tx, invoiceId: string) {
     select: {
       totalTTC: true,
       status: true,
-      receipts: { select: { amount: true } },
+      receipts: { where: { status: "POSTED" }, select: { amount: true } },
       creditNotes: { where: { status: "ISSUED" }, select: { totalTTC: true } },
     },
   });

@@ -5,6 +5,8 @@ import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { toRecycleBin } from "@/lib/recycle-bin";
+import { deleteRefusal } from "@/lib/delete-rules";
 import { requireModule } from "@/lib/auth";
 import { companyIdFor, tags } from "@/lib/data/inventory";
 import { poTag } from "@/lib/data/purchase-orders";
@@ -173,11 +175,18 @@ export async function addLandedCost(companySlug: string, purchaseId: string, _pr
 }
 
 export async function deleteLandedCost(companySlug: string, purchaseId: string, landedCostId: string): Promise<{ error?: string }> {
-  const { slug } = await requireModule(companySlug, "purchases");
+  const { user, slug } = await requireModule(companySlug, "purchases");
+  const refused = deleteRefusal(user, "posted");
+  if (refused) return { error: refused };
   const companyId = await companyIdFor(slug);
-  const found = await prisma.landedCost.findFirst({ where: { id: landedCostId, purchase: { id: purchaseId, companyId } }, select: { id: true } });
+  const found = await prisma.landedCost.findFirst({
+    where: { id: landedCostId, purchase: { id: purchaseId, companyId } },
+    select: { id: true, description: true, purchase: { select: { invoiceNumber: true } } },
+  });
   if (!found) return { error: "This cost no longer exists." };
   await prisma.$transaction(async (tx) => {
+    const label = `Landed cost · ${found.description} · purchase ${found.purchase.invoiceNumber}`;
+    await toRecycleBin(tx, { model: "LandedCost", id: landedCostId, companyId, label, deletedByName: user.name });
     await tx.landedCost.delete({ where: { id: landedCostId } });
     await recomputePurchaseCosts(tx, purchaseId);
   }, TRANSACTION_OPTIONS);

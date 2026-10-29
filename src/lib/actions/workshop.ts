@@ -4,6 +4,8 @@ import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma, type Tx } from "@/lib/prisma";
+import { toRecycleBin } from "@/lib/recycle-bin";
+import { deleteRefusal } from "@/lib/delete-rules";
 import { requireModule } from "@/lib/auth";
 import { businessToday } from "@/lib/dates";
 import { companyIdFor, tags } from "@/lib/data/inventory";
@@ -296,11 +298,17 @@ export async function invoiceJobCard(companySlug: string, jobId: string, _prev: 
 }
 
 export async function deleteJobCard(companySlug: string, jobId: string): Promise<{ error?: string }> {
-  const { slug, companyId } = await ctx(companySlug);
-  const job = await prisma.jobCard.findFirst({ where: { id: jobId, companyId }, select: { status: true, _count: { select: { invoices: true } } } });
+  const { user, slug, companyId } = await ctx(companySlug);
+  const job = await prisma.jobCard.findFirst({ where: { id: jobId, companyId }, select: { status: true, number: true, _count: { select: { invoices: true } } } });
   if (!job) return { error: "This job card no longer exists." };
   if (job._count.invoices) return { error: "This job card has invoices, so it is kept. Cancel it instead." };
-  await prisma.jobCard.delete({ where: { id: jobId } });
+  const draft = job.status === "OPEN";
+  const refused = deleteRefusal(user, draft ? "draft" : "posted");
+  if (refused) return { error: draft ? refused : "Only the admin can delete a job card that was started. Cancel it instead." };
+  await prisma.$transaction(async (tx) => {
+    await toRecycleBin(tx, { model: "JobCard", id: jobId, companyId, label: `Job card ${job.number}`, deletedByName: user.name });
+    await tx.jobCard.delete({ where: { id: jobId } });
+  }, TRANSACTION_OPTIONS);
   refresh(companyId, { stock: job.status === "DONE" });
   redirect(`/c/${slug}/workshop`);
 }

@@ -3,6 +3,7 @@ import { cacheLife, cacheTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import type { CompanySlug } from "@/lib/permissions";
 import type { ItemType, ServiceUnit } from "@/lib/catalogue";
+import { DATA_TAG } from "@/lib/cache-tag";
 
 // Reads are cached in server memory ("use cache") because the database is far away.
 // Every mutation calls updateTag() with the matching tag, so changes show immediately.
@@ -53,7 +54,7 @@ export type CatalogueProduct = {
 /** The shared catalogue of products and services (plain values so it can be cached). */
 export async function getCatalogue(): Promise<CatalogueProduct[]> {
   "use cache";
-  cacheTag(tags.products);
+  cacheTag(DATA_TAG, tags.products);
   cacheLife("hours");
 
   const products = await prisma.product.findMany({
@@ -82,7 +83,7 @@ export async function getCatalogue(): Promise<CatalogueProduct[]> {
 /** Quantity on hand per product for one company. */
 async function getStock(companyId: string): Promise<Record<string, number>> {
   "use cache";
-  cacheTag(tags.stock(companyId));
+  cacheTag(DATA_TAG, tags.stock(companyId));
   cacheLife("hours");
 
   const rows = await prisma.stockMovement.groupBy({
@@ -133,14 +134,14 @@ export async function productCatalogue() {
 
 export async function listSuppliers() {
   "use cache";
-  cacheTag(tags.suppliers);
+  cacheTag(DATA_TAG, tags.suppliers);
   cacheLife("hours");
   return prisma.supplier.findMany({ orderBy: { name: "asc" } });
 }
 
 async function getPurchases(companyId: string) {
   "use cache";
-  cacheTag(tags.purchases(companyId));
+  cacheTag(DATA_TAG, tags.purchases(companyId));
   cacheLife("hours");
 
   const purchases = await prisma.purchase.findMany({
@@ -169,7 +170,7 @@ export async function listPurchases(slug: CompanySlug) {
 
 async function getPurchaseDetail(companyId: string, id: string) {
   "use cache";
-  cacheTag(tags.purchases(companyId));
+  cacheTag(DATA_TAG, tags.purchases(companyId));
   cacheLife("hours");
 
   const p = await prisma.purchase.findFirst({

@@ -8,13 +8,15 @@ import { PAYMENT_METHODS } from "@/lib/accounting";
 import { listCreditNotes, listMoneyAccounts, listReceipts } from "@/lib/data/ledger";
 import { getInvoice } from "@/lib/data/sales";
 import { formatMoney, round2, VAT_RATE } from "@/lib/money";
-import { COMPANIES } from "@/lib/permissions";
+import { COMPANIES, can, isAdmin } from "@/lib/permissions";
 import { DeleteButton } from "@/components/delete-button";
 import { Modal } from "@/components/modal";
 import { Badge, PageHeader, ProgressBar, cardClass } from "@/components/ui";
 import { ReceiptForm } from "../../finance/receipts/receipt-form";
 import { InvoiceStatusBadge } from "../status-badge";
 import { InvoiceActions } from "./invoice-actions";
+import { CancelButton, CancelledNote } from "@/components/cancel-button";
+import { cancelReceipt } from "@/lib/actions/cancel";
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "long", timeZone: "UTC" });
 
@@ -26,14 +28,16 @@ async function InvoiceDetail({
   searchParams: Promise<{ pay?: string; paid?: string }>;
 }) {
   const [{ company, invoiceId }, { pay, paid: justPaid }] = await Promise.all([params, searchParams]);
-  const { slug } = await requireModule(company, "invoices");
+  const { user, slug } = await requireModule(company, "invoices");
+  const admin = isAdmin(user);
+  const mayCancel = can(user, "cancelEntries");
   // Only finds invoices of this company, so another company's invoice can't be opened by URL.
   const invoice = await getInvoice(slug, invoiceId);
   if (!invoice) notFound();
   const [allReceipts, allNotes] = await Promise.all([listReceipts(slug), listCreditNotes(slug)]);
   const receipts = allReceipts.filter((r) => r.invoice?.id === invoice.id);
   const notes = allNotes.filter((c) => c.invoice?.id === invoice.id);
-  const paid = round2(receipts.reduce((s, r) => s + r.amount, 0));
+  const paid = round2(receipts.filter((r) => r.status === "POSTED").reduce((s, r) => s + r.amount, 0));
   const credited = round2(notes.filter((c) => c.status === "ISSUED").reduce((s, c) => s + c.totalTTC, 0));
   const balance = invoice.status === "CANCELLED" ? 0 : Math.max(0, round2(invoice.totalTTC - paid - credited));
   const pageUrl = `/c/${slug}/invoices/${invoice.id}`;
@@ -157,21 +161,33 @@ async function InvoiceDetail({
               </thead>
               <tbody className="divide-y divide-border">
                 {receipts.map((r) => (
-                  <tr key={r.id}>
-                    <td className="py-2 pr-3 font-mono text-xs">{r.number}</td>
+                  <tr key={r.id} className={r.status === "CANCELLED" ? "opacity-60" : ""}>
+                    <td className="py-2 pr-3 font-mono text-xs">
+                      {r.number}
+                      {r.status === "CANCELLED" && <CancelledNote by={r.cancelledByName} reason={r.cancelReason} />}
+                    </td>
                     <td className="py-2 pr-3">{dateFormat.format(r.receivedAt)}</td>
                     <td className="py-2 pr-3 text-muted">
                       {PAYMENT_METHODS[r.method as keyof typeof PAYMENT_METHODS] ?? r.method} · {r.moneyAccount}
                       {r.reference && ` · ${r.reference}`}
                     </td>
-                    <td className="py-2 pr-3 text-right font-medium">{formatMoney(r.amount)}</td>
-                    <td className="py-2 text-right">
-                      <DeleteButton
-                        action={deleteReceipt.bind(null, slug, r.id)}
-                        confirmText={`Delete receipt ${r.number} of ${formatMoney(r.amount)}? Its accounting entry is removed and the invoice balance goes back up.`}
-                        title="Delete receipt"
-                        successMessage="Receipt deleted."
-                      />
+                    <td className={`py-2 pr-3 text-right font-medium ${r.status === "CANCELLED" ? "line-through" : ""}`}>{formatMoney(r.amount)}</td>
+                    <td className="whitespace-nowrap py-2 text-right">
+                      {r.status === "POSTED" && mayCancel && (
+                        <CancelButton
+                          action={cancelReceipt.bind(null, slug, r.id)}
+                          title="Cancel receipt"
+                          message={`Receipt ${r.number} of ${formatMoney(r.amount)} stays on record as cancelled, a reversing entry is posted today, and the invoice balance goes back up.`}
+                        />
+                      )}
+                      {admin && (
+                        <DeleteButton
+                          action={deleteReceipt.bind(null, slug, r.id)}
+                          confirmText={`Delete receipt ${r.number} of ${formatMoney(r.amount)}? It goes to the recycle bin with its accounting entry, and can be restored.`}
+                          title="Delete receipt"
+                          successMessage="Receipt moved to the recycle bin."
+                        />
+                      )}
                     </td>
                   </tr>
                 ))}

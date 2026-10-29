@@ -73,6 +73,8 @@ model User {
   companyId    String?
   company      Company?  @relation(fields: [companyId], references: [id])
   active       Boolean   @default(true)
+  // Custom access set on the Team page: { modules: [...], caps: [...] }. null = the role's defaults.
+  permissions  Json?
   lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -501,24 +503,29 @@ model PurchaseOrderLine {
 // ─── Accounting ────────────────────────────────────────────
 // A payment made to a supplier against a purchase (several per purchase = partial payments).
 model SupplierPayment {
-  cheques        Cheque[]
-  id             String         @id @default(cuid())
-  companyId      String
-  number         String? // PV-2026-0001: same series as payment vouchers
-  company        Company        @relation(fields: [companyId], references: [id])
-  purchaseId     String
-  purchase       Purchase       @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  amount         Decimal        @db.Decimal(12, 2)
-  paidAt         DateTime       @db.Date
-  method         String // CASH | BANK_TRANSFER | CHEQUE | CARD | OTHER
+  cheques         Cheque[]
+  id              String         @id @default(cuid())
+  companyId       String
+  number          String? // PV-2026-0001: same series as payment vouchers
+  // Cancelled instead of deleted: the record stays, a reversing journal entry is posted.
+  status          String         @default("POSTED") // POSTED | CANCELLED
+  cancelledAt     DateTime?
+  cancelledByName String?
+  cancelReason    String?
+  company         Company        @relation(fields: [companyId], references: [id])
+  purchaseId      String
+  purchase        Purchase       @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  amount          Decimal        @db.Decimal(12, 2)
+  paidAt          DateTime       @db.Date
+  method          String // CASH | BANK_TRANSFER | CHEQUE | CARD | OTHER
   // Cash box or bank account it was paid from (null only for payments made before the ledger).
-  moneyAccountId String?
-  moneyAccount   LedgerAccount? @relation(fields: [moneyAccountId], references: [id])
-  reference      String? // transfer / cheque number
-  notes          String?
-  createdById    String
-  createdBy      User           @relation(fields: [createdById], references: [id])
-  createdAt      DateTime       @default(now())
+  moneyAccountId  String?
+  moneyAccount    LedgerAccount? @relation(fields: [moneyAccountId], references: [id])
+  reference       String? // transfer / cheque number
+  notes           String?
+  createdById     String
+  createdBy       User           @relation(fields: [createdById], references: [id])
+  createdAt       DateTime       @default(now())
 
   @@unique([companyId, number])
   @@index([companyId, paidAt])
@@ -600,26 +607,31 @@ model JournalLine {
 
 // Money received from a customer, usually against an invoice (partial allowed).
 model CustomerReceipt {
-  cheques        Cheque[]
-  id             String        @id @default(cuid())
-  companyId      String
-  company        Company       @relation(fields: [companyId], references: [id])
-  number         String // RC-2026-0001
-  invoiceId      String?
-  invoice        Invoice?      @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
-  customerId     String?
-  customer       Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  customerName   String
-  amount         Decimal       @db.Decimal(12, 2)
-  receivedAt     DateTime      @db.Date
-  method         String // CASH | BANK_TRANSFER | CHEQUE | CARD | OTHER
-  moneyAccountId String
-  moneyAccount   LedgerAccount @relation(fields: [moneyAccountId], references: [id])
-  reference      String?
-  notes          String?
-  createdById    String
-  createdBy      User          @relation(fields: [createdById], references: [id])
-  createdAt      DateTime      @default(now())
+  cheques         Cheque[]
+  id              String        @id @default(cuid())
+  companyId       String
+  company         Company       @relation(fields: [companyId], references: [id])
+  number          String // RC-2026-0001
+  // Cancelled instead of deleted: the record stays, a reversing journal entry is posted.
+  status          String        @default("POSTED") // POSTED | CANCELLED
+  cancelledAt     DateTime?
+  cancelledByName String?
+  cancelReason    String?
+  invoiceId       String?
+  invoice         Invoice?      @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  customerId      String?
+  customer        Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName    String
+  amount          Decimal       @db.Decimal(12, 2)
+  receivedAt      DateTime      @db.Date
+  method          String // CASH | BANK_TRANSFER | CHEQUE | CARD | OTHER
+  moneyAccountId  String
+  moneyAccount    LedgerAccount @relation(fields: [moneyAccountId], references: [id])
+  reference       String?
+  notes           String?
+  createdById     String
+  createdBy       User          @relation(fields: [createdById], references: [id])
+  createdAt       DateTime      @default(now())
 
   @@unique([companyId, number])
   @@index([companyId, receivedAt])
@@ -634,6 +646,11 @@ model Voucher {
   company          Company       @relation(fields: [companyId], references: [id])
   number           String // PV-2026-0001 | RV-2026-0001 | TR-2026-0001
   kind             String // PAYMENT | RECEIPT | TRANSFER
+  // Cancelled instead of deleted: the record stays, a reversing journal entry is posted.
+  status           String        @default("POSTED") // POSTED | CANCELLED
+  cancelledAt      DateTime?
+  cancelledByName  String?
+  cancelReason     String?
   date             DateTime      @db.Date
   moneyAccountId   String // cash/bank paid from (PV, TR source) or received into (RV)
   moneyAccount     LedgerAccount @relation("VoucherMoneyAccount", fields: [moneyAccountId], references: [id])
@@ -1358,4 +1375,22 @@ model PosSettings {
   cashierSeesShiftTotals Boolean  @default(true)
   receiptNote            String? // printed at the bottom of the receipt
   updatedAt              DateTime @updatedAt
+}
+
+// Deleted records, kept so they can be restored: the record and everything removed with it
+// (lines, journal entries, stock movements) as rows per table. Emptied with the database.
+model RecycleBinItem {
+  id             String    @id @default(cuid())
+  companyId      String?
+  entity         String // "Invoice", "Voucher"… (the main model)
+  entityId       String
+  label          String // what the user sees, e.g. "Voucher PV-2026-0003 · $120.00"
+  rows           Json // { [model]: row[] }, inserted back parents first
+  relinks        Json? // rows whose link to the record was set to empty: { model, id, field, value }[]
+  deletedByName  String
+  deletedAt      DateTime  @default(now())
+  restoredAt     DateTime?
+  restoredByName String?
+
+  @@index([companyId, deletedAt])
 }

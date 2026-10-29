@@ -4,6 +4,8 @@ import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { toRecycleBin } from "@/lib/recycle-bin";
+import { deleteRefusal } from "@/lib/delete-rules";
 import { requireModule } from "@/lib/auth";
 import { businessToday } from "@/lib/dates";
 import { companyIdFor, tags } from "@/lib/data/inventory";
@@ -116,11 +118,16 @@ export async function postStockCount(companySlug: string, countId: string): Prom
 }
 
 export async function deleteStockCount(companySlug: string, countId: string): Promise<{ error?: string }> {
-  const { slug, companyId } = await ctx(companySlug);
-  const count = await prisma.stockCount.findFirst({ where: { id: countId, companyId }, select: { status: true } });
+  const { user, slug, companyId } = await ctx(companySlug);
+  const count = await prisma.stockCount.findFirst({ where: { id: countId, companyId }, select: { status: true, number: true } });
   if (!count) return { error: "This count no longer exists." };
   if (count.status !== "DRAFT") return { error: "A posted count can't be deleted." };
-  await prisma.stockCount.delete({ where: { id: countId } });
+  const refused = deleteRefusal(user, "draft");
+  if (refused) return { error: refused };
+  await prisma.$transaction(async (tx) => {
+    await toRecycleBin(tx, { model: "StockCount", id: countId, companyId, label: `Stock count ${count.number}`, deletedByName: user.name });
+    await tx.stockCount.delete({ where: { id: countId } });
+  });
   updateTag(stockOpsTag);
   redirect(`/c/${slug}/inventory/counts`);
 }

@@ -6,6 +6,8 @@ import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { toRecycleBin } from "@/lib/recycle-bin";
+import { deleteRefusal } from "@/lib/delete-rules";
 import { requireModule } from "@/lib/auth";
 import { internalBarcodeFor, parseBarcodes } from "@/lib/barcode";
 import { tags } from "@/lib/data/inventory";
@@ -138,10 +140,12 @@ export type DeleteResult = { error?: string };
 
 /** Delete a product, unless it has purchase/stock history (that would corrupt stock records). */
 export async function deleteProduct(companySlug: string, productId: string): Promise<DeleteResult> {
-  const { slug } = await requireModule(companySlug, "inventory");
+  const { user, slug } = await requireModule(companySlug, "inventory");
+  const refused = deleteRefusal(user, "record");
+  if (refused) return { error: refused };
   const product = await prisma.product.findUnique({
     where: { id: productId },
-    select: { type: true, imageUrl: true, _count: { select: { purchaseItems: true, stockMovements: true } } },
+    select: { type: true, code: true, name: true, _count: { select: { purchaseItems: true, stockMovements: true } } },
   });
   if (!product || product.type !== "PRODUCT") return { error: "This product no longer exists." };
   if (product._count.purchaseItems > 0 || product._count.stockMovements > 0) {
@@ -149,8 +153,11 @@ export async function deleteProduct(companySlug: string, productId: string): Pro
   }
 
   // Offer lines keep their own copy of the title and price, so offers are unaffected.
-  await prisma.product.delete({ where: { id: productId } });
-  await deleteProductImage(product.imageUrl).catch(() => {});
+  // The picture file is kept so the product can be restored from the recycle bin.
+  await prisma.$transaction(async (tx) => {
+    await toRecycleBin(tx, { model: "Product", id: productId, companyId: null, label: `Product ${product.code} · ${product.name}`, deletedByName: user.name });
+    await tx.product.delete({ where: { id: productId } });
+  }, TRANSACTION_OPTIONS);
   updateTag(tags.products);
   redirect(`/c/${slug}/inventory`);
 }

@@ -6,7 +6,7 @@ import { listSuppliers, productCatalogue } from "@/lib/data/inventory";
 import { PO_STATUSES, getPurchaseOrder } from "@/lib/data/purchase-orders";
 import { deletePurchaseOrder } from "@/lib/actions/purchase-orders";
 import { formatMoney } from "@/lib/money";
-import { COMPANIES } from "@/lib/permissions";
+import { COMPANIES, can, isAdmin } from "@/lib/permissions";
 import { DeleteButton } from "@/components/delete-button";
 import { OrderTotals } from "@/components/order-lines";
 import { ButtonLink, Kbd, PageHeader, cardClass, primaryButton, secondaryButton } from "@/components/ui";
@@ -24,7 +24,7 @@ async function PurchaseOrderPage({
   searchParams: Promise<{ saved?: string }>;
 }) {
   const [{ company, orderId }, { saved }] = await Promise.all([params, searchParams]);
-  const { slug } = await requireModule(company, "purchases");
+  const { user, slug } = await requireModule(company, "purchases");
   const order = await getPurchaseOrder(slug, orderId);
   if (!order) notFound();
   const editable = order.status === "DRAFT" || order.status === "SENT";
@@ -49,11 +49,11 @@ async function PurchaseOrderPage({
             <a href={`${pdfUrl}?download=1`} className={secondaryButton}>
               Download PDF
             </a>
-            {order.status !== "RECEIVED" && (
+            {order.status !== "RECEIVED" && (isAdmin(user) || (order.status === "DRAFT" && can(user, "deleteDrafts"))) && (
               <DeleteButton
                 bordered
                 action={deletePurchaseOrder.bind(null, slug, order.id)}
-                confirmText={`Delete purchase order ${order.number}? This can't be undone.`}
+                confirmText={`Delete purchase order ${order.number}? It goes to the recycle bin and can be restored.`}
                 title="Delete purchase order"
               />
             )}

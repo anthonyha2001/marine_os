@@ -1,5 +1,5 @@
 // Sidebar layout and keyboard shortcuts. One list drives both, so they never disagree.
-import { ROLE_MODULES, type CompanySlug, type ModuleKey, type Role } from "@/lib/permissions";
+import { modulesFor, type CompanySlug, type CustomAccess, type ModuleKey, type Role } from "@/lib/permissions";
 import { POS_COMPANIES } from "@/lib/pos";
 
 /** Icon names, mapped to lucide icons in the (client) sidebar. */
@@ -7,6 +7,7 @@ export type NavIcon =
   | "dashboard"
   | "owner"
   | "audit"
+  | "recycleBin"
   | "offers"
   | "invoices"
   | "customers"
@@ -142,15 +143,16 @@ export const NAV: NavGroup[] = [
     items: [
       { label: "Team & roles", path: "team", module: "team", icon: "team" },
       { label: "Audit log", path: "audit", module: "audit", icon: "audit" },
+      { label: "Recycle bin", path: "recycle-bin", module: "recycleBin", icon: "recycleBin" },
       { label: "Company details", path: "settings", module: "settings", icon: "company" },
     ],
   },
   // Marketing and Tasks stay hidden until they are built.
 ];
 
-/** Items a role may open (including shortcut-only ones), with no empty groups. */
-export function navFor(role: Role, company: CompanySlug): NavGroup[] {
-  const allowed = ROLE_MODULES[role];
+/** Items this person may open (including shortcut-only ones), with no empty groups. */
+export function navFor(user: { role: Role; companySlug: CompanySlug | null; access?: CustomAccess }, company: CompanySlug): NavGroup[] {
+  const allowed = modulesFor(user);
   return NAV.map((g) => ({ ...g, items: g.items.filter((i) => allowed.includes(i.module) && (!i.companies || i.companies.includes(company))) })).filter(
     (g) => g.items.length > 0,
   );

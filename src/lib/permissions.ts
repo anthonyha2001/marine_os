@@ -64,6 +64,7 @@ export const MODULES = {
   invoices: { label: "Invoices", path: "invoices" },
   sales: { label: "Point of sale", path: "pos" },
   posAdmin: { label: "POS prices & settings", path: "pos/prices" },
+  recycleBin: { label: "Recycle bin", path: "recycle-bin" },
   marketing: { label: "Marketing", path: "marketing" },
   accounting: { label: "Accounting", path: "accounting" },
   payroll: { label: "Payroll", path: "payroll" },
@@ -86,7 +87,64 @@ export const ROLE_MODULES: Record<Role, ModuleKey[]> = {
   ACCOUNTANT: ["dashboard", "purchases", "suppliers", "offers", "customers", "invoices", "accounting", "payroll", "workshop", "sales", "tasks"],
 };
 
-type Actor = { role: Role; companySlug: CompanySlug | null };
+/**
+ * What a person may do beyond opening pages. Deleting posted entries is the admin's alone;
+ * deletes always go to the recycle bin, so they can be restored.
+ */
+export const CAPABILITIES = {
+  cancelEntries: { label: "Cancel and reverse posted entries", hint: "Payments, receipts, vouchers and journal entries: the entry stays, stamped CANCELLED, with a reversing entry." },
+  deleteDrafts: { label: "Delete drafts", hint: "Offers, purchase orders, payrolls, stock counts and job cards that are still drafts." },
+} as const;
+export type Capability = keyof typeof CAPABILITIES;
+export const isCapability = (v: string): v is Capability => v in CAPABILITIES;
+
+export const ROLE_CAPS: Record<Role, Capability[]> = {
+  ADMIN: ["cancelEntries", "deleteDrafts"],
+  MANAGER: ["cancelEntries", "deleteDrafts"],
+  ACCOUNTANT: ["cancelEntries", "deleteDrafts"],
+  STOCK_WORKER: ["deleteDrafts"],
+  REGULAR_WORKER: [],
+  MARKETING_MANAGER: ["deleteDrafts"],
+  CASHIER: [],
+};
+
+/** Modules a manager can't hand out: they would let staff change permissions or see group figures. */
+export const ADMIN_ONLY_MODULES: ModuleKey[] = ["team", "owner", "audit", "recycleBin"];
+
+/** Custom access from the Team page (null = the role's defaults). */
+export type CustomAccess = { modules: ModuleKey[]; caps: Capability[] } | null;
+
+type Actor = { role: Role; companySlug: CompanySlug | null; access?: CustomAccess };
+
+export const isAdmin = (user: { role: Role }) => user.role === "ADMIN";
+
+/** Modules this person can hand out on the Team page. */
+export function grantableModules(user: Actor): ModuleKey[] {
+  const own = modulesFor(user);
+  return user.role === "ADMIN" ? own : own.filter((m) => !ADMIN_ONLY_MODULES.includes(m));
+}
+
+/** Modules this person may open: their custom list, or their role's. */
+export function modulesFor(user: Actor): ModuleKey[] {
+  if (user.role === "ADMIN" || !user.access) return ROLE_MODULES[user.role];
+  return user.access.modules;
+}
+
+export function can(user: Actor, cap: Capability) {
+  if (user.role === "ADMIN") return true;
+  return (user.access?.caps ?? ROLE_CAPS[user.role]).includes(cap);
+}
+
+/** Read the JSON stored on the user, keeping only known modules and capabilities. */
+export function parseAccess(value: unknown): CustomAccess {
+  if (!value || typeof value !== "object") return null;
+  const v = value as { modules?: unknown; caps?: unknown };
+  if (!Array.isArray(v.modules)) return null;
+  return {
+    modules: v.modules.filter((m): m is ModuleKey => typeof m === "string" && m in MODULES),
+    caps: Array.isArray(v.caps) ? v.caps.filter((c): c is Capability => typeof c === "string" && isCapability(c)) : [],
+  };
+}
 
 /** Which companies a user may enter. Admin: both. Everyone else: their own. */
 export function allowedCompanies(user: Actor): CompanySlug[] {
@@ -99,7 +157,7 @@ export function canAccessCompany(user: Actor, slug: CompanySlug) {
 }
 
 export function canAccessModule(user: Actor, slug: CompanySlug, mod: ModuleKey) {
-  return canAccessCompany(user, slug) && ROLE_MODULES[user.role].includes(mod);
+  return canAccessCompany(user, slug) && modulesFor(user).includes(mod);
 }
 
 /**

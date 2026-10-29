@@ -4,6 +4,8 @@ import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { toRecycleBin } from "@/lib/recycle-bin";
+import { deleteRefusal } from "@/lib/delete-rules";
 import { requireModule } from "@/lib/auth";
 import { isPaymentMethod } from "@/lib/accounting";
 import { payablesTag } from "@/lib/data/accounting";
@@ -52,7 +54,7 @@ export async function recordSupplierPayment(
   const [purchase, account] = await Promise.all([
     prisma.purchase.findFirst({
       where: { id: purchaseId, companyId },
-      select: { invoiceNumber: true, supplierId: true, supplier: { select: { name: true } }, totalTTC: true, payments: { select: { amount: true } } },
+      select: { invoiceNumber: true, supplierId: true, supplier: { select: { name: true } }, totalTTC: true, payments: { where: { status: "POSTED" }, select: { amount: true } } },
     }),
     prisma.ledgerAccount.findFirst({ where: { id: data.moneyAccountId, companyId, kind: { in: ["CASH", "BANK"] }, active: true }, select: { id: true } }),
   ]);
@@ -103,12 +105,19 @@ export async function recordSupplierPayment(
 
 /** Remove a payment recorded by mistake (and its journal entry). */
 export async function deleteSupplierPayment(companySlug: string, paymentId: string): Promise<{ error?: string }> {
-  const { slug } = await requireModule(companySlug, "accounting");
+  const { user, slug } = await requireModule(companySlug, "accounting");
+  const refused = deleteRefusal(user, "posted");
+  if (refused) return { error: refused };
   const companyId = await companyIdFor(slug);
-  const payment = await prisma.supplierPayment.findFirst({ where: { id: paymentId, companyId }, select: { id: true } });
+  const payment = await prisma.supplierPayment.findFirst({
+    where: { id: paymentId, companyId },
+    select: { id: true, number: true, amount: true, purchase: { select: { invoiceNumber: true, supplier: { select: { name: true } } } } },
+  });
   if (!payment) return { error: "This payment no longer exists." };
   if (await prisma.cheque.count({ where: { supplierPaymentId: paymentId } })) return { error: "This payment is a cheque. On the Cheques page, mark it as bounced or cancelled instead." };
   await prisma.$transaction(async (tx) => {
+    const label = `Supplier payment ${payment.number ?? ""} · ${payment.purchase.supplier.name} · invoice ${payment.purchase.invoiceNumber} · ${Number(payment.amount).toFixed(2)}`;
+    await toRecycleBin(tx, { model: "SupplierPayment", id: paymentId, companyId, label, deletedByName: user.name });
     await removeEntries(tx, "SUPPLIER_PAYMENT", paymentId);
     await tx.supplierPayment.delete({ where: { id: paymentId } });
   }, TRANSACTION_OPTIONS);

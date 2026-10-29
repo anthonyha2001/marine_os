@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { companyIdFor } from "@/lib/data/inventory";
 import type { CompanySlug } from "@/lib/permissions";
 import type { DiscountType, InvoiceStatus, OfferStatus, PaymentMode, PaymentPlan } from "@/lib/offers";
+import { DATA_TAG } from "@/lib/cache-tag";
 
 // Cached like inventory reads; mutations call updateTag() with these tags.
 export const salesTags = {
@@ -15,7 +16,7 @@ export const salesTags = {
 
 export async function listCustomers() {
   "use cache";
-  cacheTag(salesTags.customers);
+  cacheTag(DATA_TAG, salesTags.customers);
   cacheLife("hours");
   return prisma.customer.findMany({ orderBy: { name: "asc" } });
 }
@@ -37,7 +38,7 @@ export type CompanyProfile = {
 
 async function loadCompanyProfile(companyId: string): Promise<CompanyProfile> {
   "use cache";
-  cacheTag(salesTags.company(companyId));
+  cacheTag(DATA_TAG, salesTags.company(companyId));
   cacheLife("hours");
   const c = await prisma.company.findUniqueOrThrow({ where: { id: companyId } });
   return {
@@ -62,7 +63,7 @@ export async function getCompanyProfile(slug: CompanySlug) {
 
 async function loadOffers(companyId: string) {
   "use cache";
-  cacheTag(salesTags.offers(companyId));
+  cacheTag(DATA_TAG, salesTags.offers(companyId));
   cacheLife("hours");
   const offers = await prisma.offer.findMany({
     where: { companyId },
@@ -99,7 +100,7 @@ export type OfferDetail = NonNullable<Awaited<ReturnType<typeof loadOffer>>>;
 
 async function loadOffer(companyId: string, id: string) {
   "use cache";
-  cacheTag(salesTags.offers(companyId));
+  cacheTag(DATA_TAG, salesTags.offers(companyId));
   cacheLife("hours");
   const o = await prisma.offer.findFirst({
     where: { id, companyId },
@@ -201,7 +202,7 @@ export async function getOffer(slug: CompanySlug, id: string) {
 
 async function loadInvoices(companyId: string) {
   "use cache";
-  cacheTag(salesTags.invoices(companyId));
+  cacheTag(DATA_TAG, salesTags.invoices(companyId));
   cacheLife("hours");
   const invoices = await prisma.invoice.findMany({
     where: { companyId },
@@ -229,7 +230,7 @@ export type InvoiceDetail = NonNullable<Awaited<ReturnType<typeof loadInvoice>>>
 
 async function loadInvoice(companyId: string, id: string) {
   "use cache";
-  cacheTag(salesTags.invoices(companyId));
+  cacheTag(DATA_TAG, salesTags.invoices(companyId));
   cacheLife("hours");
   const i = await prisma.invoice.findFirst({
     where: { id, companyId },

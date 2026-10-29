@@ -8,7 +8,7 @@ import { AppShell } from "./shell/app-shell";
 async function Shell({ params, children }: { params: Promise<{ company: string }>; children: React.ReactNode }) {
   const { company } = await params;
   const { user, slug } = await requireCompany(company);
-  const groups = navFor(user.role, slug);
+  const groups = navFor(user, slug);
   const notices = await noticesFor(user, slug);
   const option = (s: keyof typeof COMPANIES) => ({ slug: s, name: COMPANIES[s].name, logo: COMPANIES[s].mark });
 

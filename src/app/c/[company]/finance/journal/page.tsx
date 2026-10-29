@@ -6,20 +6,25 @@ import { deleteJournalEntry } from "@/lib/actions/finance";
 import { dayFormat } from "@/lib/dates";
 import { getLedger } from "@/lib/data/ledger";
 import { formatMoney, round2 } from "@/lib/money";
-import { COMPANIES } from "@/lib/permissions";
+import { COMPANIES, can, isAdmin } from "@/lib/permissions";
 import { DeleteButton } from "@/components/delete-button";
 import { Modal } from "@/components/modal";
 import { Badge, ButtonLink, EmptyState, PageHeader, SearchBar, cardClass } from "@/components/ui";
 import { Amount, PeriodFilter, SOURCE_LABELS, periodFrom, sourceHref, type PeriodParams } from "../finance-ui";
 import { JournalForm } from "./journal-form";
+import { CancelButton } from "@/components/cancel-button";
+import { reverseJournalEntry } from "@/lib/actions/cancel";
 
 type Search = PeriodParams & { q?: string; new?: string; saved?: string; source?: string };
 
 async function JournalContent({ params, searchParams }: { params: Promise<{ company: string }>; searchParams: Promise<Search> }) {
   const [{ company }, search] = await Promise.all([params, searchParams]);
-  const { slug } = await requireModule(company, "accounting");
+  const { user, slug } = await requireModule(company, "accounting");
   const base = `/c/${slug}/finance/journal`;
   const ledger = await getLedger(slug);
+  const admin = isAdmin(user);
+  const mayReverse = can(user, "cancelEntries");
+  const reversed = new Set(ledger.entries.map((e) => e.reversalOf).filter(Boolean));
   const { fromStr, toStr, period } = periodFrom(search);
   const accounts = new Map(ledger.accounts.map((a) => [a.id, a]));
   const needle = (search.q ?? "").trim().toLowerCase();
@@ -95,12 +100,21 @@ async function JournalContent({ params, searchParams }: { params: Promise<{ comp
                     <span>
                       {formatMoney(total)} · by {e.createdByName}
                     </span>
-                    {e.sourceType === "MANUAL" && (
+                    {e.sourceType === "MANUAL" && reversed.has(e.id) && <Badge tone="red">Reversed</Badge>}
+                    {e.sourceType === "MANUAL" && !reversed.has(e.id) && mayReverse && (
+                      <CancelButton
+                        reverse
+                        action={reverseJournalEntry.bind(null, slug, e.id)}
+                        title="Reverse entry"
+                        message={`A new entry dated today swaps the debits and credits of ${e.number}. Both stay in the journal.`}
+                      />
+                    )}
+                    {e.sourceType === "MANUAL" && admin && (
                       <DeleteButton
                         action={deleteJournalEntry.bind(null, slug, e.id)}
-                        confirmText={`Delete manual entry ${e.number}? Reports change accordingly.`}
+                        confirmText={`Delete manual entry ${e.number}? It goes to the recycle bin and can be restored.`}
                         title="Delete entry"
-                        successMessage="Entry deleted."
+                        successMessage="Entry moved to the recycle bin."
                       />
                     )}
                   </div>

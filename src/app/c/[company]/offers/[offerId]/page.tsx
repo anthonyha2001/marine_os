@@ -10,7 +10,7 @@ import { ShareOfferButton } from "@/components/share-link";
 import { listJobCards } from "@/lib/data/workshop";
 import { getOffer } from "@/lib/data/sales";
 import { OFFER_STATUSES } from "@/lib/offers";
-import { COMPANIES, canAccessModule } from "@/lib/permissions";
+import { COMPANIES, can, canAccessModule, isAdmin } from "@/lib/permissions";
 import { deleteOffer } from "@/lib/actions/offers";
 import { DeleteButton } from "@/components/delete-button";
 import { Modal } from "@/components/modal";
@@ -61,11 +61,11 @@ async function OfferPage({
                 </button>
               </form>
             )}
-            {offer.invoiceCount === 0 && (
+            {offer.invoiceCount === 0 && (isAdmin(user) || (offer.status === "DRAFT" && can(user, "deleteDrafts"))) && (
               <DeleteButton
                 bordered
                 action={deleteOffer.bind(null, slug, offer.id)}
-                confirmText={`Delete offer ${offer.number}? This can't be undone.`}
+                confirmText={`Delete offer ${offer.number}? It goes to the recycle bin and can be restored.`}
                 title="Delete offer"
               />
             )}

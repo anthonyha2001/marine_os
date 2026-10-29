@@ -5,6 +5,8 @@ import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma, type Tx } from "@/lib/prisma";
+import { toRecycleBin } from "@/lib/recycle-bin";
+import { deleteRefusal } from "@/lib/delete-rules";
 import { requireModule } from "@/lib/auth";
 import { companyIdFor } from "@/lib/data/inventory";
 import { salesTags } from "@/lib/data/sales";
@@ -350,15 +352,21 @@ export async function setOfferStatus(companySlug: string, offerId: string, statu
 
 /** Delete an offer that has never been invoiced (cancelled invoices are kept for accounting). */
 export async function deleteOffer(companySlug: string, offerId: string): Promise<{ error?: string }> {
-  const { slug } = await requireModule(companySlug, "offers");
+  const { user, slug } = await requireModule(companySlug, "offers");
   const companyId = await companyIdFor(slug);
   const offer = await prisma.offer.findFirst({
     where: { id: offerId, companyId },
-    select: { _count: { select: { invoices: true } } },
+    select: { status: true, number: true, customerName: true, _count: { select: { invoices: true } } },
   });
   if (!offer) return { error: "This offer no longer exists." };
+  const draft = offer.status === "DRAFT";
+  const refused = deleteRefusal(user, draft ? "draft" : "posted");
+  if (refused) return { error: draft ? refused : "Only the admin can delete an offer that was sent. Mark it as rejected instead." };
   if (offer._count.invoices > 0) return { error: "This offer has invoices, so it can't be deleted." };
-  await prisma.offer.delete({ where: { id: offerId } });
+  await prisma.$transaction(async (tx) => {
+    await toRecycleBin(tx, { model: "Offer", id: offerId, companyId, label: `Offer ${offer.number} · ${offer.customerName}`, deletedByName: user.name });
+    await tx.offer.delete({ where: { id: offerId } });
+  }, TRANSACTION_OPTIONS);
   updateTag(salesTags.offers(companyId));
   redirect(`/c/${slug}/offers`);
 }
@@ -409,9 +417,14 @@ export async function saveClause(companySlug: string, _prev: OfferFormState, for
 }
 
 export async function deleteClause(companySlug: string, clauseId: string): Promise<{ error?: string }> {
-  const { slug } = await requireModule(companySlug, "offers");
+  const { user, slug } = await requireModule(companySlug, "offers");
   const companyId = await companyIdFor(slug);
-  await prisma.offerClause.deleteMany({ where: { id: clauseId, companyId } });
+  const clause = await prisma.offerClause.findFirst({ where: { id: clauseId, companyId }, select: { title: true } });
+  if (!clause) return {};
+  await prisma.$transaction(async (tx) => {
+    await toRecycleBin(tx, { model: "OfferClause", id: clauseId, companyId, label: `Standard clause · ${clause.title}`, deletedByName: user.name });
+    await tx.offerClause.delete({ where: { id: clauseId } });
+  });
   updateTag(salesTags.offers(companyId));
   return {};
 }

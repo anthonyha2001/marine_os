@@ -4,12 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { companyIdFor } from "@/lib/data/inventory";
 import type { AppointmentStatus } from "@/lib/data/portal";
 import type { CompanySlug } from "@/lib/permissions";
+import { DATA_TAG } from "@/lib/cache-tag";
 
 export const appointmentsTag = (companyId: string) => `appointments:${companyId}`;
 
 async function loadAppointments(companyId: string) {
   "use cache";
-  cacheTag(appointmentsTag(companyId));
+  cacheTag(DATA_TAG, appointmentsTag(companyId));
   cacheLife("hours");
   const rows = await prisma.appointment.findMany({
     where: { companyId },

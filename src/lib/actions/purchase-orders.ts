@@ -5,6 +5,8 @@ import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma, type Tx } from "@/lib/prisma";
+import { toRecycleBin } from "@/lib/recycle-bin";
+import { deleteRefusal } from "@/lib/delete-rules";
 import { requireModule } from "@/lib/auth";
 import { companyIdFor } from "@/lib/data/inventory";
 import { poTag } from "@/lib/data/purchase-orders";
@@ -157,12 +159,18 @@ export async function setPurchaseOrderStatus(companySlug: string, orderId: strin
 
 /** Delete a purchase order that hasn't been received. */
 export async function deletePurchaseOrder(companySlug: string, orderId: string): Promise<{ error?: string }> {
-  const { slug } = await requireModule(companySlug, "purchases");
+  const { user, slug } = await requireModule(companySlug, "purchases");
   const companyId = await companyIdFor(slug);
-  const order = await prisma.purchaseOrder.findFirst({ where: { id: orderId, companyId }, select: { status: true } });
+  const order = await prisma.purchaseOrder.findFirst({ where: { id: orderId, companyId }, select: { status: true, number: true } });
   if (!order) return { error: "This purchase order no longer exists." };
   if (order.status === "RECEIVED") return { error: "Received purchase orders are kept with their purchase, so they can't be deleted." };
-  await prisma.purchaseOrder.delete({ where: { id: orderId } });
+  const draft = order.status === "DRAFT";
+  const refused = deleteRefusal(user, draft ? "draft" : "posted");
+  if (refused) return { error: draft ? refused : "Only the admin can delete a purchase order that was sent. Cancel it instead." };
+  await prisma.$transaction(async (tx) => {
+    await toRecycleBin(tx, { model: "PurchaseOrder", id: orderId, companyId, label: `Purchase order ${order.number}`, deletedByName: user.name });
+    await tx.purchaseOrder.delete({ where: { id: orderId } });
+  });
   updateTag(poTag(companyId));
   redirect(`/c/${slug}/purchase-orders`);
 }

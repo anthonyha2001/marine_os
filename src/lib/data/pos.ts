@@ -6,13 +6,14 @@ import { averageCosts } from "@/lib/costing";
 import { round2 } from "@/lib/money";
 import { DEFAULT_POS_RULES, type PosRules } from "@/lib/pos";
 import type { CompanySlug } from "@/lib/permissions";
+import { DATA_TAG } from "@/lib/cache-tag";
 
 // Point of sale reads, cached per company. Every POS action calls updateTag(posTag(companyId)).
 export const posTag = (companyId: string) => `pos:${companyId}`;
 
 async function loadRate(companyId: string) {
   "use cache";
-  cacheTag(posTag(companyId));
+  cacheTag(DATA_TAG, posTag(companyId));
   cacheLife("hours");
   const r = await prisma.exchangeRate.findFirst({
     where: { companyId },
@@ -31,7 +32,7 @@ export type ShiftRow = Awaited<ReturnType<typeof loadShifts>>[number];
 
 async function loadShifts(companyId: string) {
   "use cache";
-  cacheTag(posTag(companyId));
+  cacheTag(DATA_TAG, posTag(companyId));
   cacheLife("hours");
   const rows = await prisma.posShift.findMany({
     where: { companyId },
@@ -71,7 +72,7 @@ export type SaleRow = Awaited<ReturnType<typeof loadSales>>[number];
 
 async function loadSales(companyId: string) {
   "use cache";
-  cacheTag(posTag(companyId));
+  cacheTag(DATA_TAG, posTag(companyId));
   cacheLife("hours");
   const rows = await prisma.posSale.findMany({
     where: { companyId },
@@ -217,7 +218,7 @@ export function shiftReport(shift: ShiftRow, sales: SaleRow[]) {
 
 async function loadPosRules(companyId: string): Promise<PosRules & { saved: boolean }> {
   "use cache";
-  cacheTag(posTag(companyId));
+  cacheTag(DATA_TAG, posTag(companyId));
   cacheLife("hours");
   const r = await prisma.posSettings.findUnique({ where: { companyId } });
   if (!r) return { ...DEFAULT_POS_RULES, saved: false };

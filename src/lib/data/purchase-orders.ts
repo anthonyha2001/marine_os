@@ -3,6 +3,7 @@ import { cacheLife, cacheTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { companyIdFor } from "@/lib/data/inventory";
 import type { CompanySlug } from "@/lib/permissions";
+import { DATA_TAG } from "@/lib/cache-tag";
 
 export const PO_STATUSES = {
   DRAFT: "Draft",
@@ -16,7 +17,7 @@ export const poTag = (companyId: string) => `purchaseOrders:${companyId}`;
 
 async function loadPurchaseOrders(companyId: string) {
   "use cache";
-  cacheTag(poTag(companyId));
+  cacheTag(DATA_TAG, poTag(companyId));
   cacheLife("hours");
   const orders = await prisma.purchaseOrder.findMany({
     where: { companyId },
@@ -56,7 +57,7 @@ export type PurchaseOrderDetail = NonNullable<Awaited<ReturnType<typeof loadPurc
 
 async function loadPurchaseOrder(companyId: string, id: string) {
   "use cache";
-  cacheTag(poTag(companyId));
+  cacheTag(DATA_TAG, poTag(companyId));
   cacheLife("hours");
   const o = await prisma.purchaseOrder.findFirst({
     where: { id, companyId },

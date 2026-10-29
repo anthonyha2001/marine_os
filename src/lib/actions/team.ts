@@ -1,11 +1,13 @@
 "use server";
 
 import bcrypt from "bcryptjs";
+import { Prisma } from "@prisma/client";
 import { revalidatePath, updateTag } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireModule, userTag } from "@/lib/auth";
-import { ROLE_LABELS, assignableRoles, isRole, type Role } from "@/lib/permissions";
+import { ROLE_LABELS, assignableRoles, can, grantableModules, isCapability, isRole, type Capability, type ModuleKey, type Role } from "@/lib/permissions";
 
 export type TeamFormState = { error?: string; success?: string };
 
@@ -80,4 +82,29 @@ export async function updateStaff(companySlug: string, formData: FormData) {
   updateTag(userTag(target.id));
 
   revalidatePath(`/c/${slug}/team`);
+}
+
+export type AccessFormState = { error?: string };
+
+/**
+ * Custom permissions for one staff member: which modules they open and what they may do.
+ * A manager can only hand out what they have themselves, never Team, owner or audit pages.
+ */
+export async function saveStaffAccess(companySlug: string, targetId: string, _prev: AccessFormState, formData: FormData): Promise<AccessFormState> {
+  const { user: actor, slug } = await requireModule(companySlug, "team");
+  if (targetId === actor.id) return { error: "You can't change your own permissions." };
+  const target = await prisma.user.findUnique({ where: { id: targetId }, include: { company: true } });
+  if (!target || target.company?.slug !== slug) return { error: "This person is not in this company." };
+  if (!isRole(target.role) || !assignableRoles(actor).includes(target.role)) return { error: "You can't change this person's permissions." };
+
+  if (formData.get("mode") === "role") {
+    await prisma.user.update({ where: { id: target.id }, data: { permissions: Prisma.DbNull } });
+  } else {
+    const grantable = grantableModules(actor);
+    const modules = [...new Set(["dashboard", ...formData.getAll("modules").map(String)])].filter((m): m is ModuleKey => grantable.includes(m as ModuleKey));
+    const caps = formData.getAll("caps").map(String).filter((c): c is Capability => isCapability(c) && can(actor, c));
+    await prisma.user.update({ where: { id: target.id }, data: { permissions: { modules, caps } } });
+  }
+  updateTag(userTag(target.id));
+  redirect(`/c/${slug}/team?accessSaved=1`);
 }

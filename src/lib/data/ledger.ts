@@ -5,6 +5,7 @@ import { companyIdFor } from "@/lib/data/inventory";
 import { listInvoices } from "@/lib/data/sales";
 import { syncLedger } from "@/lib/ledger/posting";
 import type { CompanySlug } from "@/lib/permissions";
+import { DATA_TAG } from "@/lib/cache-tag";
 
 // The general ledger and financial documents, cached per company. Every posting action calls
 // updateTag(ledgerTag(companyId)); reports are computed in memory from this data.
@@ -46,7 +47,7 @@ export type Ledger = { accounts: LedgerAccountRow[]; entries: LedgerEntryRow[] }
 
 async function loadLedger(companyId: string): Promise<Ledger> {
   "use cache";
-  cacheTag(ledgerTag(companyId));
+  cacheTag(DATA_TAG, ledgerTag(companyId));
   cacheLife("hours");
   // Make sure documents created before the ledger existed are posted.
   await syncLedger(companyId);
@@ -96,7 +97,7 @@ export async function getLedger(slug: CompanySlug) {
 
 async function loadReceipts(companyId: string) {
   "use cache";
-  cacheTag(ledgerTag(companyId));
+  cacheTag(DATA_TAG, ledgerTag(companyId));
   cacheLife("hours");
   const rows = await prisma.customerReceipt.findMany({
     where: { companyId },
@@ -116,6 +117,9 @@ async function loadReceipts(companyId: string) {
     reference: r.reference,
     notes: r.notes,
     createdByName: r.createdBy.name,
+    status: r.status as "POSTED" | "CANCELLED",
+    cancelReason: r.cancelReason,
+    cancelledByName: r.cancelledByName,
   }));
 }
 
@@ -125,7 +129,7 @@ export async function listReceipts(slug: CompanySlug) {
 
 async function loadVouchers(companyId: string) {
   "use cache";
-  cacheTag(ledgerTag(companyId));
+  cacheTag(DATA_TAG, ledgerTag(companyId));
   cacheLife("hours");
   const [rows, supplierPayments, payable] = await Promise.all([
     prisma.voucher.findMany({
@@ -166,6 +170,9 @@ async function loadVouchers(companyId: string) {
     reference: p.reference,
     createdByName: p.createdBy.name,
     createdAt: p.createdAt,
+    status: p.status as "POSTED" | "CANCELLED",
+    cancelReason: p.cancelReason,
+    cancelledByName: p.cancelledByName,
   }));
   const vouchers = rows.map((v) => ({
     id: v.id,
@@ -184,6 +191,9 @@ async function loadVouchers(companyId: string) {
     createdByName: v.createdBy.name,
     createdAt: v.createdAt,
     source: "VOUCHER" as "VOUCHER" | "SUPPLIER_PAYMENT",
+    status: v.status as "POSTED" | "CANCELLED",
+    cancelReason: v.cancelReason,
+    cancelledByName: v.cancelledByName,
     purchaseId: null as string | null,
   }));
   return [...vouchers, ...fromBills].sort((a, b) => b.date.getTime() - a.date.getTime() || b.number.localeCompare(a.number));
@@ -197,7 +207,7 @@ export type VoucherRow = Awaited<ReturnType<typeof loadVouchers>>[number];
 
 async function loadCreditNotes(companyId: string) {
   "use cache";
-  cacheTag(ledgerTag(companyId));
+  cacheTag(DATA_TAG, ledgerTag(companyId));
   cacheLife("hours");
   const rows = await prisma.creditNote.findMany({
     where: { companyId },
@@ -235,7 +245,7 @@ export async function invoiceSettlements(slug: CompanySlug) {
   const [receipts, notes] = await Promise.all([listReceipts(slug), listCreditNotes(slug)]);
   const map = new Map<string, { paid: number; credited: number }>();
   for (const r of receipts) {
-    if (!r.invoice) continue;
+    if (!r.invoice || r.status !== "POSTED") continue;
     const m = map.get(r.invoice.id) ?? { paid: 0, credited: 0 };
     m.paid += r.amount;
     map.set(r.invoice.id, m);

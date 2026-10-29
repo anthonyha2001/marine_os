@@ -7,12 +7,14 @@ import { PAYMENT_METHODS } from "@/lib/accounting";
 import { businessToday, dayFormat } from "@/lib/dates";
 import { getLedger, listMoneyAccounts, listVouchers } from "@/lib/data/ledger";
 import { formatMoney, round2 } from "@/lib/money";
-import { COMPANIES } from "@/lib/permissions";
+import { COMPANIES, can, isAdmin } from "@/lib/permissions";
 import { DeleteButton } from "@/components/delete-button";
 import { Modal } from "@/components/modal";
 import { Badge, EmptyState, PageHeader, SearchBar, StatCard, cardClass, primaryButton, secondaryButton, tdClass, thClass } from "@/components/ui";
 import { LinkTabs } from "../finance-ui";
 import { VoucherForm, type VoucherKind } from "./voucher-form";
+import { CancelButton, CancelledNote } from "@/components/cancel-button";
+import { cancelVoucher } from "@/lib/actions/cancel";
 
 type Search = { q?: string; new?: string; saved?: string; kind?: string };
 
@@ -25,9 +27,11 @@ const isKind = (k: string | undefined): k is VoucherKind => k === "PAYMENT" || k
 
 async function VouchersContent({ params, searchParams }: { params: Promise<{ company: string }>; searchParams: Promise<Search> }) {
   const [{ company }, { q = "", new: creating, saved, kind }] = await Promise.all([params, searchParams]);
-  const { slug } = await requireModule(company, "accounting");
+  const { user, slug } = await requireModule(company, "accounting");
   const base = `/c/${slug}/finance/vouchers`;
   const vouchers = await listVouchers(slug);
+  const admin = isAdmin(user);
+  const mayCancel = can(user, "cancelEntries");
   const needle = q.trim().toLowerCase();
   const shown = vouchers.filter(
     (v) =>
@@ -35,7 +39,7 @@ async function VouchersContent({ params, searchParams }: { params: Promise<{ com
       (!needle || [v.number, v.description, v.partyName ?? "", v.counterAccount, v.reference ?? ""].some((t) => t.toLowerCase().includes(needle))),
   );
   const month = businessToday().slice(0, 7);
-  const sum = (k: VoucherKind) => round2(vouchers.filter((v) => v.kind === k && v.date.toISOString().slice(0, 7) === month).reduce((s, v) => s + v.amount, 0));
+  const sum = (k: VoucherKind) => round2(vouchers.filter((v) => v.kind === k && v.status === "POSTED" && v.date.toISOString().slice(0, 7) === month).reduce((s, v) => s + v.amount, 0));
   const savedVoucher = saved ? vouchers.find((v) => v.id === saved) : undefined;
   const keep = (extra: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
@@ -117,7 +121,8 @@ async function VouchersContent({ params, searchParams }: { params: Promise<{ com
                 <tr key={v.id} className="hover:bg-surface-2/60">
                   <td className={tdClass}>
                     <span className="block font-mono text-xs font-medium text-navy">{v.number}</span>
-                    <Badge tone={KIND[v.kind].tone}>{KIND[v.kind].label}</Badge>
+                    {v.status === "CANCELLED" ? <Badge tone="red">Cancelled</Badge> : <Badge tone={KIND[v.kind].tone}>{KIND[v.kind].label}</Badge>}
+                    {v.status === "CANCELLED" && <CancelledNote by={v.cancelledByName} reason={v.cancelReason} />}
                   </td>
                   <td className={`${tdClass} whitespace-nowrap`}>{dayFormat.format(v.date)}</td>
                   <td className={tdClass}>
@@ -148,6 +153,13 @@ async function VouchersContent({ params, searchParams }: { params: Promise<{ com
                     >
                       <FileDown className="size-4" aria-hidden />
                     </a>
+                    {v.status === "POSTED" && v.source === "VOUCHER" && mayCancel && (
+                      <CancelButton
+                        action={cancelVoucher.bind(null, slug, v.id)}
+                        title="Cancel voucher"
+                        message={`Voucher ${v.number} of ${formatMoney(v.amount)} stays on record as cancelled, and a reversing entry is posted today.`}
+                      />
+                    )}
                     {v.source === "SUPPLIER_PAYMENT" ? (
                       <Link
                         href={`/c/${slug}/purchases/${v.purchaseId}`}
@@ -158,12 +170,14 @@ async function VouchersContent({ params, searchParams }: { params: Promise<{ com
                         <ExternalLink className="size-4" aria-hidden />
                       </Link>
                     ) : (
-                      <DeleteButton
-                        action={deleteVoucher.bind(null, slug, v.id)}
-                        confirmText={`Delete voucher ${v.number} of ${formatMoney(v.amount)}? Its accounting entry is removed.`}
-                        title="Delete voucher"
-                        successMessage="Voucher deleted."
-                      />
+                      admin && (
+                        <DeleteButton
+                          action={deleteVoucher.bind(null, slug, v.id)}
+                          confirmText={`Delete voucher ${v.number} of ${formatMoney(v.amount)}? It goes to the recycle bin with its accounting entry, and can be restored.`}
+                          title="Delete voucher"
+                          successMessage="Voucher moved to the recycle bin."
+                        />
+                      )
                     )}
                   </td>
                 </tr>

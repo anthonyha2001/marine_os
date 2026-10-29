@@ -11,6 +11,8 @@ import { Modal } from "@/components/modal";
 import { cardClass, secondaryButton, ProgressBar } from "@/components/ui";
 import { BillStatusBadge } from "../../accounting/bill-status";
 import { RecordPaymentForm } from "../../accounting/record-payment-form";
+import { CancelButton, CancelledNote } from "@/components/cancel-button";
+import { cancelSupplierPayment } from "@/lib/actions/cancel";
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "UTC" });
 
@@ -20,14 +22,18 @@ export async function PaymentsSection({
   purchase,
   canRecord,
   paying,
+  admin = false,
+  mayCancel = false,
 }: {
   slug: CompanySlug;
+  admin?: boolean;
+  mayCancel?: boolean;
   purchase: { id: string; invoiceNumber: string; supplierName: string; totalTTC: number; dueDate: Date };
   canRecord: boolean;
   paying: boolean;
 }) {
   const payments = await listPurchasePayments(slug, purchase.id);
-  const paid = round2(payments.reduce((s, p) => s + p.amount, 0));
+  const paid = round2(payments.filter((p) => p.status === "POSTED").reduce((s, p) => s + p.amount, 0));
   const balance = round2(purchase.totalTTC - paid);
   const status = billStatus(purchase.totalTTC, paid, purchase.dueDate);
   const pageUrl = `/c/${slug}/purchases/${purchase.id}`;
@@ -67,7 +73,7 @@ export async function PaymentsSection({
           </thead>
           <tbody className="divide-y divide-border">
             {payments.map((p) => (
-              <tr key={p.id}>
+              <tr key={p.id} className={p.status === "CANCELLED" ? "opacity-60" : ""}>
                 <td className="py-2 pr-3">
                   {p.number && canRecord ? (
                     <a href={`/c/${slug}/finance/vouchers/${p.id}/pdf`} target="_blank" rel="noopener" title="Print payment voucher" className="inline-flex items-center gap-1 font-mono text-xs font-medium text-brand hover:underline">
@@ -79,16 +85,28 @@ export async function PaymentsSection({
                 </td>
                 <td className="py-2 pr-3">{dateFormat.format(p.paidAt)}</td>
                 <td className="py-2 pr-3">{PAYMENT_METHODS[p.method] ?? p.method}</td>
-                <td className="py-2 pr-3 text-muted">{p.reference ?? "—"}</td>
+                <td className="py-2 pr-3 text-muted">
+                  {p.reference ?? "—"}
+                  {p.status === "CANCELLED" && <CancelledNote by={p.cancelledByName} reason={p.cancelReason} />}
+                </td>
                 <td className="py-2 pr-3 text-muted">{p.createdByName}</td>
-                <td className="py-2 pr-3 text-right font-medium">{formatMoney(p.amount)}</td>
+                <td className={`py-2 pr-3 text-right font-medium ${p.status === "CANCELLED" ? "line-through" : ""}`}>{formatMoney(p.amount)}</td>
                 {canRecord && (
-                  <td className="py-2 text-right">
-                    <DeleteButton
-                      action={deleteSupplierPayment.bind(null, slug, p.id)}
-                      confirmText={`Delete the ${formatMoney(p.amount)} payment of ${dateFormat.format(p.paidAt)}? Use this only for a payment entered by mistake.`}
-                      title="Delete payment"
-                    />
+                  <td className="whitespace-nowrap py-2 text-right">
+                    {p.status === "POSTED" && mayCancel && (
+                      <CancelButton
+                        action={cancelSupplierPayment.bind(null, slug, p.id)}
+                        title="Cancel payment"
+                        message={`Payment ${p.number ?? ""} of ${formatMoney(p.amount)} stays on record as cancelled, and a reversing entry is posted today. The bill goes back to unpaid for that amount.`}
+                      />
+                    )}
+                    {admin && (
+                      <DeleteButton
+                        action={deleteSupplierPayment.bind(null, slug, p.id)}
+                        confirmText={`Delete the ${formatMoney(p.amount)} payment of ${dateFormat.format(p.paidAt)}? It goes to the recycle bin with its accounting entry, and can be restored.`}
+                        title="Delete payment"
+                      />
+                    )}
                   </td>
                 )}
               </tr>

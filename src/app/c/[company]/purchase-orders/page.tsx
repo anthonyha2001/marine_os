@@ -5,7 +5,7 @@ import { requireModule } from "@/lib/auth";
 import { listPurchaseOrders } from "@/lib/data/purchase-orders";
 import { deletePurchaseOrder } from "@/lib/actions/purchase-orders";
 import { formatMoney } from "@/lib/money";
-import { COMPANIES } from "@/lib/permissions";
+import { COMPANIES, can, isAdmin } from "@/lib/permissions";
 import { DeleteButton } from "@/components/delete-button";
 import { ButtonLink, PageHeader, cardClass } from "@/components/ui";
 import { PoStatusSelect } from "./po-status-select";
@@ -14,7 +14,8 @@ const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZ
 
 async function PurchaseOrdersContent({ params }: { params: Promise<{ company: string }> }) {
   const { company } = await params;
-  const { slug } = await requireModule(company, "purchases");
+  const { user, slug } = await requireModule(company, "purchases");
+  const mayDelete = (status: string) => isAdmin(user) || (status === "DRAFT" && can(user, "deleteDrafts"));
   const orders = await listPurchaseOrders(slug);
   const base = `/c/${slug}/purchase-orders`;
   const open = orders.filter((o) => o.status === "DRAFT" || o.status === "SENT");
@@ -76,10 +77,10 @@ async function PurchaseOrdersContent({ params }: { params: Promise<{ company: st
                   </td>
                   <td className="px-4 py-3 text-right font-semibold">{formatMoney(o.totalTTC)}</td>
                   <td className="px-2 py-3 text-right">
-                    {o.status !== "RECEIVED" && (
+                    {o.status !== "RECEIVED" && mayDelete(o.status) && (
                       <DeleteButton
                         action={deletePurchaseOrder.bind(null, slug, o.id)}
-                        confirmText={`Delete purchase order ${o.number}? This can't be undone.`}
+                        confirmText={`Delete purchase order ${o.number}? It goes to the recycle bin and can be restored.`}
                         title="Delete purchase order"
                       />
                     )}

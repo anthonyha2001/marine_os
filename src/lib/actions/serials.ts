@@ -4,6 +4,8 @@ import { Prisma } from "@prisma/client";
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { toRecycleBin } from "@/lib/recycle-bin";
+import { deleteRefusal } from "@/lib/delete-rules";
 import { requireModule } from "@/lib/auth";
 import { companyIdFor } from "@/lib/data/inventory";
 import { serialsTag } from "@/lib/data/serials";
@@ -85,11 +87,16 @@ export async function setSerialStatus(companySlug: string, serialId: string, sta
 }
 
 export async function deleteSerial(companySlug: string, serialId: string): Promise<{ error?: string }> {
-  const { companyId } = await ctx(companySlug);
-  const s = await prisma.productSerial.findFirst({ where: { id: serialId, companyId }, select: { status: true } });
+  const { user, companyId } = await ctx(companySlug);
+  const s = await prisma.productSerial.findFirst({ where: { id: serialId, companyId }, select: { status: true, serialNumber: true } });
   if (!s) return { error: "This serial number no longer exists." };
   if (s.status !== "IN_STOCK") return { error: "Only a serial number still in stock can be deleted (entered by mistake)." };
-  await prisma.productSerial.delete({ where: { id: serialId } });
+  const refused = deleteRefusal(user, "draft");
+  if (refused) return { error: refused };
+  await prisma.$transaction(async (tx) => {
+    await toRecycleBin(tx, { model: "ProductSerial", id: serialId, companyId, label: `Serial number ${s.serialNumber}`, deletedByName: user.name });
+    await tx.productSerial.delete({ where: { id: serialId } });
+  });
   updateTag(serialsTag(companyId));
   return {};
 }

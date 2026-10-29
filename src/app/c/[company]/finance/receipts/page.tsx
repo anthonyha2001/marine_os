@@ -13,21 +13,27 @@ import { DeleteButton } from "@/components/delete-button";
 import { Modal } from "@/components/modal";
 import { ButtonLink, EmptyState, PageHeader, SearchBar, StatCard, cardClass, tdClass, thClass } from "@/components/ui";
 import { ReceiptForm } from "./receipt-form";
+import { CancelButton, CancelledNote } from "@/components/cancel-button";
+import { cancelReceipt } from "@/lib/actions/cancel";
+import { can, isAdmin } from "@/lib/permissions";
 
 type Search = { q?: string; new?: string; saved?: string };
 
 async function ReceiptsContent({ params, searchParams }: { params: Promise<{ company: string }>; searchParams: Promise<Search> }) {
   const [{ company }, { q = "", new: creating, saved }] = await Promise.all([params, searchParams]);
-  const { slug } = await requireModule(company, "invoices");
+  const { user, slug } = await requireModule(company, "invoices");
   const base = `/c/${slug}/finance/receipts`;
+  const admin = isAdmin(user);
+  const mayCancel = can(user, "cancelEntries");
   const [receipts, open] = await Promise.all([listReceipts(slug), invoicesWithBalance(slug)]);
   const needle = q.trim().toLowerCase();
   const shown = receipts.filter(
     (r) => !needle || r.number.toLowerCase().includes(needle) || r.customerName.toLowerCase().includes(needle) || (r.invoice?.number ?? "").toLowerCase().includes(needle),
   );
   const month = businessToday().slice(0, 7);
-  const thisMonth = round2(receipts.filter((r) => r.receivedAt.toISOString().slice(0, 7) === month).reduce((s, r) => s + r.amount, 0));
-  const onAccount = round2(receipts.filter((r) => !r.invoice).reduce((s, r) => s + r.amount, 0));
+  const posted = receipts.filter((r) => r.status === "POSTED");
+  const thisMonth = round2(posted.filter((r) => r.receivedAt.toISOString().slice(0, 7) === month).reduce((s, r) => s + r.amount, 0));
+  const onAccount = round2(posted.filter((r) => !r.invoice).reduce((s, r) => s + r.amount, 0));
   const toCollect = round2(open.reduce((s, i) => s + i.balance, 0));
 
   return (
@@ -73,8 +79,11 @@ async function ReceiptsContent({ params, searchParams }: { params: Promise<{ com
             </thead>
             <tbody className="divide-y divide-border">
               {shown.map((r) => (
-                <tr key={r.id} className="hover:bg-surface-2/60">
-                  <td className={`${tdClass} font-mono text-xs font-medium text-navy`}>{r.number}</td>
+                <tr key={r.id} className={`hover:bg-surface-2/60 ${r.status === "CANCELLED" ? "opacity-60" : ""}`}>
+                  <td className={`${tdClass} font-mono text-xs font-medium text-navy`}>
+                    {r.number}
+                    {r.status === "CANCELLED" && <CancelledNote by={r.cancelledByName} reason={r.cancelReason} />}
+                  </td>
                   <td className={`${tdClass} whitespace-nowrap`}>{dayFormat.format(r.receivedAt)}</td>
                   <td className={`${tdClass} font-medium text-navy`}>{r.customerName}</td>
                   <td className={tdClass}>
@@ -90,14 +99,23 @@ async function ReceiptsContent({ params, searchParams }: { params: Promise<{ com
                     {PAYMENT_METHODS[r.method as keyof typeof PAYMENT_METHODS] ?? r.method} · {r.moneyAccount}
                     {r.reference && <span className="block text-xs">{r.reference}</span>}
                   </td>
-                  <td className={`${tdClass} tabular text-right font-semibold`}>{formatMoney(r.amount)}</td>
-                  <td className={`${tdClass} text-right`}>
-                    <DeleteButton
-                      action={deleteReceipt.bind(null, slug, r.id)}
-                      confirmText={`Delete receipt ${r.number} of ${formatMoney(r.amount)}? Its accounting entry is removed.`}
-                      title="Delete receipt"
-                      successMessage="Receipt deleted."
-                    />
+                  <td className={`${tdClass} tabular text-right font-semibold ${r.status === "CANCELLED" ? "line-through" : ""}`}>{formatMoney(r.amount)}</td>
+                  <td className={`${tdClass} whitespace-nowrap text-right`}>
+                    {r.status === "POSTED" && mayCancel && (
+                      <CancelButton
+                        action={cancelReceipt.bind(null, slug, r.id)}
+                        title="Cancel receipt"
+                        message={`Receipt ${r.number} of ${formatMoney(r.amount)} stays on record as cancelled, and a reversing entry is posted today.`}
+                      />
+                    )}
+                    {admin && (
+                      <DeleteButton
+                        action={deleteReceipt.bind(null, slug, r.id)}
+                        confirmText={`Delete receipt ${r.number} of ${formatMoney(r.amount)}? It goes to the recycle bin with its accounting entry, and can be restored.`}
+                        title="Delete receipt"
+                        successMessage="Receipt moved to the recycle bin."
+                      />
+                    )}
                   </td>
                 </tr>
               ))}

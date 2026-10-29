@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { companyIdFor } from "@/lib/data/inventory";
 import { round2 } from "@/lib/money";
 import type { CompanySlug } from "@/lib/permissions";
+import { DATA_TAG } from "@/lib/cache-tag";
 
 // Job cards and warranties, cached per company. Actions call updateTag(workshopTag(companyId)).
 export const workshopTag = (companyId: string) => `workshop:${companyId}`;
@@ -14,7 +15,7 @@ export const JOB_TONE = { OPEN: "blue", IN_PROGRESS: "amber", DONE: "green", CAN
 
 async function loadJobCards(companyId: string) {
   "use cache";
-  cacheTag(workshopTag(companyId));
+  cacheTag(DATA_TAG, workshopTag(companyId));
   cacheLife("hours");
   const rows = await prisma.jobCard.findMany({
     where: { companyId },
@@ -78,7 +79,7 @@ export async function getJobCard(slug: CompanySlug, id: string) {
 
 async function loadWarranties(companyId: string) {
   "use cache";
-  cacheTag(workshopTag(companyId));
+  cacheTag(DATA_TAG, workshopTag(companyId));
   cacheLife("hours");
   const rows = await prisma.warranty.findMany({
     where: { companyId },

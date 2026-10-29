@@ -2,11 +2,14 @@ import { Suspense } from "react";
 import { requireModule } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { updateStaff } from "@/lib/actions/team";
-import { COMPANIES, ROLE_LABELS, assignableRoles, isRole } from "@/lib/permissions";
+import Link from "next/link";
+import { CAPABILITIES, COMPANIES, MODULES, ROLE_CAPS, ROLE_LABELS, ROLE_MODULES, assignableRoles, can, grantableModules, isRole, parseAccess, type Capability } from "@/lib/permissions";
+import { Modal } from "@/components/modal";
+import { AccessForm } from "./access-form";
 import { AddStaffForm } from "./add-staff-form";
 
-async function TeamContent({ params }: { params: Promise<{ company: string }> }) {
-  const { company } = await params;
+async function TeamContent({ params, searchParams }: { params: Promise<{ company: string }>; searchParams: Promise<{ access?: string; accessSaved?: string }> }) {
+  const [{ company }, search] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "team");
   const roles = assignableRoles(user);
 
@@ -16,12 +19,19 @@ async function TeamContent({ params }: { params: Promise<{ company: string }> })
   });
 
   const update = updateStaff.bind(null, slug);
+  const editing = search.access ? staff.find((m) => m.id === search.access && m.id !== user.id && isRole(m.role) && roles.includes(m.role)) : undefined;
+  const editingAccess = editing ? parseAccess(editing.permissions) : null;
 
   return (
     <>
       <p className="text-sm text-muted">{COMPANIES[slug].name}</p>
       <h1 className="text-2xl font-semibold text-navy">Team &amp; roles</h1>
       <p className="mt-1 text-muted">Create accounts and decide what each person can open.</p>
+      {search.accessSaved && (
+        <p role="status" className="mt-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-success">
+          Permissions saved. They apply on that person&apos;s next click.
+        </p>
+      )}
 
       <div className="mt-8 grid gap-8 xl:grid-cols-[22rem_1fr]">
         <section className="h-fit rounded-2xl border border-border bg-surface p-5">
@@ -35,6 +45,7 @@ async function TeamContent({ params }: { params: Promise<{ company: string }> })
               <tr>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Role</th>
+                <th className="px-4 py-3">Permissions</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Last sign-in</th>
               </tr>
@@ -72,6 +83,14 @@ async function TeamContent({ params }: { params: Promise<{ company: string }> })
                       )}
                     </td>
                     <td className="px-4 py-3">
+                      {member.permissions ? <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand">Custom</span> : <span className="text-xs text-muted">Role defaults</span>}
+                      {editable && (
+                        <Link href={`/c/${slug}/team?access=${member.id}`} scroll={false} className="ml-2 text-xs font-medium text-brand hover:underline">
+                          Edit
+                        </Link>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
                       {editable ? (
                         <form action={update}>
                           <input type="hidden" name="userId" value={member.id} />
@@ -100,14 +119,30 @@ async function TeamContent({ params }: { params: Promise<{ company: string }> })
           </table>
         </section>
       </div>
+
+      {editing && isRole(editing.role) && (
+        <Modal title={`Permissions · ${editing.name}`} closeHref={`/c/${slug}/team`} size="lg">
+          <AccessForm
+            key={editing.id}
+            companySlug={slug}
+            userId={editing.id}
+            roleLabel={ROLE_LABELS[editing.role]}
+            custom={!!editingAccess}
+            modules={grantableModules(user).map((m) => ({ key: m, label: MODULES[m].label }))}
+            caps={(Object.keys(CAPABILITIES) as Capability[]).filter((c) => can(user, c)).map((c) => ({ key: c, ...CAPABILITIES[c] }))}
+            checkedModules={editingAccess?.modules ?? ROLE_MODULES[editing.role]}
+            checkedCaps={editingAccess?.caps ?? ROLE_CAPS[editing.role]}
+          />
+        </Modal>
+      )}
     </>
   );
 }
 
-export default function TeamPage({ params }: PageProps<"/c/[company]/team">) {
+export default function TeamPage({ params, searchParams }: PageProps<"/c/[company]/team">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading…</p>}>
-      <TeamContent params={params} />
+      <TeamContent params={params} searchParams={searchParams as Promise<{ access?: string; accessSaved?: string }>} />
     </Suspense>
   );
 }

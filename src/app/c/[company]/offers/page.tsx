@@ -8,7 +8,7 @@ import { requireModule } from "@/lib/auth";
 import { listOffers } from "@/lib/data/sales";
 import { formatMoney } from "@/lib/money";
 
-import { COMPANIES } from "@/lib/permissions";
+import { COMPANIES, can, isAdmin } from "@/lib/permissions";
 import { cardClass, PageHeader, ButtonLink, SearchBar, secondaryButton } from "@/components/ui";
 import { deleteOffer } from "@/lib/actions/offers";
 import { DeleteButton } from "@/components/delete-button";
@@ -24,7 +24,8 @@ async function OffersContent({
   searchParams: Promise<{ q?: string; clauses?: string }>;
 }) {
   const [{ company }, { q = "", clauses }] = await Promise.all([params, searchParams]);
-  const { slug } = await requireModule(company, "offers");
+  const { user, slug } = await requireModule(company, "offers");
+  const mayDelete = (status: string) => isAdmin(user) || (status === "DRAFT" && can(user, "deleteDrafts"));
   const needle = q.trim().toLowerCase();
   const offers = (await listOffers(slug)).filter(
     (o) =>
@@ -92,10 +93,10 @@ async function OffersContent({
                     <td className="px-4 py-3 text-right font-semibold">{formatMoney(o.totalTTC)}</td>
                     <td className="px-2 py-3 text-right">
                       {/* Offers with invoices (even cancelled ones) can't be deleted. */}
-                      {o.invoiceCount === 0 && (
+                      {o.invoiceCount === 0 && mayDelete(o.status) && (
                         <DeleteButton
                           action={deleteOffer.bind(null, slug, o.id)}
-                          confirmText={`Delete offer ${o.number} for ${o.customerName}? This can't be undone.`}
+                          confirmText={`Delete offer ${o.number} for ${o.customerName}? It goes to the recycle bin and can be restored.`}
                           title="Delete offer"
                         />
                       )}

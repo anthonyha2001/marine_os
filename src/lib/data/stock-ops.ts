@@ -3,13 +3,14 @@ import { cacheLife, cacheTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { companyIdFor } from "@/lib/data/inventory";
 import type { CompanySlug } from "@/lib/permissions";
+import { DATA_TAG } from "@/lib/cache-tag";
 
 // Stock counts (per company) and transfers between the two companies.
 export const stockOpsTag = "stock-ops";
 
 async function loadCounts(companyId: string) {
   "use cache";
-  cacheTag(stockOpsTag);
+  cacheTag(DATA_TAG, stockOpsTag);
   cacheLife("hours");
   const rows = await prisma.stockCount.findMany({
     where: { companyId },
@@ -46,7 +47,7 @@ export type StockCountRow = Awaited<ReturnType<typeof loadCounts>>[number];
 
 async function loadTransfers() {
   "use cache";
-  cacheTag(stockOpsTag);
+  cacheTag(DATA_TAG, stockOpsTag);
   cacheLife("hours");
   const rows = await prisma.stockTransfer.findMany({
     include: {

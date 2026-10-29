@@ -226,7 +226,7 @@ export async function cancelInvoice(companySlug: string, invoiceId: string): Pro
     select: {
       number: true,
       status: true,
-      _count: { select: { receipts: true, creditNotes: { where: { status: "ISSUED" } } } },
+      _count: { select: { receipts: { where: { status: "POSTED" } }, creditNotes: { where: { status: "ISSUED" } } } },
     },
   });
   if (!invoice) return { error: "This invoice no longer exists." };

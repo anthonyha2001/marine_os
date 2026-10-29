@@ -5,6 +5,8 @@ import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { toRecycleBin } from "@/lib/recycle-bin";
+import { deleteRefusal } from "@/lib/delete-rules";
 import { requireModule } from "@/lib/auth";
 import { isPaymentMethod } from "@/lib/accounting";
 import { businessToday } from "@/lib/dates";
@@ -125,12 +127,16 @@ export async function recordReceipt(companySlug: string, _prev: FinanceFormState
 }
 
 export async function deleteReceipt(companySlug: string, receiptId: string): Promise<{ error?: string }> {
-  const { slug } = await requireModule(companySlug, "invoices");
+  const { user, slug } = await requireModule(companySlug, "invoices");
+  const refused = deleteRefusal(user, "posted");
+  if (refused) return { error: refused };
   const companyId = await companyIdFor(slug);
-  const receipt = await prisma.customerReceipt.findFirst({ where: { id: receiptId, companyId }, select: { invoiceId: true } });
+  const receipt = await prisma.customerReceipt.findFirst({ where: { id: receiptId, companyId }, select: { invoiceId: true, number: true, customerName: true, amount: true } });
   if (!receipt) return { error: "This receipt no longer exists." };
   if (await prisma.cheque.count({ where: { receiptId } })) return { error: "This receipt is a cheque. On the Cheques page, mark it as bounced or cancelled instead." };
   await prisma.$transaction(async (tx) => {
+    const label = `Receipt ${receipt.number} · ${receipt.customerName} · ${Number(receipt.amount).toFixed(2)}`;
+    await toRecycleBin(tx, { model: "CustomerReceipt", id: receiptId, companyId, label, deletedByName: user.name });
     await removeEntries(tx, "RECEIPT", receiptId);
     await tx.customerReceipt.delete({ where: { id: receiptId } });
     if (receipt.invoiceId) await refreshInvoiceStatus(tx, receipt.invoiceId);
@@ -225,11 +231,15 @@ export async function createVoucher(companySlug: string, _prev: FinanceFormState
 }
 
 export async function deleteVoucher(companySlug: string, voucherId: string): Promise<{ error?: string }> {
-  const { slug } = await requireModule(companySlug, "accounting");
+  const { user, slug } = await requireModule(companySlug, "accounting");
+  const refused = deleteRefusal(user, "posted");
+  if (refused) return { error: refused };
   const companyId = await companyIdFor(slug);
-  const voucher = await prisma.voucher.findFirst({ where: { id: voucherId, companyId }, select: { id: true } });
+  const voucher = await prisma.voucher.findFirst({ where: { id: voucherId, companyId }, select: { id: true, number: true, description: true, amount: true } });
   if (!voucher) return { error: "This voucher no longer exists." };
   await prisma.$transaction(async (tx) => {
+    const label = `Voucher ${voucher.number} · ${voucher.description} · ${Number(voucher.amount).toFixed(2)}`;
+    await toRecycleBin(tx, { model: "Voucher", id: voucherId, companyId, label, deletedByName: user.name });
     await removeEntries(tx, "VOUCHER", voucherId);
     await tx.voucher.delete({ where: { id: voucherId } });
   }, TRANSACTION_OPTIONS);
@@ -361,11 +371,13 @@ export async function saveLedgerAccount(companySlug: string, accountId: string |
 }
 
 export async function deleteLedgerAccount(companySlug: string, accountId: string): Promise<{ error?: string }> {
-  const { slug } = await requireModule(companySlug, "accounting");
+  const { user, slug } = await requireModule(companySlug, "accounting");
+  const refused = deleteRefusal(user, "record");
+  if (refused) return { error: refused };
   const companyId = await companyIdFor(slug);
   const account = await prisma.ledgerAccount.findFirst({
     where: { id: accountId, companyId },
-    select: { isSystem: true, _count: { select: { lines: true, receipts: true, supplierPayments: true, voucherMoney: true, voucherCounterpart: true } } },
+    select: { isSystem: true, code: true, name: true, _count: { select: { lines: true, receipts: true, supplierPayments: true, voucherMoney: true, voucherCounterpart: true } } },
   });
   if (!account) return { error: "This account no longer exists." };
   if (account.isSystem) return { error: "This account is used by automatic postings and can't be deleted." };
@@ -374,7 +386,10 @@ export async function deleteLedgerAccount(companySlug: string, accountId: string
     // Keep the history: an account with entries is deactivated instead of deleted.
     await prisma.ledgerAccount.update({ where: { id: accountId }, data: { active: false } });
   } else {
-    await prisma.ledgerAccount.delete({ where: { id: accountId } });
+    await prisma.$transaction(async (tx) => {
+      await toRecycleBin(tx, { model: "LedgerAccount", id: accountId, companyId, label: `Account ${account.code} ${account.name}`, deletedByName: user.name });
+      await tx.ledgerAccount.delete({ where: { id: accountId } });
+    }, TRANSACTION_OPTIONS);
   }
   refresh(companyId);
   return {};
@@ -436,12 +451,17 @@ export async function createJournalEntry(companySlug: string, _prev: FinanceForm
 }
 
 export async function deleteJournalEntry(companySlug: string, entryId: string): Promise<{ error?: string }> {
-  const { slug } = await requireModule(companySlug, "accounting");
+  const { user, slug } = await requireModule(companySlug, "accounting");
+  const refused = deleteRefusal(user, "posted");
+  if (refused) return { error: refused.replace("Cancel it", "Reverse it") };
   const companyId = await companyIdFor(slug);
-  const entry = await prisma.journalEntry.findFirst({ where: { id: entryId, companyId }, select: { sourceType: true } });
+  const entry = await prisma.journalEntry.findFirst({ where: { id: entryId, companyId }, select: { sourceType: true, number: true, memo: true } });
   if (!entry) return { error: "This entry no longer exists." };
   if (entry.sourceType !== "MANUAL") return { error: "Automatic entries are changed through their document (invoice, payment, voucher…)." };
-  await prisma.journalEntry.delete({ where: { id: entryId } });
+  await prisma.$transaction(async (tx) => {
+    await toRecycleBin(tx, { model: "JournalEntry", id: entryId, companyId, label: `Journal entry ${entry.number} · ${entry.memo}`, deletedByName: user.name });
+    await tx.journalEntry.delete({ where: { id: entryId } });
+  }, TRANSACTION_OPTIONS);
   refresh(companyId);
   return {};
 }

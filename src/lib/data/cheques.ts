@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { companyIdFor } from "@/lib/data/inventory";
 import { ledgerTag } from "@/lib/data/ledger";
 import type { CompanySlug } from "@/lib/permissions";
+import { DATA_TAG } from "@/lib/cache-tag";
 
 export const CHEQUE_STATUS = {
   IN_HAND: "In hand",
@@ -17,7 +18,7 @@ export type ChequeStatus = keyof typeof CHEQUE_STATUS;
 
 async function loadCheques(companyId: string) {
   "use cache";
-  cacheTag(ledgerTag(companyId));
+  cacheTag(DATA_TAG, ledgerTag(companyId));
   cacheLife("hours");
   const rows = await prisma.cheque.findMany({
     where: { companyId },

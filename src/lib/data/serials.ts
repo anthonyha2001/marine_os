@@ -3,6 +3,7 @@ import { cacheLife, cacheTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { companyIdFor } from "@/lib/data/inventory";
 import type { CompanySlug } from "@/lib/permissions";
+import { DATA_TAG } from "@/lib/cache-tag";
 
 // Serial-numbered units (engines, outboards…), per company. Actions call updateTag(serialsTag(companyId)).
 export const serialsTag = (companyId: string) => `serials:${companyId}`;
@@ -12,7 +13,7 @@ export type SerialStatus = keyof typeof SERIAL_STATUS;
 
 async function loadSerials(companyId: string) {
   "use cache";
-  cacheTag(serialsTag(companyId));
+  cacheTag(DATA_TAG, serialsTag(companyId));
   cacheLife("hours");
   const rows = await prisma.productSerial.findMany({
     where: { companyId },

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { requireModule } from "@/lib/auth";
+import { isAdmin } from "@/lib/permissions";
 import { getService } from "@/lib/data/inventory";
 import { deleteService } from "@/lib/actions/services";
 import { DeleteButton } from "@/components/delete-button";
@@ -9,7 +10,7 @@ import { ServiceForm } from "../service-form";
 
 async function EditService({ params }: { params: Promise<{ company: string; serviceId: string }> }) {
   const { company, serviceId } = await params;
-  const { slug } = await requireModule(company, "services");
+  const { user, slug } = await requireModule(company, "services");
   const service = await getService(serviceId);
   if (!service) notFound();
 
@@ -20,12 +21,14 @@ async function EditService({ params }: { params: Promise<{ company: string; serv
         title={service.name}
         description={`Service #${service.code}`}
         action={
-          <DeleteButton
-            bordered
-            action={deleteService.bind(null, slug, service.id)}
-            confirmText={`Delete service #${service.code} “${service.name}”? Offers that already include it keep their lines.`}
-            title="Delete service"
-          />
+          isAdmin(user) && (
+            <DeleteButton
+              bordered
+              action={deleteService.bind(null, slug, service.id)}
+              confirmText={`Delete service #${service.code} “${service.name}”? Offers that already include it keep their lines.`}
+              title="Delete service"
+            />
+          )
         }
       />
       <ServiceForm

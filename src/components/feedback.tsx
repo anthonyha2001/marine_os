@@ -17,12 +17,16 @@ type ConfirmOptions = {
   confirmLabel?: string;
   cancelLabel?: string;
   tone?: "danger" | "default";
+  /** Ask for a reason (required): the dialog shows a text box and resolves with what was typed. */
+  reasonLabel?: string;
 };
 type ToastKind = "success" | "error" | "info";
 type Toast = { id: number; kind: ToastKind; message: string };
 
 type Feedback = {
   confirm: (options: ConfirmOptions) => Promise<boolean>;
+  /** Like confirm, with a required reason; resolves with the reason, or null if cancelled. */
+  askReason: (options: ConfirmOptions) => Promise<string | null>;
   toast: { success: (m: string) => void; error: (m: string) => void; info: (m: string) => void };
 };
 
@@ -35,12 +39,16 @@ export function useFeedback() {
 }
 
 export function FeedbackProvider({ children }: { children: React.ReactNode }) {
-  const [dialog, setDialog] = useState<(ConfirmOptions & { resolve: (v: boolean) => void }) | null>(null);
+  const [dialog, setDialog] = useState<(ConfirmOptions & { resolve: (v: string | null) => void }) | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(1);
 
   const confirm = useCallback(
-    (options: ConfirmOptions) => new Promise<boolean>((resolve) => setDialog({ ...options, resolve })),
+    (options: ConfirmOptions) => new Promise<boolean>((resolve) => setDialog({ ...options, reasonLabel: undefined, resolve: (v) => resolve(v !== null) })),
+    [],
+  );
+  const askReason = useCallback(
+    (options: ConfirmOptions) => new Promise<string | null>((resolve) => setDialog({ ...options, reasonLabel: options.reasonLabel ?? "Reason", resolve })),
     [],
   );
 
@@ -56,13 +64,13 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
     info: (m: string) => push("info", m),
   }));
 
-  const close = (value: boolean) => {
+  const close = (value: string | null) => {
     dialog?.resolve(value);
     setDialog(null);
   };
 
   return (
-    <FeedbackContext.Provider value={{ confirm, toast }}>
+    <FeedbackContext.Provider value={{ confirm, askReason, toast }}>
       {children}
       {dialog && <ConfirmDialog options={dialog} onClose={close} />}
       <div className="pointer-events-none fixed bottom-4 right-4 z-[80] flex w-full max-w-sm flex-col gap-2" aria-live="polite">
@@ -95,17 +103,22 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-function ConfirmDialog({ options, onClose }: { options: ConfirmOptions; onClose: (value: boolean) => void }) {
+function ConfirmDialog({ options, onClose }: { options: ConfirmOptions; onClose: (value: string | null) => void }) {
   const confirmButton = useRef<HTMLButtonElement>(null);
+  const reasonBox = useRef<HTMLTextAreaElement>(null);
+  const [reason, setReason] = useState("");
   const danger = options.tone === "danger";
+  const needsReason = !!options.reasonLabel;
+  const ok = !needsReason || reason.trim().length >= 3;
 
   useEffect(() => {
-    confirmButton.current?.focus();
+    if (reasonBox.current) reasonBox.current.focus();
+    else confirmButton.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
-        onClose(false);
+        onClose(null);
       }
     };
     window.addEventListener("keydown", onKey, true);
@@ -113,7 +126,7 @@ function ConfirmDialog({ options, onClose }: { options: ConfirmOptions; onClose:
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-navy-deep/40 p-4" onMouseDown={() => onClose(false)}>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-navy-deep/40 p-4" onMouseDown={() => onClose(null)}>
       <div
         role="alertdialog"
         aria-modal="true"
@@ -134,10 +147,23 @@ function ConfirmDialog({ options, onClose }: { options: ConfirmOptions; onClose:
             {options.message && <p className="mt-1 text-sm text-muted">{options.message}</p>}
           </div>
         </div>
+        {needsReason && (
+          <label className="mt-4 block text-[13px] font-medium text-slate-700">
+            {options.reasonLabel} *
+            <textarea
+              ref={reasonBox}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={2}
+              maxLength={500}
+              className="mt-1.5 block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-brand focus:ring-4 focus:ring-brand/10"
+            />
+          </label>
+        )}
         <div className="mt-6 flex justify-end gap-2">
           <button
             type="button"
-            onClick={() => onClose(false)}
+            onClick={() => onClose(null)}
             className="h-10 rounded-lg border border-border bg-surface px-4 text-sm font-medium text-slate-700 hover:bg-surface-2"
           >
             {options.cancelLabel ?? "Cancel"}
@@ -145,8 +171,9 @@ function ConfirmDialog({ options, onClose }: { options: ConfirmOptions; onClose:
           <button
             ref={confirmButton}
             type="button"
-            onClick={() => onClose(true)}
-            className={`h-10 rounded-lg px-4 text-sm font-medium text-white shadow-sm ${danger ? "bg-danger hover:bg-red-700" : "bg-navy hover:bg-navy-deep"}`}
+            disabled={!ok}
+            onClick={() => onClose(needsReason ? reason.trim() : "yes")}
+            className={`h-10 rounded-lg px-4 disabled:opacity-50 text-sm font-medium text-white shadow-sm ${danger ? "bg-danger hover:bg-red-700" : "bg-navy hover:bg-navy-deep"}`}
           >
             {options.confirmLabel ?? "Confirm"}
           </button>

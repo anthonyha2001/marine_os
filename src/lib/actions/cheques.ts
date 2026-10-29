@@ -116,7 +116,7 @@ export async function issueCheque(companySlug: string, _prev: ChequeFormState, f
   if (d.dueDate < d.issueDate) return { error: "The cheque date can't be before the day it was given." };
   const purchase = await prisma.purchase.findFirst({
     where: { id: d.purchaseId, companyId },
-    select: { id: true, invoiceNumber: true, supplierId: true, supplier: { select: { name: true } }, totalTTC: true, payments: { select: { amount: true } } },
+    select: { id: true, invoiceNumber: true, supplierId: true, supplier: { select: { name: true } }, totalTTC: true, payments: { where: { status: "POSTED" }, select: { amount: true } } },
   });
   if (!purchase) return { error: "That bill no longer exists." };
   const balance = round2(Number(purchase.totalTTC) - purchase.payments.reduce((s, p) => s + Number(p.amount), 0));

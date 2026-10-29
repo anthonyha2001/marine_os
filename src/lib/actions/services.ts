@@ -5,6 +5,8 @@ import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { toRecycleBin } from "@/lib/recycle-bin";
+import { deleteRefusal } from "@/lib/delete-rules";
 import { requireModule } from "@/lib/auth";
 import { isServiceUnit } from "@/lib/catalogue";
 import { tags } from "@/lib/data/inventory";
@@ -67,10 +69,15 @@ export async function saveService(
 
 /** Delete a service. Offer lines keep their own copy of the title and price. */
 export async function deleteService(companySlug: string, serviceId: string): Promise<{ error?: string }> {
-  const { slug } = await requireModule(companySlug, "services");
-  const service = await prisma.product.findUnique({ where: { id: serviceId }, select: { type: true } });
+  const { user, slug } = await requireModule(companySlug, "services");
+  const refused = deleteRefusal(user, "record");
+  if (refused) return { error: refused };
+  const service = await prisma.product.findUnique({ where: { id: serviceId }, select: { type: true, code: true, name: true } });
   if (!service || service.type !== "SERVICE") return { error: "This service no longer exists." };
-  await prisma.product.delete({ where: { id: serviceId } });
+  await prisma.$transaction(async (tx) => {
+    await toRecycleBin(tx, { model: "Product", id: serviceId, companyId: null, label: `Service ${service.code} · ${service.name}`, deletedByName: user.name });
+    await tx.product.delete({ where: { id: serviceId } });
+  });
   updateTag(tags.products);
   redirect(`/c/${slug}/services`);
 }
