@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { SendButton } from "@/components/send-button";
 import Link from "next/link";
 import { FileDown, ScrollText } from "lucide-react";
 import { requireModule } from "@/lib/auth";
@@ -33,6 +34,7 @@ async function StatementsContent({ params, searchParams }: { params: Promise<{ c
         action={
           partner && (
             <>
+              {partner.type === "CUSTOMER" && partner.id && <SendButton companySlug={slug} kind="statement" id={partner.id} />}
               <a href={`${base}/pdf?${qs(search.party!)}`} target="_blank" rel="noopener" className={primaryButton}>
                 <FileDown className="size-4" aria-hidden /> Open PDF
               </a>

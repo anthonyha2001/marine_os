@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { SendButton } from "@/components/send-button";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Hammer } from "lucide-react";
@@ -45,6 +46,7 @@ async function OfferPage({
         action={
           <div className="flex flex-wrap gap-2">
             <OfferToolbar companySlug={slug} offerId={offer.id} />
+            {offer.status !== "REJECTED" && <SendButton companySlug={slug} kind="offer" id={offer.id} />}
             {offer.status !== "REJECTED" && <ShareOfferButton companySlug={slug} offerId={offer.id} />}
             {canWorkshop && offer.status === "ACCEPTED" && (
               <form action={createJobCardFromOffer.bind(null, slug, offer.id)}>

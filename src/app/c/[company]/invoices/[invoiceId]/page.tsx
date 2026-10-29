@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { SendButton } from "@/components/send-button";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireModule } from "@/lib/auth";
@@ -62,6 +63,8 @@ async function InvoiceDetail({
         title={invoice.number}
         description={invoice.subject ?? undefined}
         action={
+          <div className="flex flex-wrap gap-2">
+          {invoice.status !== "CANCELLED" && <SendButton companySlug={slug} kind="invoice" id={invoice.id} />}
           <InvoiceActions
             companySlug={slug}
             invoiceId={invoice.id}
@@ -70,6 +73,7 @@ async function InvoiceDetail({
             creditable={round2(invoice.totalTTC - credited)}
             hasSettlements={receipts.length > 0 || notes.some((c) => c.status === "ISSUED")}
           />
+          </div>
         }
       />
       <div className="mt-3">

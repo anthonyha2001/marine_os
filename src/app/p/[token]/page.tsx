@@ -108,6 +108,15 @@ async function Portal({ params, searchParams }: { params: Promise<{ token: strin
       </Section>
 
       <Section title={`Invoices${due > 0 ? ` · ${formatMoney(due)} to pay` : ""}`} icon={FileText}>
+        {data.invoices.length > 0 && (
+          <p className="mb-3 flex flex-wrap gap-2 text-sm">
+            {[...new Set(data.invoices.map((i) => i.company))].map((c) => (
+              <a key={c} href={`/p/${token}/statement/${c}`} target="_blank" rel="noopener" className={secondaryButtonSm}>
+                Statement of account · {COMPANIES[c].name}
+              </a>
+            ))}
+          </p>
+        )}
         {data.invoices.length === 0 ? (
           <p className="text-sm text-muted">No invoices yet.</p>
         ) : (

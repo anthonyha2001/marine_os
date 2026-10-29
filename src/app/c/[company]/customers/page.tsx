@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { SendButton } from "@/components/send-button";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { PortalLinkButton } from "@/components/share-link";
@@ -131,6 +132,7 @@ async function CustomersContent({
                   Customer portal: <PortalLinkButton companySlug={slug} customerId={c.id} hasLink={!!c.portalToken} token={c.portalToken} />
                   <span className="text-xs">{c.portalToken ? "link active" : "no link yet"}</span>
                 </span>
+                <SendButton companySlug={slug} kind="portal" id={c.id} label="Send portal link" />
                 <Link href={`/c/${slug}/vessels?q=${encodeURIComponent(c.name)}`} className="text-brand hover:underline">
                   Boats →
                 </Link>
