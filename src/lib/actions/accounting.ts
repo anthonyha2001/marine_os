@@ -10,6 +10,7 @@ import { payablesTag } from "@/lib/data/accounting";
 import { companyIdFor, tags } from "@/lib/data/inventory";
 import { ledgerTag } from "@/lib/data/ledger";
 import { TRANSACTION_OPTIONS } from "@/lib/item-codes";
+import { nextNumber } from "@/lib/ledger/numbering";
 import { postSupplierPayment, removeEntries } from "@/lib/ledger/posting";
 import { round2 } from "@/lib/money";
 
@@ -64,10 +65,13 @@ export async function recordSupplierPayment(
 
   const paidAt = new Date(`${data.paidAt}T00:00:00Z`);
   await prisma.$transaction(async (tx) => {
+    // Numbered as a payment voucher (PV), in the same series as the vouchers page.
+    const number = await nextNumber(tx, companyId, "PV", paidAt.getUTCFullYear());
     const payment = await tx.supplierPayment.create({
       select: { id: true },
       data: {
         companyId,
+        number,
         purchaseId,
         amount,
         paidAt,
@@ -81,6 +85,7 @@ export async function recordSupplierPayment(
     await postSupplierPayment(tx, {
       id: payment.id,
       companyId,
+      number,
       amount,
       paidAt,
       moneyAccountId: account.id,

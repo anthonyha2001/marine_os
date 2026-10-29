@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, FileDown, TicketCheck } from "lucide-react";
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, ExternalLink, FileDown, TicketCheck } from "lucide-react";
 import { requireModule } from "@/lib/auth";
 import { deleteVoucher } from "@/lib/actions/finance";
 import { PAYMENT_METHODS } from "@/lib/accounting";
@@ -148,12 +148,23 @@ async function VouchersContent({ params, searchParams }: { params: Promise<{ com
                     >
                       <FileDown className="size-4" aria-hidden />
                     </a>
-                    <DeleteButton
-                      action={deleteVoucher.bind(null, slug, v.id)}
-                      confirmText={`Delete voucher ${v.number} of ${formatMoney(v.amount)}? Its accounting entry is removed.`}
-                      title="Delete voucher"
-                      successMessage="Voucher deleted."
-                    />
+                    {v.source === "SUPPLIER_PAYMENT" ? (
+                      <Link
+                        href={`/c/${slug}/purchases/${v.purchaseId}`}
+                        title="Open the supplier bill (change or delete the payment there)"
+                        aria-label="Open the supplier bill"
+                        className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-navy"
+                      >
+                        <ExternalLink className="size-4" aria-hidden />
+                      </Link>
+                    ) : (
+                      <DeleteButton
+                        action={deleteVoucher.bind(null, slug, v.id)}
+                        confirmText={`Delete voucher ${v.number} of ${formatMoney(v.amount)}? Its accounting entry is removed.`}
+                        title="Delete voucher"
+                        successMessage="Voucher deleted."
+                      />
+                    )}
                   </td>
                 </tr>
               ))}

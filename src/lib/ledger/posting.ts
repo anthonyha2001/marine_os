@@ -195,13 +195,13 @@ export async function postPurchase(
 /** Supplier payment: Dr Suppliers / Cr Cash or Bank. */
 export async function postSupplierPayment(
   tx: Tx,
-  p: { id: string; companyId: string; amount: number; paidAt: Date; moneyAccountId: string; supplierId: string; supplierName: string; invoiceNumber: string; createdById: string },
+  p: { id: string; companyId: string; number?: string | null; amount: number; paidAt: Date; moneyAccountId: string; supplierId: string; supplierName: string; invoiceNumber: string; createdById: string },
 ) {
   const a = await systemAccounts(p.companyId, tx);
   return postEntry(tx, {
     companyId: p.companyId,
     date: p.paidAt,
-    memo: `Payment to ${p.supplierName} · invoice ${p.invoiceNumber}`,
+    memo: `${p.number ? `Payment voucher ${p.number} · ` : "Payment to "}${p.supplierName} · invoice ${p.invoiceNumber}`,
     sourceType: "SUPPLIER_PAYMENT",
     sourceId: p.id,
     createdById: p.createdById,

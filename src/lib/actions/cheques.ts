@@ -126,14 +126,15 @@ export async function issueCheque(companySlug: string, _prev: ChequeFormState, f
   await prisma.$transaction(async (tx) => {
     const a = await systemAccounts(companyId, tx);
     const date = toDate(d.issueDate);
+    const number = await nextNumber(tx, companyId, "PV", date.getUTCFullYear());
     const payment = await tx.supplierPayment.create({
       select: { id: true },
       data: {
-        companyId, purchaseId: purchase.id, amount, paidAt: date, method: "CHEQUE", moneyAccountId: a.CHEQUES_OUT,
+        companyId, number, purchaseId: purchase.id, amount, paidAt: date, method: "CHEQUE", moneyAccountId: a.CHEQUES_OUT,
         reference: `Cheque ${d.chequeNumber}${d.bank ? ` · ${d.bank}` : ""} due ${d.dueDate}`, notes: d.notes, createdById: user.id,
       },
     });
-    await postSupplierPayment(tx, { id: payment.id, companyId, amount, paidAt: date, moneyAccountId: a.CHEQUES_OUT, supplierId: purchase.supplierId, supplierName: purchase.supplier.name, invoiceNumber: purchase.invoiceNumber, createdById: user.id });
+    await postSupplierPayment(tx, { id: payment.id, companyId, number, amount, paidAt: date, moneyAccountId: a.CHEQUES_OUT, supplierId: purchase.supplierId, supplierName: purchase.supplier.name, invoiceNumber: purchase.invoiceNumber, createdById: user.id });
     await tx.cheque.create({
       data: {
         companyId, number: await nextNumber(tx, companyId, "CQ", date.getUTCFullYear()), direction: "ISSUED", chequeNumber: d.chequeNumber, bank: d.bank,

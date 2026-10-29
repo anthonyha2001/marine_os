@@ -62,6 +62,7 @@ async function loadPayments(companyId: string, purchaseId: string) {
   });
   return payments.map((p) => ({
     id: p.id,
+    number: p.number,
     amount: Number(p.amount),
     paidAt: p.paidAt,
     method: p.method as PaymentMethod,

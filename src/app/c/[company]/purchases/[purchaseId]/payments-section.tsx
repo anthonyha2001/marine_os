@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FileDown } from "lucide-react";
 import { deleteSupplierPayment } from "@/lib/actions/accounting";
 import { PAYMENT_METHODS, billStatus } from "@/lib/accounting";
 import { listPurchasePayments } from "@/lib/data/accounting";
@@ -55,6 +56,7 @@ export async function PaymentsSection({
         <table className="mt-4 w-full text-left text-sm">
           <thead className="border-b border-border text-xs uppercase tracking-wider text-muted">
             <tr>
+              <th className="py-2 pr-3">Voucher</th>
               <th className="py-2 pr-3">Date</th>
               <th className="py-2 pr-3">Method</th>
               <th className="py-2 pr-3">Reference</th>
@@ -66,6 +68,15 @@ export async function PaymentsSection({
           <tbody className="divide-y divide-border">
             {payments.map((p) => (
               <tr key={p.id}>
+                <td className="py-2 pr-3">
+                  {p.number && canRecord ? (
+                    <a href={`/c/${slug}/finance/vouchers/${p.id}/pdf`} target="_blank" rel="noopener" title="Print payment voucher" className="inline-flex items-center gap-1 font-mono text-xs font-medium text-brand hover:underline">
+                      <FileDown className="size-3.5" aria-hidden /> {p.number}
+                    </a>
+                  ) : (
+                    <span className="font-mono text-xs text-muted">{p.number ?? "—"}</span>
+                  )}
+                </td>
                 <td className="py-2 pr-3">{dateFormat.format(p.paidAt)}</td>
                 <td className="py-2 pr-3">{PAYMENT_METHODS[p.method] ?? p.method}</td>
                 <td className="py-2 pr-3 text-muted">{p.reference ?? "—"}</td>

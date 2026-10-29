@@ -504,6 +504,7 @@ model SupplierPayment {
   cheques        Cheque[]
   id             String         @id @default(cuid())
   companyId      String
+  number         String? // PV-2026-0001: same series as payment vouchers
   company        Company        @relation(fields: [companyId], references: [id])
   purchaseId     String
   purchase       Purchase       @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
@@ -519,6 +520,7 @@ model SupplierPayment {
   createdBy      User           @relation(fields: [createdById], references: [id])
   createdAt      DateTime       @default(now())
 
+  @@unique([companyId, number])
   @@index([companyId, paidAt])
   @@index([purchaseId])
 }

@@ -127,16 +127,47 @@ async function loadVouchers(companyId: string) {
   "use cache";
   cacheTag(ledgerTag(companyId));
   cacheLife("hours");
-  const rows = await prisma.voucher.findMany({
-    where: { companyId },
-    include: {
-      moneyAccount: { select: { code: true, name: true } },
-      counterAccount: { select: { code: true, name: true } },
-      createdBy: { select: { name: true } },
-    },
-    orderBy: [{ date: "desc" }, { number: "desc" }],
-  });
-  return rows.map((v) => ({
+  const [rows, supplierPayments, payable] = await Promise.all([
+    prisma.voucher.findMany({
+      where: { companyId },
+      include: {
+        moneyAccount: { select: { code: true, name: true } },
+        counterAccount: { select: { code: true, name: true } },
+        createdBy: { select: { name: true } },
+      },
+      orderBy: [{ date: "desc" }, { number: "desc" }],
+    }),
+    prisma.supplierPayment.findMany({
+      where: { companyId, number: { not: null } },
+      include: {
+        moneyAccount: { select: { code: true, name: true } },
+        purchase: { select: { id: true, invoiceNumber: true, supplier: { select: { name: true } } } },
+        createdBy: { select: { name: true } },
+      },
+    }),
+    prisma.ledgerAccount.findFirst({ where: { companyId, kind: "PAYABLE" }, select: { code: true, name: true } }),
+  ]);
+  // Payments of supplier bills are payment vouchers too (PV series), recorded on the bill.
+  const fromBills = supplierPayments.map((p) => ({
+    id: p.id,
+    number: p.number!,
+    kind: "PAYMENT" as const,
+    source: "SUPPLIER_PAYMENT" as const,
+    purchaseId: p.purchase.id,
+    date: p.paidAt,
+    moneyAccount: p.moneyAccount ? `${p.moneyAccount.code} ${p.moneyAccount.name}` : "—",
+    counterAccount: payable ? `${payable.code} ${payable.name}` : "Suppliers",
+    partyName: p.purchase.supplier.name as string | null,
+    description: `Payment of supplier invoice ${p.purchase.invoiceNumber}${p.notes ? ` · ${p.notes}` : ""}`,
+    amountHT: Number(p.amount),
+    vatAmount: 0,
+    amount: Number(p.amount),
+    method: p.method,
+    reference: p.reference,
+    createdByName: p.createdBy.name,
+    createdAt: p.createdAt,
+  }));
+  const vouchers = rows.map((v) => ({
     id: v.id,
     number: v.number,
     kind: v.kind as "PAYMENT" | "RECEIPT" | "TRANSFER",
@@ -152,7 +183,10 @@ async function loadVouchers(companyId: string) {
     reference: v.reference,
     createdByName: v.createdBy.name,
     createdAt: v.createdAt,
+    source: "VOUCHER" as "VOUCHER" | "SUPPLIER_PAYMENT",
+    purchaseId: null as string | null,
   }));
+  return [...vouchers, ...fromBills].sort((a, b) => b.date.getTime() - a.date.getTime() || b.number.localeCompare(a.number));
 }
 
 export async function listVouchers(slug: CompanySlug) {
