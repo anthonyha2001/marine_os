@@ -1,12 +1,15 @@
 import { Suspense } from "react";
-import { Plus } from "lucide-react";
+import { Plus, ScrollText } from "lucide-react";
+import { prisma } from "@/lib/prisma";
+import { Modal } from "@/components/modal";
+import { ClauseLibrary } from "./clause-library";
 import Link from "next/link";
 import { requireModule } from "@/lib/auth";
 import { listOffers } from "@/lib/data/sales";
 import { formatMoney } from "@/lib/money";
 
 import { COMPANIES } from "@/lib/permissions";
-import { cardClass, PageHeader, ButtonLink, SearchBar } from "@/components/ui";
+import { cardClass, PageHeader, ButtonLink, SearchBar, secondaryButton } from "@/components/ui";
 import { deleteOffer } from "@/lib/actions/offers";
 import { DeleteButton } from "@/components/delete-button";
 import { StatusSelect } from "./status-select";
@@ -18,9 +21,9 @@ async function OffersContent({
   searchParams,
 }: {
   params: Promise<{ company: string }>;
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; clauses?: string }>;
 }) {
-  const [{ company }, { q = "" }] = await Promise.all([params, searchParams]);
+  const [{ company }, { q = "", clauses }] = await Promise.all([params, searchParams]);
   const { slug } = await requireModule(company, "offers");
   const needle = q.trim().toLowerCase();
   const offers = (await listOffers(slug)).filter(
@@ -39,7 +42,14 @@ async function OffersContent({
         eyebrow={COMPANIES[slug].name}
         title="Offers"
         description="Quotations sent to customers by this company."
-        action={<ButtonLink icon={Plus} href={`${base}/new`}>New offer</ButtonLink>}
+        action={
+          <>
+            <Link href={`${base}?clauses=1`} scroll={false} className={secondaryButton}>
+              <ScrollText className="size-4" aria-hidden /> Standard clauses
+            </Link>
+            <ButtonLink icon={Plus} href={`${base}/new`}>New offer</ButtonLink>
+          </>
+        }
       />
 
       <div className="mt-6">
@@ -97,6 +107,15 @@ async function OffersContent({
           </table>
         )}
       </div>
+
+      {clauses && (
+        <Modal title="Standard clauses" closeHref={base} size="lg">
+          <ClauseLibrary
+            companySlug={slug}
+            clauses={await prisma.offerClause.findMany({ where: { company: { slug } }, orderBy: { createdAt: "asc" }, select: { id: true, title: true, text: true } })}
+          />
+        </Modal>
+      )}
     </>
   );
 }
@@ -104,7 +123,7 @@ async function OffersContent({
 export default function OffersPage({ params, searchParams }: PageProps<"/c/[company]/offers">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading offers…</p>}>
-      <OffersContent params={params} searchParams={searchParams as Promise<{ q?: string }>} />
+      <OffersContent params={params} searchParams={searchParams as Promise<{ q?: string; clauses?: string }>} />
     </Suspense>
   );
 }

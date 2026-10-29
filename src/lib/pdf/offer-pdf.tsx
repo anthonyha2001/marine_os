@@ -47,7 +47,7 @@ export function OfferPdf({ slug, offer, company, bilingual = false }: { slug: Co
           title="COMMERCIAL OFFER"
           subtitle="QUOTATION FOR SERVICES AND SUPPLIES"
           meta={[
-            ["Offer No.", offer.number],
+            ["Offer No.", offer.revision ? `${offer.number.replace(/-R\d+$/, "")} Rev. ${offer.revision}` : offer.number],
             ["Date", longDate.format(offer.offerDate)],
             ["Valid until", longDate.format(offer.validUntil)],
             ...(offer.reference ? ([["Your ref.", offer.reference]] as [string, string][]) : []),
@@ -179,6 +179,26 @@ export function OfferPdf({ slug, offer, company, bilingual = false }: { slug: Co
             <Text style={{ fontSize: 7.6, color: MUTED, marginTop: 5 }}>
               Amounts include VAT where applicable. Each payment is invoiced separately.
             </Text>
+          </View>
+        )}
+
+        {(offer.incoterm || offer.deliveryPlace || offer.leadTime || offer.warranty) && (
+          <View wrap={false}>
+            <SectionHeading brand={brand} bilingual={bilingual}>Delivery and warranty</SectionHeading>
+            {(
+              [
+                ["Delivery terms", offer.incoterm ? `${offer.incoterm} (Incoterms 2020)${offer.deliveryPlace ? ` · ${offer.deliveryPlace}` : ""}` : offer.deliveryPlace],
+                ["Lead time", offer.leadTime],
+                ["Warranty", offer.warranty],
+              ] as [string, string | null][]
+            )
+              .filter(([, v]) => v)
+              .map(([label, value]) => (
+                <View key={label} style={s.term}>
+                  <Text style={{ width: 100, color: MUTED }}>{label}</Text>
+                  <Text style={{ flex: 1 }}>{value}</Text>
+                </View>
+              ))}
           </View>
         )}
 

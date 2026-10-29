@@ -33,6 +33,10 @@ const offerSchema = z
     customerId: z.string().optional().transform((v) => v || null),
     saveCustomer: z.boolean().default(true),
     vesselId: z.string().optional().transform((v) => v || null),
+    incoterm: text(20),
+    deliveryPlace: text(200),
+    leadTime: text(200),
+    warranty: text(500),
     customerName: z.string().trim().min(2, "Enter the customer's name").max(200),
     customerAttention: text(200),
     customerAddress: text(1000),
@@ -88,6 +92,10 @@ function offerData(data: OfferInput, customerId: string | null) {
   return {
     customerId,
     vesselId: data.vesselId,
+    incoterm: data.incoterm,
+    deliveryPlace: data.deliveryPlace,
+    leadTime: data.leadTime,
+    warranty: data.warranty,
     customerName: data.customerName,
     customerAttention: data.customerAttention,
     customerAddress: data.customerAddress,
@@ -181,11 +189,11 @@ async function resolveCustomer(data: OfferInput) {
 async function nextOfferNumber(tx: Tx, slug: CompanySlug, year: number) {
   const prefix = `${NUMBER_PREFIX[slug]}-OF-${year}-`;
   const last = await tx.offer.findFirst({
-    where: { number: { startsWith: prefix } },
+    where: { number: { startsWith: prefix }, revision: 0 },
     orderBy: { number: "desc" },
     select: { number: true },
   });
-  const next = last ? Number(last.number.slice(prefix.length)) + 1 : 1;
+  const next = last ? Number(last.number.slice(prefix.length, prefix.length + 4)) + 1 : 1;
   return prefix + String(next).padStart(4, "0");
 }
 
@@ -353,4 +361,118 @@ export async function deleteOffer(companySlug: string, offerId: string): Promise
   await prisma.offer.delete({ where: { id: offerId } });
   updateTag(salesTags.offers(companyId));
   redirect(`/c/${slug}/offers`);
+}
+
+/**
+ * New revision of an offer (Rev. 1, Rev. 2…): a copy with the same base number and "-R1", "-R2"…,
+ * to edit and send again. The previous version is kept as it was.
+ */
+export async function reviseOffer(companySlug: string, offerId: string) {
+  const { user, slug } = await requireModule(companySlug, "offers");
+  const companyId = await companyIdFor(slug);
+  const offer = await prisma.offer.findFirst({ where: { id: offerId, companyId }, include: { lines: true, paymentTerms: true } });
+  if (!offer) redirect(`/c/${slug}/offers`);
+  const base = offer.number.replace(/-R\d+$/, "");
+  const siblings = await prisma.offer.findMany({ where: { number: { startsWith: `${base}-R` } }, select: { revision: true } });
+  const revision = Math.max(offer.revision, ...siblings.map((x) => x.revision)) + 1;
+  const { id: _id, number: _n, lines, paymentTerms, createdAt: _c, updatedAt: _u, shareToken: _t, respondedAt: _ra, respondedName: _rn, customerNote: _cn, ...rest } = offer;
+  void _id; void _n; void _c; void _u; void _t; void _ra; void _rn; void _cn;
+  const created = await prisma.offer.create({
+    select: { id: true },
+    data: {
+      ...rest,
+      number: `${base}-R${revision}`,
+      revision,
+      revisionOf: offer.id,
+      status: "DRAFT",
+      offerDate: new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`),
+      createdById: user.id,
+      lines: { create: lines.map(({ id: _lid, offerId: _oid, ...l }) => (void _lid, void _oid, l)) },
+      paymentTerms: { create: paymentTerms.map(({ id: _pid, offerId: _poid, ...t }) => (void _pid, void _poid, t)) },
+    },
+  });
+  updateTag(salesTags.offers(companyId));
+  redirect(`/c/${slug}/offers/${created.id}?saved=1`);
+}
+
+// ── Standard clauses ──
+
+export async function saveClause(companySlug: string, _prev: OfferFormState, formData: FormData): Promise<OfferFormState> {
+  const { slug } = await requireModule(companySlug, "offers");
+  const companyId = await companyIdFor(slug);
+  const title = String(formData.get("title") ?? "").trim().slice(0, 120);
+  const body = String(formData.get("text") ?? "").trim().slice(0, 5000);
+  if (title.length < 2 || body.length < 3) return { error: "Give the clause a title and its text." };
+  await prisma.offerClause.create({ data: { companyId, title, text: body } });
+  updateTag(salesTags.offers(companyId));
+  redirect(`/c/${slug}/offers?clauses=1`);
+}
+
+export async function deleteClause(companySlug: string, clauseId: string): Promise<{ error?: string }> {
+  const { slug } = await requireModule(companySlug, "offers");
+  const companyId = await companyIdFor(slug);
+  await prisma.offerClause.deleteMany({ where: { id: clauseId, companyId } });
+  updateTag(salesTags.offers(companyId));
+  return {};
+}
+
+/** Render the offer PDF from the editor's current (unsaved) content, for the live preview. */
+export async function previewOffer(companySlug: string, payload: string): Promise<{ error?: string; pdf?: string }> {
+  const { user, slug } = await requireModule(companySlug, "offers");
+  let raw: unknown;
+  try {
+    raw = JSON.parse(payload);
+  } catch {
+    return { error: "The form couldn't be read." };
+  }
+  const parsed = offerSchema.safeParse(raw);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const data = parsed.data;
+  const schedule = scheduleRows(data);
+  const totals = offerTotals(data.lines, data.discountType, data.discountValue, data.applyVat);
+  const { createElement } = await import("react");
+  const { renderToBuffer } = await import("@react-pdf/renderer");
+  const { OfferPdf } = await import("@/lib/pdf/offer-pdf");
+  const { getCompanyProfile } = await import("@/lib/data/sales");
+  const { isBilingual } = await import("@/lib/pdf-language");
+  const offer = {
+    ...offerData(data, data.customerId),
+    id: "preview",
+    number: "PREVIEW",
+    status: "DRAFT" as const,
+    discountType: data.discountType,
+    paymentPlan: data.paymentPlan as "FULL" | "PERCENT" | "INSTALLMENTS",
+    ...totals,
+    respondedAt: null,
+    respondedName: null,
+    customerNote: null,
+    revision: 0,
+    revisionOf: null,
+    customerTaxNumber: null,
+    createdByName: user.name,
+    createdByEmail: user.email,
+    paymentTerms: "rows" in schedule
+      ? schedule.rows.map((r, i) => ({ id: String(i), label: r.label, mode: r.mode as "PERCENT" | "BALANCE", value: Number(r.value), percent: Number(r.percent), amount: Number(r.amount), dueDays: r.dueDays ?? 0, invoice: null }))
+      : [],
+    locked: false,
+    invoiceCount: 0,
+    invoicedTTC: 0,
+    customInvoices: [],
+    lines: data.lines.map((l, i) => ({
+      id: String(i),
+      kind: l.kind,
+      productId: l.productId ?? null,
+      code: l.code ?? null,
+      title: l.title,
+      description: l.description ?? null,
+      quantity: l.quantity,
+      unit: l.unit ?? null,
+      unitPrice: l.unitPrice,
+      discountPercent: l.discountPercent,
+      lineTotal: l.kind === "SECTION" ? 0 : lineTotal(l),
+    })),
+  };
+  const element = createElement(OfferPdf, { slug, offer: offer as never, company: await getCompanyProfile(slug), bilingual: await isBilingual(data.customerId) });
+  const buf = await renderToBuffer(element as Parameters<typeof renderToBuffer>[0]);
+  return { pdf: Buffer.from(buf).toString("base64") };
 }

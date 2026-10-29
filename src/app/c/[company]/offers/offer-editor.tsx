@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { Modal } from "@/components/modal";
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { saveOffer, type OfferFormState } from "@/lib/actions/offers";
+import { previewOffer, saveOffer, type OfferFormState } from "@/lib/actions/offers";
 import { formatMoney, VAT_RATE } from "@/lib/money";
 import {
   MARKING_SUGGESTIONS,
@@ -47,10 +48,19 @@ export type CustomerOption = {
   address: string | null;
 };
 
+const INCOTERMS: [string, string][] = [
+  ["EXW", "Ex works"], ["FCA", "Free carrier"], ["FOB", "Free on board"], ["CFR", "Cost and freight"], ["CIF", "Cost, insurance and freight"],
+  ["CPT", "Carriage paid to"], ["CIP", "Carriage and insurance paid to"], ["DAP", "Delivered at place"], ["DPU", "Delivered at place unloaded"], ["DDP", "Delivered duty paid"],
+];
+
 export type OfferEditorValue = {
   id: string;
   customerId: string | null;
   vesselId: string | null;
+  incoterm: string | null;
+  deliveryPlace: string | null;
+  leadTime: string | null;
+  warranty: string | null;
   customerName: string;
   customerAttention: string | null;
   customerAddress: string | null;
@@ -117,8 +127,10 @@ export function OfferEditor({
   defaultTerms,
   offer,
   vessels = [],
+  clauses = [],
 }: {
   vessels?: { id: string; customerId: string | null; label: string }[];
+  clauses?: { id: string; title: string; text: string }[];
   companySlug: string;
   companyName: string;
   catalogue: CatalogueOption[];
@@ -147,6 +159,10 @@ export function OfferEditor({
   const [header, setHeader] = useState({
     customerId: offer?.customerId ?? "",
     vesselId: offer?.vesselId ?? "",
+    incoterm: offer?.incoterm ?? "",
+    deliveryPlace: offer?.deliveryPlace ?? "",
+    leadTime: offer?.leadTime ?? "",
+    warranty: offer?.warranty ?? "",
     customerName: offer?.customerName ?? "",
     customerAttention: offer?.customerAttention ?? "",
     customerAddress: offer?.customerAddress ?? "",
@@ -346,8 +362,7 @@ export function OfferEditor({
   }
   const numbers = itemNumbers(lines);
 
-  const [state, formAction, pending] = useActionState<OfferFormState, FormData>(async (prev) => {
-    const payload = {
+  const buildPayload = () => ({
       ...header,
       customerId: header.customerId || undefined,
       saveCustomer,
@@ -366,9 +381,21 @@ export function OfferEditor({
         unitPrice: numeric[i].unitPrice,
         discountPercent: numeric[i].discountPercent,
       })),
-    };
+  });
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string>();
+  const [previewing, startPreview] = useTransition();
+  const preview = () =>
+    startPreview(async () => {
+      setPreviewError(undefined);
+      const res = await previewOffer(companySlug, JSON.stringify(buildPayload()));
+      if (res.error || !res.pdf) return setPreviewError(res.error ?? "The preview couldn't be made.");
+      const bytes = Uint8Array.from(atob(res.pdf), (c) => c.charCodeAt(0));
+      setPreviewUrl(URL.createObjectURL(new Blob([bytes], { type: "application/pdf" })));
+    });
+  const [state, formAction, pending] = useActionState<OfferFormState, FormData>(async (prev) => {
     const fd = new FormData();
-    fd.set("payload", JSON.stringify(payload));
+    fd.set("payload", JSON.stringify(buildPayload()));
     return saveOffer(companySlug, offer?.id ?? null, prev, fd);
   }, {});
 
@@ -516,6 +543,33 @@ export function OfferEditor({
         Introduction (printed above the price table)
         <textarea rows={4} value={header.intro} onChange={(e) => set("intro", e.target.value)} className={inputClass} />
       </label>
+
+      <section className="grid gap-4 rounded-2xl border border-border bg-surface p-5 sm:grid-cols-2 lg:grid-cols-4">
+        <h2 className="font-semibold text-navy sm:col-span-2 lg:col-span-4">Delivery & warranty (printed on the PDF)</h2>
+        <label className={labelClass}>
+          Incoterm
+          <select value={header.incoterm} onChange={(e) => set("incoterm", e.target.value)} className={inputClass}>
+            <option value="">—</option>
+            {INCOTERMS.map(([code, name]) => (
+              <option key={code} value={code}>
+                {code} — {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={labelClass}>
+          Delivery place
+          <input value={header.deliveryPlace} onChange={(e) => set("deliveryPlace", e.target.value)} placeholder="e.g. Port of Beirut, Jounieh marina" className={inputClass} />
+        </label>
+        <label className={labelClass}>
+          Lead time
+          <input value={header.leadTime} onChange={(e) => set("leadTime", e.target.value)} placeholder="e.g. 4–6 weeks from order" className={inputClass} />
+        </label>
+        <label className={labelClass}>
+          Warranty
+          <input value={header.warranty} onChange={(e) => set("warranty", e.target.value)} placeholder="e.g. 12 months parts & labour" className={inputClass} />
+        </label>
+      </section>
 
       {/* Lines */}
       <section className="rounded-2xl border border-border bg-surface">
@@ -839,6 +893,27 @@ export function OfferEditor({
       {/* Terms + totals */}
       <section className="grid gap-6 lg:grid-cols-[1fr_24rem]">
         <div className="space-y-4">
+          {clauses.length > 0 && (
+            <label className="flex items-center gap-2 text-sm text-muted">
+              Insert a standard clause:
+              <select
+                value=""
+                onChange={(e) => {
+                  const c = clauses.find((x) => x.id === e.target.value);
+                  if (c) set("terms", header.terms.trim() ? `${header.terms.trimEnd()}\n${c.text}` : c.text);
+                }}
+                className="rounded-md border border-border bg-surface px-2 py-1 text-sm"
+                aria-label="Insert a standard clause"
+              >
+                <option value="">Choose…</option>
+                {clauses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className={`${labelClass} block`}>
             Terms and conditions (one per line, numbered on the PDF)
             <textarea rows={7} value={header.terms} onChange={(e) => set("terms", e.target.value)} className={inputClass} />
@@ -906,7 +981,7 @@ export function OfferEditor({
           <p className="mt-2 text-xs italic text-muted">{amountInWords(totals.totalTTC)}</p>
 
           <div className="mt-4">
-            <FormMessage error={state.error} />
+            <FormMessage error={state.error ?? previewError} />
           </div>
         </div>
       </section>
@@ -923,11 +998,19 @@ export function OfferEditor({
         <Link href={`/c/${companySlug}/offers`} className={secondaryButton}>
           Cancel
         </Link>
+        <button type="button" onClick={preview} disabled={previewing} className={secondaryButton}>
+          {previewing ? "Preparing…" : "Preview PDF"}
+        </button>
         <button type="submit" disabled={pending || offer?.locked} className={primaryButton}>
           {pending ? "Saving…" : offer?.locked ? "Locked (invoiced)" : offer ? "Save changes" : "Save offer"}
           <Kbd className="border-white/20 bg-white/10 text-white/80">Ctrl S</Kbd>
         </button>
       </StickyActions>
+      {previewUrl && (
+        <Modal title="Preview (not saved yet)" onClose={() => setPreviewUrl(null)} size="xl">
+          <iframe src={previewUrl} title="Offer preview" className="h-[75vh] w-full rounded-lg border border-border" />
+        </Modal>
+      )}
     </form>
   );
 }

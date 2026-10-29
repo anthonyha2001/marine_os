@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Hammer } from "lucide-react";
 import { requireModule } from "@/lib/auth";
 import { createJobCardFromOffer } from "@/lib/actions/workshop";
+import { reviseOffer } from "@/lib/actions/offers";
 import { ShareOfferButton } from "@/components/share-link";
 import { listJobCards } from "@/lib/data/workshop";
 import { getOffer } from "@/lib/data/sales";
@@ -47,6 +48,11 @@ async function OfferPage({
           <div className="flex flex-wrap gap-2">
             <OfferToolbar companySlug={slug} offerId={offer.id} />
             {offer.status !== "REJECTED" && <SendButton companySlug={slug} kind="offer" id={offer.id} />}
+            <form action={reviseOffer.bind(null, slug, offer.id)}>
+              <button type="submit" className={secondaryButton} title="Copy this offer as Rev. n to change and send again">
+                New revision
+              </button>
+            </form>
             {offer.status !== "REJECTED" && <ShareOfferButton companySlug={slug} offerId={offer.id} />}
             {canWorkshop && offer.status === "ACCEPTED" && (
               <form action={createJobCardFromOffer.bind(null, slug, offer.id)}>
@@ -125,6 +131,7 @@ async function OfferPage({
         catalogue={data.catalogue}
         customers={data.customers}
         vessels={data.vessels}
+        clauses={data.clauses}
         defaultIntro={data.defaultIntro}
         defaultTerms={data.defaultTerms}
         offer={{

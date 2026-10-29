@@ -1,4 +1,5 @@
 import "server-only";
+import { prisma } from "@/lib/prisma";
 import { getCatalogue } from "@/lib/data/inventory";
 import { getCompanyProfile, listCustomers } from "@/lib/data/sales";
 import { vesselOptions } from "@/lib/data/vessels";
@@ -10,7 +11,13 @@ const SERVICE_UNIT_SHORT = { HOUR: "hr", FIXED: "lot", DAY: "day", UNIT: "unit" 
 
 /** Everything the offer editor needs besides the offer itself. */
 export async function offerEditorData(slug: CompanySlug) {
-  const [catalogue, customers, company, vessels] = await Promise.all([getCatalogue(), listCustomers(), getCompanyProfile(slug), vesselOptions()]);
+  const [catalogue, customers, company, vessels, clauses] = await Promise.all([
+    getCatalogue(),
+    listCustomers(),
+    getCompanyProfile(slug),
+    vesselOptions(),
+    prisma.offerClause.findMany({ where: { company: { slug } }, orderBy: [{ position: "asc" }, { createdAt: "asc" }], select: { id: true, title: true, text: true } }),
+  ]);
 
   const options: CatalogueOption[] = catalogue
     .filter((c) => c.active)
@@ -39,6 +46,7 @@ export async function offerEditorData(slug: CompanySlug) {
     customers: customerOptions,
     company,
     vessels: vessels.map((v) => ({ id: v.id, customerId: v.customerId, label: v.label })),
+    clauses,
     defaultIntro: DEFAULT_INTRO,
     defaultTerms: company.offerTerms || DEFAULT_TERMS,
   };

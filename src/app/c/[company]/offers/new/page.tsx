@@ -25,6 +25,7 @@ async function NewOffer({ params }: { params: Promise<{ company: string }> }) {
         catalogue={data.catalogue}
         customers={data.customers}
         vessels={data.vessels}
+        clauses={data.clauses}
         defaultIntro={data.defaultIntro}
         defaultTerms={data.defaultTerms}
       />

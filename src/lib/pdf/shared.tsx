@@ -288,6 +288,7 @@ export const AR: Record<string, string> = {
   "Payment schedule": "جدول الدفعات",
   "Terms and conditions": "الشروط والأحكام",
   "Bank details": "التفاصيل المصرفية",
+  "Delivery and warranty": "التسليم والكفالة",
   "Authorised signature and stamp": "التوقيع والختم",
   "Authorised signature": "التوقيع المعتمد",
   "Accepted by the customer": "موافقة الزبون",

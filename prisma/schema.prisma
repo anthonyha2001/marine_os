@@ -58,6 +58,7 @@ model Company {
   reconciliations  BankReconciliation[]
   appointments     Appointment[]
   payrollSettings  PayrollSettings?
+  offerClauses     OfferClause[]
 }
 
 model User {
@@ -184,10 +185,16 @@ model Offer {
   respondedName String?
   customerNote  String?
 
-  lines        OfferLine[]
-  paymentTerms OfferPaymentTerm[]
-  invoices     Invoice[]
-  jobCards     JobCard[]
+  lines         OfferLine[]
+  paymentTerms  OfferPaymentTerm[]
+  invoices      Invoice[]
+  jobCards      JobCard[]
+  incoterm      String? // EXW, FCA, CIF, DAP, DDP…
+  deliveryPlace String?
+  leadTime      String? // e.g. 4–6 weeks from order
+  warranty      String? // e.g. 12 months parts and labour
+  revision      Int                @default(0) // 0 = original, 1 = Rev. 1…
+  revisionOf    String? // id of the offer this one revises
 
   @@index([companyId, offerDate])
 }
@@ -1310,4 +1317,19 @@ model PayrollSettings {
   endOfService     Decimal @default(8.5) @db.Decimal(6, 3) // employer, no ceiling
   taxBrackets      String  @default("") // one per line: "<annual USD up to> <rate %>", last line may be "* <rate %>"
   defaultExemption Decimal @default(0) @db.Decimal(12, 2) // yearly tax-free amount for a new employee
+}
+
+/**
+ * Standard clauses (payment, delivery, warranty…) to insert into offers.
+ */
+model OfferClause {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  title     String
+  text      String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
 }
