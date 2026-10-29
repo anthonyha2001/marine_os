@@ -8,12 +8,12 @@ import { prisma } from "@/lib/prisma";
 import { requireModule } from "@/lib/auth";
 import { companyIdFor } from "@/lib/data/inventory";
 import { ledgerTag } from "@/lib/data/ledger";
-import { payrollTag } from "@/lib/data/payroll";
+import { getPayrollRules, payrollTag } from "@/lib/data/payroll";
 import { TRANSACTION_OPTIONS } from "@/lib/item-codes";
 import { nextNumber } from "@/lib/ledger/numbering";
 import { postPayroll, removeEntries } from "@/lib/ledger/posting";
 import { round2 } from "@/lib/money";
-import { isPayFrequency, lineGross, lineNet, payPeriod, type PayFrequency } from "@/lib/payroll";
+import { isPayFrequency, lineGross, lineNet, payPeriod, statutory, type PayFrequency, type PayrollRules } from "@/lib/payroll";
 
 export type PayrollFormState = { error?: string };
 
@@ -36,13 +36,15 @@ const employeeSchema = z.object({
   payFrequency: z.string().refine(isPayFrequency, "Choose monthly or weekly"),
   baseSalary: z.coerce.number({ message: "Enter the salary" }).min(0, "The salary can't be negative"),
   notes: optionalText(1000),
+  nssfEnrolled: z.string().optional().transform((v) => v === "on"),
+  taxExemption: z.coerce.number().min(0, "The exemption can't be negative").max(10_000_000).default(0),
 });
 
 export async function saveEmployee(companySlug: string, employeeId: string | null, _prev: PayrollFormState, formData: FormData): Promise<PayrollFormState> {
   const { slug, companyId } = await ctx(companySlug);
   const parsed = employeeSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
-  const data = { ...parsed.data, baseSalary: round2(parsed.data.baseSalary) };
+  const data = { ...parsed.data, baseSalary: round2(parsed.data.baseSalary), taxExemption: round2(parsed.data.taxExemption) };
   if (employeeId) {
     const updated = await prisma.employee.updateMany({ where: { id: employeeId, companyId }, data });
     if (!updated.count) return { error: "This employee no longer exists." };
@@ -76,7 +78,10 @@ export async function createPayrollRun(companySlug: string, _prev: PayrollFormSt
   const frequency = parsed.data.frequency as PayFrequency;
   const period = payPeriod(frequency, parsed.data.period);
   if (!period) return { error: "Choose the period." };
-  const staff = await prisma.employee.findMany({ where: { companyId, active: true, payFrequency: frequency }, orderBy: { name: "asc" } });
+  const [staff, rules] = await Promise.all([
+    prisma.employee.findMany({ where: { companyId, active: true, payFrequency: frequency }, orderBy: { name: "asc" } }),
+    getPayrollRules(slug),
+  ]);
   if (!staff.length) return { error: `No active staff are paid ${frequency === "MONTHLY" ? "monthly" : "weekly"}. Add them on the Staff page first.` };
 
   let id: string;
@@ -92,15 +97,7 @@ export async function createPayrollRun(companySlug: string, _prev: PayrollFormSt
           periodEnd: period.end,
           label: period.label,
           createdById: user.id,
-          lines: {
-            create: staff.map((e) => ({
-              employeeId: e.id,
-              name: e.name,
-              position: e.position,
-              baseSalary: e.baseSalary,
-              net: e.baseSalary,
-            })),
-          },
+          lines: { create: staff.map((e) => newLine(e, frequency, rules)) },
         },
       });
       return run.id;
@@ -139,13 +136,21 @@ export async function savePayrollLines(companySlug: string, runId: string, _prev
   }
   const parsed = linesSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
-  const run = await prisma.payrollRun.findFirst({ where: { id: runId, companyId }, select: { status: true, lines: { select: { id: true, name: true } } } });
+  const run = await prisma.payrollRun.findFirst({
+    where: { id: runId, companyId },
+    select: { status: true, frequency: true, lines: { select: { id: true, name: true, employee: { select: { nssfEnrolled: true, taxExemption: true } } } } },
+  });
   if (!run) return { error: "This payroll no longer exists." };
   if (run.status !== "DRAFT") return { error: "Only a draft payroll can be changed. Reopen it first." };
-  const known = new Map(run.lines.map((l) => [l.id, l.name]));
+  const rules = await getPayrollRules(slug);
+  const known = new Map(run.lines.map((l) => [l.id, l]));
+  const computed = new Map<string, ReturnType<typeof statutory>>();
   for (const l of parsed.data.lines) {
-    if (!known.has(l.id)) return { error: "A line of this payroll no longer exists. Reload the page." };
-    if (lineNet({ ...l }) < 0) return { error: `${known.get(l.id)}'s pay would be negative. Check the deductions and advance.` };
+    const line = known.get(l.id);
+    if (!line) return { error: "A line of this payroll no longer exists. Reload the page." };
+    const st = statutory(lineGross(l), run.frequency as PayFrequency, rules, { nssfEnrolled: line.employee.nssfEnrolled, taxExemption: Number(line.employee.taxExemption) });
+    computed.set(l.id, st);
+    if (lineNet({ ...l, ...st }) < 0) return { error: `${line.name}'s pay would be negative. Check the deductions and advance.` };
   }
   await prisma.$transaction(async (tx) => {
     for (const l of parsed.data.lines) {
@@ -157,7 +162,8 @@ export async function savePayrollLines(companySlug: string, runId: string, _prev
           overtime: round2(l.overtime),
           deductions: round2(l.deductions),
           advance: round2(l.advance),
-          net: lineNet(l),
+          ...computed.get(l.id)!,
+          net: lineNet({ ...l, ...computed.get(l.id)! }),
           note: l.note || null,
         },
       });
@@ -177,9 +183,9 @@ export async function addMissingStaff(companySlug: string, runId: string): Promi
   const have = new Set(run.lines.map((l) => l.employeeId));
   const missing = (await prisma.employee.findMany({ where: { companyId, active: true, payFrequency: run.frequency } })).filter((e) => !have.has(e.id));
   if (missing.length) {
-    await prisma.payrollLine.createMany({
-      data: missing.map((e) => ({ runId, employeeId: e.id, name: e.name, position: e.position, baseSalary: e.baseSalary, net: e.baseSalary })),
-    });
+    const { slug } = await ctx(companySlug);
+    const rules = await getPayrollRules(slug);
+    await prisma.payrollLine.createMany({ data: missing.map((e) => ({ runId, ...newLine(e, run.frequency as PayFrequency, rules) })) });
     updateTag(payrollTag(companyId));
   }
   return { added: missing.length };
@@ -227,8 +233,11 @@ export async function payPayroll(companySlug: string, runId: string, _prev: Payr
       if (!run) throw new UserError("This payroll no longer exists.");
       if (run.status !== "APPROVED") throw new UserError(run.status === "PAID" ? "This payroll is already paid." : "Approve the payroll before paying it.");
       const lines = run.lines.map((l) => {
-        const a = { baseSalary: Number(l.baseSalary), bonus: Number(l.bonus), overtime: Number(l.overtime), deductions: Number(l.deductions), advance: Number(l.advance) };
-        return { name: l.name, gross: lineGross(a), advance: a.advance, net: lineNet(a) };
+        const a = {
+          baseSalary: Number(l.baseSalary), bonus: Number(l.bonus), overtime: Number(l.overtime), deductions: Number(l.deductions), advance: Number(l.advance),
+          nssfEmployee: Number(l.nssfEmployee), incomeTax: Number(l.incomeTax),
+        };
+        return { name: l.name, gross: lineGross(a), advance: a.advance, nssfEmployee: a.nssfEmployee, nssfEmployer: Number(l.nssfEmployer), incomeTax: a.incomeTax, net: lineNet(a) };
       });
       await tx.payrollRun.update({ where: { id: run.id }, data: { status: "PAID", payDate: date, moneyAccountId: account.id } });
       await postPayroll(tx, { id: run.id, companyId, number: run.number, label: run.label, date, moneyAccountId: account.id, lines, createdById: user.id });
@@ -264,6 +273,37 @@ export async function deletePayrollRun(companySlug: string, runId: string): Prom
   await prisma.payrollRun.delete({ where: { id: runId } });
   updateTag(payrollTag(companyId));
   redirect(`/c/${slug}/payroll`);
+}
+
+/** A payroll line for an employee at their base salary, with NSSF and income tax worked out. */
+function newLine(e: { id: string; name: string; position: string | null; baseSalary: unknown; nssfEnrolled: boolean; taxExemption: unknown }, frequency: PayFrequency, rules: PayrollRules) {
+  const base = Number(e.baseSalary);
+  const st = statutory(base, frequency, rules, { nssfEnrolled: e.nssfEnrolled, taxExemption: Number(e.taxExemption) });
+  return { employeeId: e.id, name: e.name, position: e.position, baseSalary: base, ...st, net: lineNet({ baseSalary: base, bonus: 0, overtime: 0, deductions: 0, advance: 0, ...st }) };
+}
+
+const rate = (max: number) => z.coerce.number().min(0, "Rates can't be negative").max(max);
+const settingsSchema = z.object({
+  sicknessEmployee: rate(100),
+  sicknessEmployer: rate(100),
+  sicknessCap: rate(1_000_000),
+  familyEmployer: rate(100),
+  familyCap: rate(1_000_000),
+  endOfService: rate(100),
+  taxBrackets: z.string().max(2000),
+  defaultExemption: rate(10_000_000),
+});
+
+/** NSSF rates and ceilings, and income-tax brackets (set by the accountant). */
+export async function savePayrollSettings(companySlug: string, _prev: PayrollFormState, formData: FormData): Promise<PayrollFormState> {
+  const { slug, companyId } = await ctx(companySlug);
+  const parsed = settingsSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const bad = parsed.data.taxBrackets.split("\n").map((l) => l.trim()).filter(Boolean).find((l) => !/^(\*|[\d,.]+)\s+[\d.]+%?$/.test(l));
+  if (bad) return { error: `Tax bracket line “${bad}”: write the yearly amount up to which it applies, then the rate (e.g. 18000 2), and “* 25” for the top rate.` };
+  await prisma.payrollSettings.upsert({ where: { companyId }, create: { companyId, ...parsed.data }, update: parsed.data });
+  updateTag(payrollTag(companyId));
+  redirect(`/c/${slug}/payroll?settingsSaved=1`);
 }
 
 class UserError extends Error {}

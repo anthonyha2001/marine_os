@@ -5,7 +5,7 @@ import { FileSignature, FileText, HandCoins } from "lucide-react";
 import { requireModule } from "@/lib/auth";
 import { dayFormat } from "@/lib/dates";
 import { listMoneyAccounts } from "@/lib/data/ledger";
-import { getPayrollRun, outstandingAdvances } from "@/lib/data/payroll";
+import { getPayrollRules, getPayrollRun, listEmployees, outstandingAdvances } from "@/lib/data/payroll";
 import { formatMoney, round2 } from "@/lib/money";
 import { PAY_FREQUENCIES, RUN_STATUS } from "@/lib/payroll";
 import { COMPANIES } from "@/lib/permissions";
@@ -24,6 +24,8 @@ async function RunDetail({ params, searchParams }: { params: Promise<{ company: 
   if (!run) notFound();
   const base = `/c/${slug}/payroll/${run.id}`;
   const advances = run.status === "DRAFT" ? await outstandingAdvances(slug) : null;
+  const [rules, staff] = run.status === "DRAFT" ? await Promise.all([getPayrollRules(slug), listEmployees(slug)]) : [null, []];
+  const staffById = new Map(staff.map((e) => [e.id, e]));
   const owed = (employeeId: string, name: string) =>
     advances ? Math.max(0, round2((advances.byName.get(name.trim().toLowerCase()) ?? 0) - (advances.repaid.get(employeeId) ?? 0))) : 0;
 
@@ -73,7 +75,14 @@ async function RunDetail({ params, searchParams }: { params: Promise<{ company: 
             companySlug={slug}
             runId={run.id}
             notes={run.notes}
-            lines={run.lines.map((l) => ({ ...l, owedAdvance: owed(l.employeeId, l.name) }))}
+            rules={rules!}
+            frequency={run.frequency}
+            lines={run.lines.map((l) => ({
+              ...l,
+              owedAdvance: owed(l.employeeId, l.name),
+              nssfEnrolled: staffById.get(l.employeeId)?.nssfEnrolled ?? true,
+              taxExemption: staffById.get(l.employeeId)?.taxExemption ?? 0,
+            }))}
           />
         ) : (
           <>
@@ -87,6 +96,8 @@ async function RunDetail({ params, searchParams }: { params: Promise<{ company: 
                     <th className={`${thClass} text-right`}>Overtime</th>
                     <th className={`${thClass} text-right`}>Deductions</th>
                     <th className={`${thClass} text-right`}>Advance back</th>
+                    <th className={`${thClass} text-right`}>NSSF</th>
+                    <th className={`${thClass} text-right`}>Tax</th>
                     <th className={`${thClass} text-right`}>Net pay</th>
                   </tr>
                 </thead>
@@ -98,7 +109,7 @@ async function RunDetail({ params, searchParams }: { params: Promise<{ company: 
                         {l.position && <span className="block text-xs text-muted">{l.position}</span>}
                         {l.note && <span className="block text-xs text-muted">{l.note}</span>}
                       </td>
-                      {[l.baseSalary, l.bonus, l.overtime, l.deductions, l.advance].map((v, i) => (
+                      {[l.baseSalary, l.bonus, l.overtime, l.deductions, l.advance, l.nssfEmployee, l.incomeTax].map((v, i) => (
                         <td key={i} className={`${tdClass} tabular text-right ${v ? "" : "text-slate-300"}`}>
                           {v ? formatMoney(v) : "—"}
                         </td>
@@ -107,8 +118,10 @@ async function RunDetail({ params, searchParams }: { params: Promise<{ company: 
                     </tr>
                   ))}
                   <tr className="bg-surface-2 font-semibold text-navy">
-                    <td className={tdClass} colSpan={6}>
-                      Total · salary cost {formatMoney(run.totalGross)}
+                    <td className={tdClass} colSpan={8}>
+                      Total · salaries {formatMoney(run.totalGross)}
+                      {run.totalNssfEmployee + run.totalIncomeTax > 0 && ` · withheld NSSF ${formatMoney(run.totalNssfEmployee)}, tax ${formatMoney(run.totalIncomeTax)}`}
+                      {run.totalNssfEmployer > 0 && ` · employer NSSF ${formatMoney(run.totalNssfEmployer)}`}
                       {run.totalAdvance > 0 && ` · advances back ${formatMoney(run.totalAdvance)}`}
                     </td>
                     <td className={`${tdClass} tabular text-right`}>{formatMoney(run.totalNet)}</td>

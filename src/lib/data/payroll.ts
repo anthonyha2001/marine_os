@@ -2,7 +2,7 @@ import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { companyIdFor } from "@/lib/data/inventory";
-import { lineGross, lineNet, type PayFrequency, type RunStatus } from "@/lib/payroll";
+import { lineGross, lineNet, parseBrackets, type PayFrequency, type PayrollRules, type RunStatus } from "@/lib/payroll";
 import { round2 } from "@/lib/money";
 import type { CompanySlug } from "@/lib/permissions";
 
@@ -23,6 +23,8 @@ async function loadEmployees(companyId: string) {
     startDate: e.startDate,
     payFrequency: e.payFrequency as PayFrequency,
     baseSalary: Number(e.baseSalary),
+    nssfEnrolled: e.nssfEnrolled,
+    taxExemption: Number(e.taxExemption),
     active: e.active,
     notes: e.notes,
   }));
@@ -54,8 +56,10 @@ async function loadRuns(companyId: string) {
         overtime: Number(l.overtime),
         deductions: Number(l.deductions),
         advance: Number(l.advance),
+        nssfEmployee: Number(l.nssfEmployee),
+        incomeTax: Number(l.incomeTax),
       };
-      return { id: l.id, employeeId: l.employeeId, name: l.name, position: l.position, note: l.note, ...amounts, gross: lineGross(amounts), net: lineNet(amounts) };
+      return { id: l.id, employeeId: l.employeeId, name: l.name, position: l.position, note: l.note, ...amounts, nssfEmployer: Number(l.nssfEmployer), gross: lineGross(amounts), net: lineNet(amounts) };
     });
     return {
       id: r.id,
@@ -72,6 +76,9 @@ async function loadRuns(companyId: string) {
       lines,
       totalGross: round2(lines.reduce((s, l) => s + l.gross, 0)),
       totalAdvance: round2(lines.reduce((s, l) => s + l.advance, 0)),
+      totalNssfEmployee: round2(lines.reduce((s, l) => s + l.nssfEmployee, 0)),
+      totalNssfEmployer: round2(lines.reduce((s, l) => s + l.nssfEmployer, 0)),
+      totalIncomeTax: round2(lines.reduce((s, l) => s + l.incomeTax, 0)),
       totalNet: round2(lines.reduce((s, l) => s + l.net, 0)),
     };
   });
@@ -106,4 +113,29 @@ export async function outstandingAdvances(slug: CompanySlug) {
     if (key) byName.set(key, round2((byName.get(key) ?? 0) + Number(v.amount)));
   }
   return { byName, repaid: new Map(repaid.map((r) => [r.employeeId, Number(r._sum.advance ?? 0)])) };
+}
+
+/** The company's NSSF / income-tax rules (defaults until the accountant saves their own). */
+export async function getPayrollRules(slug: CompanySlug): Promise<PayrollRules & { saved: boolean; bracketsText: string }> {
+  return loadRules(await companyIdFor(slug));
+}
+
+async function loadRules(companyId: string) {
+  "use cache";
+  cacheTag(payrollTag(companyId));
+  cacheLife("hours");
+  const r = await prisma.payrollSettings.findUnique({ where: { companyId } });
+  const n = (v: unknown, d: number) => (v === undefined || v === null ? d : Number(v));
+  return {
+    saved: !!r,
+    sicknessEmployee: n(r?.sicknessEmployee, 3),
+    sicknessEmployer: n(r?.sicknessEmployer, 8),
+    sicknessCap: n(r?.sicknessCap, 0),
+    familyEmployer: n(r?.familyEmployer, 6),
+    familyCap: n(r?.familyCap, 0),
+    endOfService: n(r?.endOfService, 8.5),
+    bracketsText: r?.taxBrackets ?? "",
+    brackets: parseBrackets(r?.taxBrackets ?? ""),
+    defaultExemption: n(r?.defaultExemption, 0),
+  };
 }

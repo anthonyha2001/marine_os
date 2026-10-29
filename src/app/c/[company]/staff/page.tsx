@@ -3,7 +3,7 @@ import Link from "next/link";
 import { IdCard, Pencil, Plus } from "lucide-react";
 import { requireModule } from "@/lib/auth";
 import { dayFormat } from "@/lib/dates";
-import { listEmployees, outstandingAdvances } from "@/lib/data/payroll";
+import { getPayrollRules, listEmployees, outstandingAdvances } from "@/lib/data/payroll";
 import { formatMoney, round2 } from "@/lib/money";
 import { PAY_FREQUENCIES, monthlyEquivalent } from "@/lib/payroll";
 import { COMPANIES } from "@/lib/permissions";
@@ -18,7 +18,7 @@ async function StaffContent({ params, searchParams }: { params: Promise<{ compan
   const [{ company }, search] = await Promise.all([params, searchParams]);
   const { slug } = await requireModule(company, "payroll");
   const base = `/c/${slug}/staff`;
-  const [all, advances] = await Promise.all([listEmployees(slug), outstandingAdvances(slug)]);
+  const [all, advances, rules] = await Promise.all([listEmployees(slug), outstandingAdvances(slug), getPayrollRules(slug)]);
   const active = all.filter((e) => e.active);
   const needle = (search.q ?? "").trim().toLowerCase();
   const shown = all.filter((e) => (search.left ? !e.active : e.active) && (!needle || e.name.toLowerCase().includes(needle) || (e.position ?? "").toLowerCase().includes(needle)));
@@ -103,7 +103,7 @@ async function StaffContent({ params, searchParams }: { params: Promise<{ compan
 
       {(search.new || editing) && (
         <Modal title={editing ? `Edit ${editing.name}` : "New employee"} closeHref={base} size="md">
-          <EmployeeForm key={crypto.randomUUID()} companySlug={slug} employee={editing} />
+          <EmployeeForm key={crypto.randomUUID()} companySlug={slug} employee={editing} defaultExemption={rules.defaultExemption} />
         </Modal>
       )}
     </>

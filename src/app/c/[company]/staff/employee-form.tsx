@@ -7,7 +7,7 @@ import { PAY_FREQUENCIES } from "@/lib/payroll";
 import { useFocusOnShow } from "@/components/use-focus-on-show";
 import { FormMessage, Kbd, inputClass, labelClass, primaryButton } from "@/components/ui";
 
-export function EmployeeForm({ companySlug, employee }: { companySlug: string; employee?: EmployeeRow }) {
+export function EmployeeForm({ companySlug, employee, defaultExemption = 0 }: { companySlug: string; employee?: EmployeeRow; defaultExemption?: number }) {
   const [state, formAction, pending] = useActionState<PayrollFormState, FormData>(saveEmployee.bind(null, companySlug, employee?.id ?? null), {});
   const nameInput = useFocusOnShow<HTMLInputElement>();
   return (
@@ -46,6 +46,20 @@ export function EmployeeForm({ companySlug, employee }: { companySlug: string; e
         <label className={labelClass}>
           Start date
           <input name="startDate" type="date" defaultValue={employee?.startDate ? employee.startDate.toISOString().slice(0, 10) : ""} className={inputClass} />
+        </label>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="flex items-start gap-2 pt-6 text-sm">
+          <input type="checkbox" name="nssfEnrolled" defaultChecked={employee?.nssfEnrolled ?? true} className="mt-0.5 size-4 accent-brand" />
+          <span>
+            <span className="font-medium text-navy">Declared to the NSSF</span>
+            <span className="block text-xs text-muted">NSSF is withheld and the employer share is counted.</span>
+          </span>
+        </label>
+        <label className={labelClass}>
+          Yearly income-tax exemption (USD)
+          <input name="taxExemption" type="number" min="0" step="0.01" defaultValue={employee?.taxExemption ?? defaultExemption} className={inputClass} />
+          <span className="mt-1 block text-xs font-normal text-muted">Personal + family allowances, as your accountant advises.</span>
         </label>
       </div>
       <label className={labelClass}>

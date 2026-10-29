@@ -443,7 +443,7 @@ export async function postPayroll(
     label: string;
     date: Date;
     moneyAccountId: string;
-    lines: { name: string; gross: number; advance: number; net: number }[];
+    lines: { name: string; gross: number; advance: number; net: number; nssfEmployee?: number; nssfEmployer?: number; incomeTax?: number }[];
     createdById: string;
   },
 ) {
@@ -451,6 +451,9 @@ export async function postPayroll(
   const memo = `Payroll ${run.number} · ${run.label}`;
   const advances = round2(run.lines.reduce((s, l) => s + l.advance, 0));
   const net = round2(run.lines.reduce((s, l) => s + l.net, 0));
+  const employer = round2(run.lines.reduce((s, l) => s + (l.nssfEmployer ?? 0), 0));
+  const nssf = round2(run.lines.reduce((s, l) => s + (l.nssfEmployee ?? 0), 0) + employer);
+  const tax = round2(run.lines.reduce((s, l) => s + (l.incomeTax ?? 0), 0));
   return postEntry(tx, {
     companyId: run.companyId,
     date: run.date,
@@ -460,6 +463,9 @@ export async function postPayroll(
     createdById: run.createdById,
     lines: [
       ...run.lines.map((l) => ({ accountId: a.SALARIES, debit: l.gross, description: `${l.name} · ${run.label}` })),
+      { accountId: a.SOCIAL_COST, debit: employer, description: `Employer NSSF · ${run.label}` },
+      { accountId: a.NSSF_PAYABLE, credit: nssf, description: `NSSF to pay (employee + employer) · ${run.label}` },
+      { accountId: a.SALARY_TAX, credit: tax, description: `Income tax withheld · ${run.label}` },
       { accountId: a.STAFF_ADVANCES, credit: advances, description: `Advances paid back · ${run.label}` },
       { accountId: run.moneyAccountId, credit: net, description: memo },
     ],

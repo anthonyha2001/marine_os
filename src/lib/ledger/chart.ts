@@ -31,6 +31,9 @@ export const DEFAULT_CHART: Seed[] = [
   // Cheques we gave to suppliers that the bank has not paid yet.
   { code: "403", name: "Cheques issued", type: "LIABILITY", kind: "OTHER", system: true },
   { code: "421", name: "Salaries payable", type: "LIABILITY", kind: "OTHER" },
+  // Withheld from salaries and owed to the NSSF / the tax office until paid with a voucher.
+  { code: "431", name: "NSSF payable", type: "LIABILITY", kind: "OTHER", system: true },
+  { code: "4421", name: "Salary tax withheld", type: "LIABILITY", kind: "OTHER", system: true },
   // Money advanced to staff, paid back through payroll.
   { code: "425", name: "Staff advances", type: "ASSET", kind: "OTHER", system: true },
   { code: "4427", name: "VAT collected", type: "LIABILITY", kind: "VAT_OUT", system: true },
@@ -65,7 +68,7 @@ export const DEFAULT_CHART: Seed[] = [
   { code: "627", name: "Bank charges", type: "EXPENSE", kind: "EXPENSE" },
   { code: "635", name: "Taxes and fees", type: "EXPENSE", kind: "EXPENSE" },
   { code: "641", name: "Salaries and wages", type: "EXPENSE", kind: "EXPENSE", system: true },
-  { code: "645", name: "Social security (NSSF)", type: "EXPENSE", kind: "EXPENSE" },
+  { code: "645", name: "Social security (NSSF)", type: "EXPENSE", kind: "EXPENSE", system: true },
   { code: "658", name: "Other expenses", type: "EXPENSE", kind: "EXPENSE" },
 ];
 
@@ -86,7 +89,7 @@ export async function ensureChart(companyId: string, db: Tx | typeof prisma = pr
   });
 }
 
-export type SystemAccounts = Record<"CASH" | "CASH_LBP" | "BANK" | "RECEIVABLE" | "PAYABLE" | "CHEQUES_IN" | "CHEQUES_OUT" | "INTERCOMPANY" | "SALARIES" | "STAFF_ADVANCES" | "VAT_IN" | "VAT_OUT" | "SALES" | "PURCHASES", string>;
+export type SystemAccounts = Record<"CASH" | "CASH_LBP" | "BANK" | "RECEIVABLE" | "PAYABLE" | "CHEQUES_IN" | "CHEQUES_OUT" | "INTERCOMPANY" | "SALARIES" | "SOCIAL_COST" | "NSSF_PAYABLE" | "SALARY_TAX" | "STAFF_ADVANCES" | "VAT_IN" | "VAT_OUT" | "SALES" | "PURCHASES", string>;
 
 const SYSTEM_CODES: Record<keyof SystemAccounts, string> = {
   CASH: "530",
@@ -98,6 +101,9 @@ const SYSTEM_CODES: Record<keyof SystemAccounts, string> = {
   CHEQUES_OUT: "403",
   INTERCOMPANY: "458",
   SALARIES: "641",
+  SOCIAL_COST: "645",
+  NSSF_PAYABLE: "431",
+  SALARY_TAX: "4421",
   STAFF_ADVANCES: "425",
   VAT_IN: "4426",
   VAT_OUT: "4427",

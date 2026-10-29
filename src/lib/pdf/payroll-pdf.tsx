@@ -34,7 +34,7 @@ export function PayrollSheetPdf({ slug, run, company }: { slug: CompanySlug; run
             <Text style={c.no}>No.</Text>
             <Text style={c.name}>Employee</Text>
             <Text style={c.num}>Salary</Text>
-            <Text style={c.num}>Adv. back</Text>
+            <Text style={c.num}>Withheld</Text>
             <Text style={c.num}>Net paid</Text>
             <Text style={c.sign}>Signature</Text>
           </View>
@@ -46,7 +46,9 @@ export function PayrollSheetPdf({ slug, run, company }: { slug: CompanySlug; run
                 {l.position && <Text style={s.itemDesc}>{l.position}</Text>}
               </View>
               <Text style={c.num}>{money.format(l.gross)}</Text>
-              <Text style={[c.num, { color: l.advance ? INK : MUTED }]}>{l.advance ? money.format(l.advance) : "—"}</Text>
+              <Text style={[c.num, { color: l.advance + l.nssfEmployee + l.incomeTax ? INK : MUTED }]}>
+                {l.advance + l.nssfEmployee + l.incomeTax ? money.format(l.advance + l.nssfEmployee + l.incomeTax) : "—"}
+              </Text>
               <Text style={[c.num, { fontFamily: "Helvetica-Bold" }]}>{money.format(l.net)}</Text>
               <View style={[c.sign, { height: 24, borderBottomWidth: 0.8, borderBottomColor: INK }]} />
             </View>
@@ -55,7 +57,7 @@ export function PayrollSheetPdf({ slug, run, company }: { slug: CompanySlug; run
             <Text style={c.no} />
             <Text style={[c.name, { fontFamily: "Helvetica-Bold" }]}>Total</Text>
             <Text style={[c.num, { fontFamily: "Helvetica-Bold" }]}>{money.format(run.totalGross)}</Text>
-            <Text style={[c.num, { fontFamily: "Helvetica-Bold" }]}>{money.format(run.totalAdvance)}</Text>
+            <Text style={[c.num, { fontFamily: "Helvetica-Bold" }]}>{money.format(run.totalAdvance + run.totalNssfEmployee + run.totalIncomeTax)}</Text>
             <Text style={[c.num, { fontFamily: "Helvetica-Bold" }]}>{money.format(run.totalNet)}</Text>
             <View style={c.sign} />
           </View>
@@ -91,6 +93,8 @@ export function PayslipsPdf({ slug, run, company, employees }: { slug: CompanySl
           ["Overtime", l.overtime, false],
           ["Deductions (absence, other)", -l.deductions, false],
           ["Salary for the period", l.gross, true],
+          ["NSSF (employee share)", -l.nssfEmployee, false],
+          ["Income tax withheld", -l.incomeTax, false],
           ["Advance paid back", -l.advance, false],
         ];
         return (
@@ -141,6 +145,9 @@ export function PayslipsPdf({ slug, run, company, employees }: { slug: CompanySl
               </View>
             </View>
             <Text style={s.words}>In words: {amountInWords(l.net)}.</Text>
+            {l.nssfEmployer > 0 && (
+              <Text style={{ marginTop: 8, fontSize: 8, color: MUTED }}>Paid by the employer on top of this salary: NSSF contributions {money.format(l.nssfEmployer)}.</Text>
+            )}
             {l.note && <Text style={[s.paragraph, { marginTop: 10 }]}>Note: {l.note}</Text>}
             <View style={[s.signatures, { marginTop: 40 }]} wrap={false}>
               <View style={s.signBox}>

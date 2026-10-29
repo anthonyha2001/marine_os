@@ -57,6 +57,7 @@ model Company {
   cheques          Cheque[]
   reconciliations  BankReconciliation[]
   appointments     Appointment[]
+  payrollSettings  PayrollSettings?
 }
 
 model User {
@@ -863,6 +864,8 @@ model Employee {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   payrollLines PayrollLine[]
+  nssfEnrolled Boolean       @default(true) // declared to the NSSF
+  taxExemption Decimal       @default(0) @db.Decimal(12, 2) // yearly tax-free amount (family situation)
 
   @@index([companyId, active])
 }
@@ -895,20 +898,23 @@ model PayrollRun {
 }
 
 model PayrollLine {
-  id         String     @id @default(cuid())
-  runId      String
-  run        PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  employeeId String
-  employee   Employee   @relation(fields: [employeeId], references: [id])
-  name       String // snapshot at the time of the run
-  position   String?
-  baseSalary Decimal    @db.Decimal(12, 2)
-  bonus      Decimal    @default(0) @db.Decimal(12, 2)
-  overtime   Decimal    @default(0) @db.Decimal(12, 2)
-  deductions Decimal    @default(0) @db.Decimal(12, 2) // absence, penalties: lower the salary cost
-  advance    Decimal    @default(0) @db.Decimal(12, 2) // advance already given, paid back now
-  net        Decimal    @db.Decimal(12, 2)
-  note       String?
+  id           String     @id @default(cuid())
+  runId        String
+  run          PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  employeeId   String
+  employee     Employee   @relation(fields: [employeeId], references: [id])
+  name         String // snapshot at the time of the run
+  position     String?
+  baseSalary   Decimal    @db.Decimal(12, 2)
+  bonus        Decimal    @default(0) @db.Decimal(12, 2)
+  overtime     Decimal    @default(0) @db.Decimal(12, 2)
+  deductions   Decimal    @default(0) @db.Decimal(12, 2) // absence, penalties: lower the salary cost
+  advance      Decimal    @default(0) @db.Decimal(12, 2) // advance already given, paid back now
+  net          Decimal    @db.Decimal(12, 2)
+  note         String?
+  nssfEmployee Decimal    @default(0) @db.Decimal(12, 2) // withheld from the salary
+  nssfEmployer Decimal    @default(0) @db.Decimal(12, 2) // company cost (sickness, family, end of service)
+  incomeTax    Decimal    @default(0) @db.Decimal(12, 2) // withheld from the salary
 
   @@unique([runId, employeeId])
 }
@@ -1270,7 +1276,9 @@ model Appointment {
   @@index([companyId, date])
 }
 
-/** Who created, changed or deleted what, and when (written automatically). */
+/**
+ * Who created, changed or deleted what, and when (written automatically).
+ */
 model AuditLog {
   id        String   @id @default(cuid())
   companyId String? // null: shared records (products, customers, suppliers, vessels)
@@ -1285,4 +1293,21 @@ model AuditLog {
 
   @@index([companyId, createdAt])
   @@index([entity, entityId])
+}
+
+/**
+ * NSSF and income-tax rules for a company's payroll (set by the accountant).
+ */
+model PayrollSettings {
+  id               String  @id @default(cuid())
+  companyId        String  @unique
+  company          Company @relation(fields: [companyId], references: [id])
+  sicknessEmployee Decimal @default(3) @db.Decimal(6, 3) // % of salary (up to the ceiling)
+  sicknessEmployer Decimal @default(8) @db.Decimal(6, 3)
+  sicknessCap      Decimal @default(0) @db.Decimal(12, 2) // monthly ceiling in USD, 0 = none
+  familyEmployer   Decimal @default(6) @db.Decimal(6, 3)
+  familyCap        Decimal @default(0) @db.Decimal(12, 2)
+  endOfService     Decimal @default(8.5) @db.Decimal(6, 3) // employer, no ceiling
+  taxBrackets      String  @default("") // one per line: "<annual USD up to> <rate %>", last line may be "* <rate %>"
+  defaultExemption Decimal @default(0) @db.Decimal(12, 2) // yearly tax-free amount for a new employee
 }

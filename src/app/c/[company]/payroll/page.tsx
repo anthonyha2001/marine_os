@@ -1,23 +1,24 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Banknote, Plus } from "lucide-react";
+import { Banknote, Plus, Settings2 } from "lucide-react";
 import { requireModule } from "@/lib/auth";
 import { dayFormat } from "@/lib/dates";
-import { listEmployees, listPayrollRuns } from "@/lib/data/payroll";
+import { getPayrollRules, listEmployees, listPayrollRuns } from "@/lib/data/payroll";
 import { formatMoney, round2 } from "@/lib/money";
 import { PAY_FREQUENCIES, RUN_STATUS } from "@/lib/payroll";
 import { COMPANIES } from "@/lib/permissions";
 import { Modal } from "@/components/modal";
 import { Badge, ButtonLink, EmptyState, PageHeader, StatCard, cardClass, tdClass, thClass } from "@/components/ui";
 import { NewRunForm } from "./new-run-form";
+import { PayrollSettingsForm } from "./settings-form";
 
 const TONE = { DRAFT: "gray", APPROVED: "amber", PAID: "green" } as const;
 
-async function PayrollContent({ params, searchParams }: { params: Promise<{ company: string }>; searchParams: Promise<{ new?: string }> }) {
-  const [{ company }, { new: creating }] = await Promise.all([params, searchParams]);
+async function PayrollContent({ params, searchParams }: { params: Promise<{ company: string }>; searchParams: Promise<{ new?: string; settings?: string; settingsSaved?: string }> }) {
+  const [{ company }, { new: creating, settings, settingsSaved }] = await Promise.all([params, searchParams]);
   const { slug } = await requireModule(company, "payroll");
   const base = `/c/${slug}/payroll`;
-  const [runs, staff] = await Promise.all([listPayrollRuns(slug), listEmployees(slug)]);
+  const [runs, staff, rules] = await Promise.all([listPayrollRuns(slug), listEmployees(slug), getPayrollRules(slug)]);
   const active = staff.filter((e) => e.active);
   const year = new Date().getUTCFullYear();
   const paidThisYear = round2(runs.filter((r) => r.status === "PAID" && r.periodStart.getUTCFullYear() === year).reduce((s, r) => s + r.totalNet, 0));
@@ -29,8 +30,29 @@ async function PayrollContent({ params, searchParams }: { params: Promise<{ comp
         eyebrow={COMPANIES[slug].name}
         title="Payroll"
         description="One payroll per month or per week: adjust bonuses and deductions, approve, print the sheet for staff to sign, then pay."
-        action={<ButtonLink icon={Plus} href={`${base}?new=1`}>New payroll</ButtonLink>}
+        action={
+          <>
+            <ButtonLink icon={Settings2} href={`${base}?settings=1`} variant="secondary">
+              NSSF & tax settings
+            </ButtonLink>
+            <ButtonLink icon={Plus} href={`${base}?new=1`}>New payroll</ButtonLink>
+          </>
+        }
       />
+      {settingsSaved && (
+        <p role="status" className="mt-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-success">
+          Payroll settings saved. New payrolls (and drafts you save again) use them.
+        </p>
+      )}
+      {!rules.saved && (
+        <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          NSSF uses default rates and no income tax is withheld yet.{" "}
+          <Link href={`${base}?settings=1`} className="font-medium underline">
+            Review the NSSF & tax settings
+          </Link>{" "}
+          with your accountant before the first real payroll.
+        </p>
+      )}
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
         <StatCard label={`Paid in ${year}`} value={formatMoney(paidThisYear)} icon={Banknote} hint="net salaries paid out" />
         <StatCard label="Waiting to be paid" value={formatMoney(round2(waiting.reduce((s, r) => s + r.totalNet, 0)))} hint={`${waiting.length} payroll${waiting.length === 1 ? "" : "s"} in draft or approved`} />
@@ -80,6 +102,11 @@ async function PayrollContent({ params, searchParams }: { params: Promise<{ comp
         )}
       </div>
 
+      {settings && (
+        <Modal title="NSSF & income-tax settings" closeHref={base} size="lg">
+          <PayrollSettingsForm key={crypto.randomUUID()} companySlug={slug} rules={rules} />
+        </Modal>
+      )}
       {creating && (
         <Modal title="New payroll" closeHref={base} size="md">
           <NewRunForm
@@ -96,7 +123,7 @@ async function PayrollContent({ params, searchParams }: { params: Promise<{ comp
 export default function PayrollPage({ params, searchParams }: PageProps<"/c/[company]/payroll">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading payroll…</p>}>
-      <PayrollContent params={params} searchParams={searchParams as Promise<{ new?: string }>} />
+      <PayrollContent params={params} searchParams={searchParams as Promise<{ new?: string; settings?: string; settingsSaved?: string }>} />
     </Suspense>
   );
 }

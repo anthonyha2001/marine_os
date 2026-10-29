@@ -3,10 +3,23 @@
 import { useActionState, useState } from "react";
 import { savePayrollLines, type PayrollFormState } from "@/lib/actions/payroll";
 import { formatMoney, round2 } from "@/lib/money";
-import { lineGross, lineNet } from "@/lib/payroll";
+import { lineGross, lineNet, statutory, type PayFrequency, type PayrollRules } from "@/lib/payroll";
 import { FormMessage, Kbd, StickyActions, cardClass, inputClass, primaryButton } from "@/components/ui";
 
-type Line = { id: string; name: string; position: string | null; baseSalary: number; bonus: number; overtime: number; deductions: number; advance: number; note: string | null; owedAdvance: number };
+type Line = {
+  id: string;
+  name: string;
+  position: string | null;
+  baseSalary: number;
+  bonus: number;
+  overtime: number;
+  deductions: number;
+  advance: number;
+  note: string | null;
+  owedAdvance: number;
+  nssfEnrolled: boolean;
+  taxExemption: number;
+};
 type Field = "baseSalary" | "bonus" | "overtime" | "deductions" | "advance";
 const FIELDS: { key: Field; label: string }[] = [
   { key: "baseSalary", label: "Base" },
@@ -17,7 +30,21 @@ const FIELDS: { key: Field; label: string }[] = [
 ];
 
 /** Draft payroll: one row per employee; net updates as you type. Ctrl+S saves. */
-export function PayrollGrid({ companySlug, runId, lines, notes }: { companySlug: string; runId: string; lines: Line[]; notes: string | null }) {
+export function PayrollGrid({
+  companySlug,
+  runId,
+  lines,
+  notes,
+  rules,
+  frequency,
+}: {
+  companySlug: string;
+  runId: string;
+  lines: Line[];
+  notes: string | null;
+  rules: PayrollRules;
+  frequency: PayFrequency;
+}) {
   const [values, setValues] = useState(() => Object.fromEntries(lines.map((l) => [l.id, Object.fromEntries(FIELDS.map((f) => [f.key, l[f.key] ? String(l[f.key]) : ""]))])) as Record<string, Record<Field, string>>);
   const [lineNotes, setLineNotes] = useState(() => Object.fromEntries(lines.map((l) => [l.id, l.note ?? ""])) as Record<string, string>);
   const [dirty, setDirty] = useState(false);
@@ -25,7 +52,10 @@ export function PayrollGrid({ companySlug, runId, lines, notes }: { companySlug:
   const amounts = (id: string) => {
     const v = values[id];
     const n = (k: Field) => Number(v[k]) || 0;
-    return { baseSalary: n("baseSalary"), bonus: n("bonus"), overtime: n("overtime"), deductions: n("deductions"), advance: n("advance") };
+    const a = { baseSalary: n("baseSalary"), bonus: n("bonus"), overtime: n("overtime"), deductions: n("deductions"), advance: n("advance") };
+    const line = lines.find((l) => l.id === id)!;
+    // NSSF and income tax are recalculated on the server when you save; this is a live preview.
+    return { ...a, ...statutory(lineGross(a), frequency, rules, { nssfEnrolled: line.nssfEnrolled, taxExemption: line.taxExemption }) };
   };
   const totalNet = round2(lines.reduce((s, l) => s + lineNet(amounts(l.id)), 0));
   const totalGross = round2(lines.reduce((s, l) => s + lineGross(amounts(l.id)), 0));
@@ -34,7 +64,16 @@ export function PayrollGrid({ companySlug, runId, lines, notes }: { companySlug:
   return (
     <form
       action={(fd) => {
-        fd.set("payload", JSON.stringify({ notes: fd.get("notes"), lines: lines.map((l) => ({ id: l.id, ...amounts(l.id), note: lineNotes[l.id] })) }));
+        fd.set(
+          "payload",
+          JSON.stringify({
+            notes: fd.get("notes"),
+            lines: lines.map((l) => {
+              const { baseSalary, bonus, overtime, deductions, advance } = amounts(l.id);
+              return { id: l.id, baseSalary, bonus, overtime, deductions, advance, note: lineNotes[l.id] };
+            }),
+          }),
+        );
         return formAction(fd);
       }}
       data-save-shortcut
@@ -50,6 +89,8 @@ export function PayrollGrid({ companySlug, runId, lines, notes }: { companySlug:
                   {f.label}
                 </th>
               ))}
+              <th className="px-2 py-2.5 text-right">NSSF</th>
+              <th className="px-2 py-2.5 text-right">Tax</th>
               <th className="px-4 py-2.5 text-right">Net pay</th>
               <th className="px-2 py-2.5">Note</th>
             </tr>
@@ -81,6 +122,8 @@ export function PayrollGrid({ companySlug, runId, lines, notes }: { companySlug:
                       />
                     </td>
                   ))}
+                  <td className="tabular px-2 py-2 text-right text-muted">{formatMoney(amounts(l.id).nssfEmployee)}</td>
+                  <td className="tabular px-2 py-2 text-right text-muted">{formatMoney(amounts(l.id).incomeTax)}</td>
                   <td className={`tabular px-4 py-2 text-right font-semibold ${net < 0 ? "text-danger" : "text-navy"}`}>{formatMoney(net)}</td>
                   <td className="px-2 py-2">
                     <input
