@@ -63,6 +63,7 @@ export const MODULES = {
   customers: { label: "Customers", path: "customers" },
   invoices: { label: "Invoices", path: "invoices" },
   sales: { label: "Point of sale", path: "pos" },
+  posAdmin: { label: "POS prices & settings", path: "pos/prices" },
   marketing: { label: "Marketing", path: "marketing" },
   accounting: { label: "Accounting", path: "accounting" },
   payroll: { label: "Payroll", path: "payroll" },

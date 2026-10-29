@@ -2,8 +2,8 @@
 
 import { useActionState, useState } from "react";
 import { refundSale, updateSaleCustomer, type PosFormState } from "@/lib/actions/pos";
-import { VAT_RATE, formatMoney, round2 } from "@/lib/money";
-import { REFUND_METHODS, formatLbp, roundLbp } from "@/lib/pos";
+import { formatMoney, round2 } from "@/lib/money";
+import { REFUND_METHODS, formatLbp, refundTTC, roundLbp } from "@/lib/pos";
 import { useFocusOnShow } from "@/components/use-focus-on-show";
 import { FormMessage, Kbd, inputClass, labelClass, primaryButton } from "@/components/ui";
 
@@ -15,8 +15,7 @@ export function RefundForm({ companySlug, saleId, lines, discountPct, maxRefund,
   const [method, setMethod] = useState("CASH_USD");
   const [state, formAction, pending] = useActionState<PosFormState, FormData>(refundSale.bind(null, companySlug, saleId), {});
   const reason = useFocusOnShow<HTMLInputElement>();
-  const ht = round2(lines.reduce((s, l) => s + round2(l.unitPriceHT * (qty[l.id] ?? 0) * (1 - discountPct / 100)), 0));
-  const total = Math.min(round2(ht + round2(ht * VAT_RATE)), maxRefund);
+  const total = Math.min(round2(lines.reduce((s, l) => s + refundTTC(l.unitPriceHT, qty[l.id] ?? 0, discountPct), 0)), maxRefund);
 
   return (
     <form

@@ -39,6 +39,8 @@ export type NavIcon =
   | "payroll"
   | "posSales"
   | "posShifts"
+  | "posPrices"
+  | "posSettings"
   | "team"
   | "company";
 
@@ -85,6 +87,8 @@ export const NAV: NavGroup[] = [
       { label: "Point of sale", path: "pos", module: "sales", icon: "pos", shortcut: "Shift+F9", companies: POS_COMPANIES },
       { label: "Counter sales", path: "pos/sales", module: "sales", icon: "posSales", companies: POS_COMPANIES },
       { label: "Shifts & reports", path: "pos/shifts", module: "sales", icon: "posShifts", companies: POS_COMPANIES },
+      { label: "Prices & margins", path: "pos/prices", module: "posAdmin", icon: "posPrices", companies: POS_COMPANIES },
+      { label: "POS settings", path: "pos/settings", module: "posAdmin", icon: "posSettings", companies: POS_COMPANIES },
     ],
   },
   {

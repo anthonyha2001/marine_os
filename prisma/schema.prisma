@@ -59,6 +59,7 @@ model Company {
   appointments     Appointment[]
   payrollSettings  PayrollSettings?
   offerClauses     OfferClause[]
+  posSettings      PosSettings?
 }
 
 model User {
@@ -256,6 +257,8 @@ model Product {
   supplier     Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   // Price without VAT. The TTC price is derived (see src/lib/money.ts).
   priceHT      Decimal   @db.Decimal(12, 2)
+  // Shop (POS) price without VAT, when the counter sells at a different price. Null = priceHT.
+  posPriceHT   Decimal?  @db.Decimal(12, 4) // 4 decimals so the price incl. VAT is exact
   minQuantity  Int       @default(0)
   active       Boolean   @default(true)
   trackSerials Boolean   @default(false) // engines, outboards…: each unit has a serial number
@@ -799,7 +802,7 @@ model PosSaleLine {
   code        String
   name        String
   quantity    Int
-  unitPriceHT Decimal         @db.Decimal(12, 2)
+  unitPriceHT Decimal         @db.Decimal(12, 4) // 4 decimals: the shelf price incl. VAT is exact
   lineTotalHT Decimal         @db.Decimal(12, 2) // before the sale discount
   unitCost    Decimal         @default(0) @db.Decimal(12, 4) // average cost when sold
   refundLines PosRefundLine[]
@@ -1332,4 +1335,25 @@ model OfferClause {
   createdAt DateTime @default(now())
 
   @@index([companyId])
+}
+
+// What the till allows, set by the admin / manager for each company with a counter.
+// "Cashier" limits apply to the CASHIER role; managers, accountants and admins are not limited.
+model PosSettings {
+  id                     String   @id @default(cuid())
+  companyId              String   @unique
+  company                Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  maxDiscountPct         Decimal  @default(10) @db.Decimal(5, 2) // cashier's largest discount
+  allowUsd               Boolean  @default(true)
+  allowLbp               Boolean  @default(true)
+  allowCard              Boolean  @default(true)
+  cardOverpay            String   @default("BLOCK") // BLOCK | CHANGE (give the extra back in cash)
+  sellOutOfStock         Boolean  @default(true) // cashier may sell more than the stock shows
+  customerRequiredAbove  Decimal  @default(0) @db.Decimal(12, 2) // USD incl. VAT; 0 = never
+  cashierRefunds         Boolean  @default(true)
+  refundDays             Int      @default(0) // cashier refunds only within N days; 0 = any time
+  blindClose             Boolean  @default(false) // cashier counts the drawer without seeing the expected cash
+  cashierSeesShiftTotals Boolean  @default(true)
+  receiptNote            String? // printed at the bottom of the receipt
+  updatedAt              DateTime @updatedAt
 }

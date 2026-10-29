@@ -3,10 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarClock, Coins, LockKeyhole, ReceiptText } from "lucide-react";
 import { requireModule } from "@/lib/auth";
-import { expectedCash, getRate, listSales, openShiftFor, posCatalogue } from "@/lib/data/pos";
+import { expectedCash, getPosRules, getRate, listSales, openShiftFor, posCatalogue } from "@/lib/data/pos";
 import { listCustomers } from "@/lib/data/sales";
 import { formatMoney, round2 } from "@/lib/money";
-import { canSetRate, formatRate, hasPos, maxDiscountFor } from "@/lib/pos";
+import { canSetRate, formatRate, hasPos, rulesFor } from "@/lib/pos";
 import { COMPANIES } from "@/lib/permissions";
 import { Modal } from "@/components/modal";
 import { EmptyState, PageHeader, cardClass, secondaryButton } from "@/components/ui";
@@ -88,7 +88,8 @@ async function PosContent({ params, searchParams }: { params: Promise<{ company:
     );
   }
 
-  const [products, customers, sales] = await Promise.all([posCatalogue(slug), listCustomers(), listSales(slug)]);
+  const [products, customers, sales, allRules] = await Promise.all([posCatalogue(slug), listCustomers(), listSales(slug), getPosRules(slug)]);
+  const rules = rulesFor(allRules, user.role);
   const shiftSales = sales.filter((s) => s.shiftId === shift.id);
   const takings = round2(shiftSales.reduce((s, x) => s + x.totalTTC, 0));
   const expected = expectedCash(shift, sales);
@@ -100,8 +101,12 @@ async function PosContent({ params, searchParams }: { params: Promise<{ company:
           <p className="text-xs font-medium uppercase tracking-wider text-brand">{COMPANIES[slug].name} · Retail</p>
           <h1 className="text-2xl font-semibold tracking-tight text-navy">Point of sale</h1>
           <p className="text-sm text-muted">
-            Shift {shift.number} · {user.name} · since {time.format(shift.openedAt)} · {shiftSales.length} sale{shiftSales.length === 1 ? "" : "s"},{" "}
-            <span className="tabular font-medium text-navy">{formatMoney(takings)}</span>
+            Shift {shift.number} · {user.name} · since {time.format(shift.openedAt)} · {shiftSales.length} sale{shiftSales.length === 1 ? "" : "s"}
+            {rules.cashierSeesShiftTotals && (
+              <>
+                , <span className="tabular font-medium text-navy">{formatMoney(takings)}</span>
+              </>
+            )}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -126,13 +131,17 @@ async function PosContent({ params, searchParams }: { params: Promise<{ company:
           products={products}
           customers={customers.map((c) => ({ id: c.id, name: c.name, taxNumber: c.taxNumber }))}
           rate={rate.lbpPerUsd}
-          maxDiscount={maxDiscountFor(user.role)}
+          rules={rules}
         />
       </div>
 
       {search.close && (
         <Modal title={`Close shift ${shift.number}`} closeHref={base} size="md">
-          <CloseShiftForm key={crypto.randomUUID()} companySlug={slug} shiftId={shift.id} expectedUsd={expected.usd} expectedLbp={expected.lbp} rate={rate.lbpPerUsd} />
+          <CloseShiftForm key={crypto.randomUUID()} companySlug={slug} shiftId={shift.id} expectedUsd={rules.blindClose ? 0 : expected.usd}
+            expectedLbp={rules.blindClose ? 0 : expected.lbp}
+            rate={rate.lbpPerUsd}
+            blind={rules.blindClose}
+          />
         </Modal>
       )}
       {rateModal}

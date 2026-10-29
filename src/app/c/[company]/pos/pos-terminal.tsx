@@ -6,7 +6,7 @@ import { CheckCircle2, FileText, Minus, Plus, Printer, ScanBarcode, Trash2, User
 import { completeSale, type CompleteSaleResult } from "@/lib/actions/pos";
 import type { PosProduct } from "@/lib/data/pos";
 import { formatMoney, round2, withVat } from "@/lib/money";
-import { ceilLbp, formatLbp, saleTotals, settle, type ChangeCurrency } from "@/lib/pos";
+import { ceilLbp, formatLbp, saleTotals, settle, type ChangeCurrency, type PosRules } from "@/lib/pos";
 import { useFeedback } from "@/components/feedback";
 import { useFocusOnShow } from "@/components/use-focus-on-show";
 import { FormMessage, Kbd, cardClass, inputClass, labelClass, primaryButton, secondaryButton, secondaryButtonSm } from "@/components/ui";
@@ -55,14 +55,16 @@ export function PosTerminal({
   products,
   customers,
   rate,
-  maxDiscount,
+  rules,
 }: {
   companySlug: string;
   products: PosProduct[];
   customers: Customer[];
   rate: number;
-  maxDiscount: number;
+  /** The till settings as they apply to the person at the till. */
+  rules: PosRules;
 }) {
+  const maxDiscount = rules.maxDiscountPct;
   const [cart, setCart] = useState<CartItem[]>([]);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
@@ -94,10 +96,12 @@ export function PosTerminal({
 
   const discountPct = Math.min(num(discount), 100);
   const totals = saleTotals(cart.map((c) => ({ unitPriceHT: c.priceHT, quantity: c.quantity })), discountPct);
-  const pay = settle({ totalTTC: totals.totalTTC, rate, paidUsd: num(paidUsd), paidLbp: num(paidLbp), paidCard: num(paidCard), changeCurrency });
+  const pay = settle({ totalTTC: totals.totalTTC, rate, paidUsd: num(paidUsd), paidLbp: num(paidLbp), paidCard: num(paidCard), changeCurrency, cardOverpay: rules.cardOverpay });
   const totalLbp = ceilLbp(totals.totalTTC * rate);
   const discountTooHigh = discountPct > maxDiscount;
-  const canComplete = cart.length > 0 && pay.ok && !discountTooHigh && !pending && !done;
+  const overStock = !rules.sellOutOfStock && cart.some((c) => c.quantity > c.stock);
+  const needsCustomer = rules.customerRequiredAbove > 0 && totals.totalTTC > rules.customerRequiredAbove && !customerId && !customerName.trim();
+  const canComplete = cart.length > 0 && pay.ok && !discountTooHigh && !overStock && !needsCustomer && !pending && !done;
 
   const add = (p: PosProduct) => {
     setCart((items) => {
@@ -290,7 +294,7 @@ export function PosTerminal({
                         </button>
                       </div>
                     </td>
-                    <td className="tabular px-4 py-2.5 text-right font-semibold text-navy">{formatMoney(withVat(round2(c.priceHT * c.quantity)))}</td>
+                    <td className="tabular px-4 py-2.5 text-right font-semibold text-navy">{formatMoney(round2(withVat(c.priceHT) * c.quantity))}</td>
                     <td className="pr-2 text-right">
                       <button type="button" disabled={!!done} onClick={() => setQty(c.productId, 0)} title="Remove" aria-label={`Remove ${c.name}`} className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-red-50 hover:text-danger">
                         <Trash2 className="size-4" aria-hidden />
@@ -360,7 +364,7 @@ export function PosTerminal({
                 <span className="tabular w-24 text-right">− {formatMoney(totals.discountHT)}</span>
               </dd>
             </div>
-            {discountTooHigh && <p className="text-xs text-danger">At most {maxDiscount}% without a manager.</p>}
+            {discountTooHigh && <p className="text-xs text-danger">{maxDiscount > 0 ? `At most ${maxDiscount}% without a manager.` : "Discounts need a manager."}</p>}
             <div className="flex justify-between">
               <dt className="text-muted">VAT 11%</dt>
               <dd className="tabular">{formatMoney(totals.vatAmount)}</dd>
@@ -376,30 +380,47 @@ export function PosTerminal({
         </div>
 
         <div className={`${cardClass} space-y-3 p-5`}>
-          <div className="grid grid-cols-3 gap-2">
-            <button type="button" disabled={!cart.length || !!done} onClick={() => exact("usd")} className={secondaryButtonSm}>
-              Exact $
-            </button>
-            <button type="button" disabled={!cart.length || !!done} onClick={() => exact("lbp")} className={secondaryButtonSm}>
-              Exact LBP
-            </button>
-            <button type="button" disabled={!cart.length || !!done} onClick={() => exact("card")} className={secondaryButtonSm}>
-              All by card
-            </button>
+          <div className="flex gap-2 [&>*]:flex-1">
+            {rules.allowUsd && (
+              <button type="button" disabled={!cart.length || !!done} onClick={() => exact("usd")} className={secondaryButtonSm}>
+                Exact $
+              </button>
+            )}
+            {rules.allowLbp && (
+              <button type="button" disabled={!cart.length || !!done} onClick={() => exact("lbp")} className={secondaryButtonSm}>
+                Exact LBP
+              </button>
+            )}
+            {rules.allowCard && (
+              <button type="button" disabled={!cart.length || !!done} onClick={() => exact("card")} className={secondaryButtonSm}>
+                All by card
+              </button>
+            )}
           </div>
-          <label className={labelClass}>
-            Cash USD received
-            <input ref={usdRef} value={paidUsd} disabled={!!done} onChange={(e) => setPaidUsd(e.target.value)} inputMode="decimal" placeholder="0.00" className={`${inputClass} tabular text-right text-lg`} />
-          </label>
-          <label className={labelClass}>
-            Cash LBP received
-            <input value={paidLbp} disabled={!!done} onChange={(e) => setPaidLbp(e.target.value)} inputMode="numeric" placeholder="0" className={`${inputClass} tabular text-right text-lg`} />
-          </label>
-          <label className={labelClass}>
-            Card (USD)
-            <input value={paidCard} disabled={!!done} onChange={(e) => setPaidCard(e.target.value)} inputMode="decimal" placeholder="0.00" className={`${inputClass} tabular text-right text-lg`} />
-          </label>
+          {rules.allowUsd && (
+            <label className={labelClass}>
+              Cash USD received
+              <input ref={usdRef} value={paidUsd} disabled={!!done} onChange={(e) => setPaidUsd(e.target.value)} inputMode="decimal" placeholder="0.00" className={`${inputClass} tabular text-right text-lg`} />
+            </label>
+          )}
+          {rules.allowLbp && (
+            <label className={labelClass}>
+              Cash LBP received
+              <input value={paidLbp} disabled={!!done} onChange={(e) => setPaidLbp(e.target.value)} inputMode="numeric" placeholder="0" className={`${inputClass} tabular text-right text-lg`} />
+            </label>
+          )}
+          {rules.allowCard && (
+            <label className={labelClass}>
+              Card (USD)
+              <input value={paidCard} disabled={!!done} onChange={(e) => setPaidCard(e.target.value)} inputMode="decimal" placeholder="0.00" className={`${inputClass} tabular text-right text-lg`} />
+            </label>
+          )}
           {pay.cardTooHigh && <p className="text-xs text-danger">The card amount can&apos;t be more than the total.</p>}
+          {rules.cardOverpay === "CHANGE" && num(paidCard) > totals.totalTTC + 0.004 && (
+            <p className="text-xs text-amber-700">The card is more than the total: give the difference back in cash.</p>
+          )}
+          {overStock && <p className="text-xs text-danger">Some quantities are more than the stock. Lower them or ask a manager.</p>}
+          {needsCustomer && <p className="text-xs text-danger">Enter the customer&apos;s name for sales above {formatMoney(rules.customerRequiredAbove)}.</p>}
 
           {cart.length > 0 && !done && (
             <div className="rounded-lg bg-background p-3 text-sm" aria-live="polite">

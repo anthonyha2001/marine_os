@@ -36,8 +36,7 @@ import {
   Truck,
   Users,
   Wrench,
-  type LucideIcon,
-} from "lucide-react";
+  type LucideIcon, SlidersHorizontal, Tags } from "lucide-react";
 import type { NavIcon } from "@/lib/navigation";
 
 export const NAV_ICONS: Record<NavIcon, LucideIcon> = {
@@ -76,6 +75,8 @@ export const NAV_ICONS: Record<NavIcon, LucideIcon> = {
   payroll: Banknote,
   posSales: ReceiptText,
   posShifts: CalendarClock,
+  posPrices: Tags,
+  posSettings: SlidersHorizontal,
   team: ShieldCheck,
   company: Building2,
 };

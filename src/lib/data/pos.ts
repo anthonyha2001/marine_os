@@ -2,7 +2,9 @@ import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { companyIdFor, listProductsWithStock } from "@/lib/data/inventory";
+import { averageCosts } from "@/lib/costing";
 import { round2 } from "@/lib/money";
+import { DEFAULT_POS_RULES, type PosRules } from "@/lib/pos";
 import type { CompanySlug } from "@/lib/permissions";
 
 // Point of sale reads, cached per company. Every POS action calls updateTag(posTag(companyId)).
@@ -145,7 +147,7 @@ export async function getSale(slug: CompanySlug, id: string) {
 export async function posCatalogue(slug: CompanySlug) {
   return (await listProductsWithStock(slug))
     .filter((p) => p.active)
-    .map((p) => ({ id: p.id, code: p.code, name: p.name, priceHT: p.priceHT, barcodes: p.barcodes, stock: p.stock, imageUrl: p.imageUrl }));
+    .map((p) => ({ id: p.id, code: p.code, name: p.name, priceHT: p.posPriceHT ?? p.priceHT, barcodes: p.barcodes, stock: p.stock, imageUrl: p.imageUrl }));
 }
 export type PosProduct = Awaited<ReturnType<typeof posCatalogue>>[number];
 
@@ -212,3 +214,48 @@ export function shiftReport(shift: ShiftRow, sales: SaleRow[]) {
     shift.status === "CLOSED" && shift.expectedUsd !== null && shift.expectedLbp !== null ? { usd: shift.expectedUsd, lbp: shift.expectedLbp } : expectedCash(shift, sales);
   return { sales: own, refunds, summary: salesSummary(own, refunds), expected };
 }
+
+async function loadPosRules(companyId: string): Promise<PosRules & { saved: boolean }> {
+  "use cache";
+  cacheTag(posTag(companyId));
+  cacheLife("hours");
+  const r = await prisma.posSettings.findUnique({ where: { companyId } });
+  if (!r) return { ...DEFAULT_POS_RULES, saved: false };
+  return {
+    saved: true,
+    maxDiscountPct: Number(r.maxDiscountPct),
+    allowUsd: r.allowUsd,
+    allowLbp: r.allowLbp,
+    allowCard: r.allowCard,
+    cardOverpay: r.cardOverpay === "CHANGE" ? "CHANGE" : "BLOCK",
+    sellOutOfStock: r.sellOutOfStock,
+    customerRequiredAbove: Number(r.customerRequiredAbove),
+    cashierRefunds: r.cashierRefunds,
+    refundDays: r.refundDays,
+    blindClose: r.blindClose,
+    cashierSeesShiftTotals: r.cashierSeesShiftTotals,
+    receiptNote: r.receiptNote,
+  };
+}
+
+/** The till settings for this company (defaults until the admin saves them). */
+export async function getPosRules(slug: CompanySlug) {
+  return loadPosRules(await companyIdFor(slug));
+}
+
+/** Every stocked product with its average cost, catalogue price and shop price, for pricing. */
+export async function posPricing(slug: CompanySlug) {
+  const companyId = await companyIdFor(slug);
+  const [products, costs] = await Promise.all([listProductsWithStock(slug), averageCosts(companyId)]);
+  return products.map((p) => ({
+    id: p.id,
+    code: p.code,
+    name: p.name,
+    active: p.active,
+    stock: p.stock,
+    cost: round2(costs.get(p.id) ?? 0),
+    priceHT: p.priceHT,
+    posPriceHT: p.posPriceHT,
+  }));
+}
+export type PricingRow = Awaited<ReturnType<typeof posPricing>>[number];

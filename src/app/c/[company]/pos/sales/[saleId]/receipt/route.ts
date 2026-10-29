@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireModule } from "@/lib/auth";
-import { getSale } from "@/lib/data/pos";
+import { getPosRules, getSale } from "@/lib/data/pos";
 import { getCompanyProfile } from "@/lib/data/sales";
 import { formatMoney, withVat } from "@/lib/money";
 import { REFUND_METHODS, formatLbp, formatRate, hasPos } from "@/lib/pos";
@@ -17,7 +17,7 @@ export async function GET(request: Request, ctx: RouteContext<"/c/[company]/pos/
   const { company, saleId } = await ctx.params;
   const { slug } = await requireModule(company, "sales");
   if (!hasPos(slug)) notFound();
-  const [sale, profile] = await Promise.all([getSale(slug, saleId), getCompanyProfile(slug)]);
+  const [sale, profile, rules] = await Promise.all([getSale(slug, saleId), getCompanyProfile(slug), getPosRules(slug)]);
   if (!sale) return new Response("Sale not found", { status: 404 });
   const url = new URL(request.url);
   const refund = url.searchParams.get("refund") ? sale.refunds.find((r) => r.id === url.searchParams.get("refund")) : undefined;
@@ -76,7 +76,7 @@ export async function GET(request: Request, ctx: RouteContext<"/c/[company]/pos/
       <div class="small">Rate ${formatRate(sale.rate)}</div>
       <div class="rule"></div>
       <div class="center">Thank you for your visit!</div>
-      <div class="center small">Goods can be returned with this receipt.</div>`;
+      <div class="center small">${rules.receiptNote ? esc(rules.receiptNote).replace(/\n/g, "<br>") : "Goods can be returned with this receipt."}</div>`;
   }
 
   const html = `<!doctype html>

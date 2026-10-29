@@ -3,9 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FileText, Printer, Undo2, UserRound } from "lucide-react";
 import { requireModule } from "@/lib/auth";
-import { getSale } from "@/lib/data/pos";
+import { getPosRules, getSale } from "@/lib/data/pos";
+import { businessToday } from "@/lib/dates";
 import { formatMoney, round2, withVat } from "@/lib/money";
-import { REFUND_METHODS, SALE_STATUS, formatLbp, formatRate, hasPos } from "@/lib/pos";
+import { REFUND_METHODS, SALE_STATUS, formatLbp, formatRate, hasPos, rulesFor } from "@/lib/pos";
 import { COMPANIES } from "@/lib/permissions";
 import { Modal } from "@/components/modal";
 import { Badge, PageHeader, cardClass, primaryButton, secondaryButton, tdClass, thClass } from "@/components/ui";
@@ -22,7 +23,10 @@ async function SaleDetail({ params, searchParams }: { params: Promise<{ company:
   if (!sale || (user.role === "CASHIER" && sale.cashierId !== user.id)) notFound();
   const base = `/c/${slug}/pos/sales/${sale.id}`;
   const refunded = round2(sale.refunds.reduce((s, r) => s + r.totalTTC, 0));
-  const canRefund = sale.status !== "REFUNDED";
+  const rules = rulesFor(await getPosRules(slug), user.role);
+  const age = (new Date(`${businessToday()}T00:00:00Z`).getTime() - sale.saleDate.getTime()) / 86_400_000;
+  // Cashiers may be limited by the POS settings (no refunds, or only within N days).
+  const canRefund = sale.status !== "REFUNDED" && rules.cashierRefunds && (rules.refundDays === 0 || age <= rules.refundDays);
 
   return (
     <>

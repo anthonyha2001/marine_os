@@ -8,13 +8,13 @@ import { requireModule } from "@/lib/auth";
 import { businessToday } from "@/lib/dates";
 import { companyIdFor, tags } from "@/lib/data/inventory";
 import { ledgerTag } from "@/lib/data/ledger";
-import { posTag } from "@/lib/data/pos";
+import { getPosRules, posTag } from "@/lib/data/pos";
 import { averageCosts } from "@/lib/costing";
 import { TRANSACTION_OPTIONS } from "@/lib/item-codes";
 import { nextNumber } from "@/lib/ledger/numbering";
 import { postPosRefund, postPosSale, postShiftDifference } from "@/lib/ledger/posting";
 import { VAT_RATE, round2 } from "@/lib/money";
-import { canSetRate, hasPos, isRefundMethod, lbpUsdValue, maxDiscountFor, roundLbp, saleTotals, settle } from "@/lib/pos";
+import { canManagePos, canSetRate, hasPos, htForShelfPrice, isRefundMethod, lbpUsdValue, refundTTC, roundLbp, rulesFor, saleTotals, settle, shelfPrice } from "@/lib/pos";
 
 export type PosFormState = { error?: string; saved?: boolean };
 
@@ -160,16 +160,20 @@ const saleSchema = z.object({
 export type CompleteSaleResult = { error?: string; saleId?: string; number?: string; changeUsd?: number; changeLbp?: number };
 
 export async function completeSale(companySlug: string, payload: unknown): Promise<CompleteSaleResult> {
-  const { user, companyId } = await requirePos(companySlug);
+  const { user, slug, companyId } = await requirePos(companySlug);
   const parsed = saleSchema.safeParse(payload);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const data = parsed.data;
-  if (data.discountPct > maxDiscountFor(user.role)) return { error: `A cashier can give at most ${maxDiscountFor(user.role)}% discount. Ask a manager.` };
+  const rules = rulesFor(await getPosRules(slug), user.role);
+  if (data.discountPct > rules.maxDiscountPct)
+    return { error: rules.maxDiscountPct > 0 ? `A cashier can give at most ${rules.maxDiscountPct}% discount. Ask a manager.` : "Cashiers can't give discounts. Ask a manager." };
+  if ((data.paidUsd > 0 && !rules.allowUsd) || (data.paidLbp > 0 && !rules.allowLbp) || (data.paidCard > 0 && !rules.allowCard))
+    return { error: "This payment method is turned off in the POS settings." };
 
   const [shift, rate, products, customer] = await Promise.all([
     prisma.posShift.findFirst({ where: { companyId, cashierId: user.id, status: "OPEN" }, select: { id: true } }),
     latestRate(companyId),
-    prisma.product.findMany({ where: { id: { in: data.lines.map((l) => l.productId) }, type: "PRODUCT" }, select: { id: true, code: true, name: true, priceHT: true } }),
+    prisma.product.findMany({ where: { id: { in: data.lines.map((l) => l.productId) }, type: "PRODUCT" }, select: { id: true, code: true, name: true, priceHT: true, posPriceHT: true } }),
     data.customerId ? prisma.customer.findUnique({ where: { id: data.customerId }, select: { id: true, name: true, address: true, taxNumber: true } }) : null,
   ]);
   if (!shift) return { error: "Open a shift before selling." };
@@ -181,11 +185,20 @@ export async function completeSale(companySlug: string, payload: unknown): Promi
   if (data.lines.some((l) => !byId.has(l.productId))) return { error: "One of the products no longer exists. Remove it and scan again." };
   const lines = data.lines.map((l, position) => {
     const p = byId.get(l.productId)!;
-    const unitPriceHT = Number(p.priceHT);
-    return { position, productId: p.id, code: p.code, name: p.name, quantity: l.quantity, unitPriceHT, lineTotalHT: round2(unitPriceHT * l.quantity), unitCost: costs.get(p.id) ?? 0 };
+    const unitPriceHT = Number(p.posPriceHT ?? p.priceHT);
+    const lineTotalHT = round2(round2(shelfPrice(unitPriceHT) * l.quantity) / (1 + VAT_RATE));
+    return { position, productId: p.id, code: p.code, name: p.name, quantity: l.quantity, unitPriceHT, lineTotalHT, unitCost: costs.get(p.id) ?? 0 };
   });
+  if (!rules.sellOutOfStock) {
+    const stock = await prisma.stockMovement.groupBy({ by: ["productId"], where: { companyId, productId: { in: lines.map((l) => l.productId) } }, _sum: { quantity: true } });
+    const onHand = new Map(stock.map((r) => [r.productId, r._sum.quantity ?? 0]));
+    const short = lines.find((l) => l.quantity > (onHand.get(l.productId) ?? 0));
+    if (short) return { error: `Only ${Math.max(0, onHand.get(short.productId) ?? 0)} of ${short.name} in stock. A manager can sell beyond the stock.` };
+  }
   const totals = saleTotals(lines, data.discountPct);
-  const pay = settle({ totalTTC: totals.totalTTC, rate, paidUsd: data.paidUsd, paidLbp: data.paidLbp, paidCard: data.paidCard, changeCurrency: data.changeCurrency });
+  if (rules.customerRequiredAbove > 0 && totals.totalTTC > rules.customerRequiredAbove && !customer && !data.customerName?.trim())
+    return { error: `Enter the customer's name for sales above ${rules.customerRequiredAbove} USD.` };
+  const pay = settle({ totalTTC: totals.totalTTC, rate, paidUsd: data.paidUsd, paidLbp: data.paidLbp, paidCard: data.paidCard, changeCurrency: data.changeCurrency, cardOverpay: rules.cardOverpay });
   if (pay.cardTooHigh) return { error: "The card amount can't be more than the total." };
   if (!pay.ok) return { error: "The payment doesn't cover the total yet." };
 
@@ -270,6 +283,13 @@ const refundSchema = z.object({
 
 export async function refundSale(companySlug: string, saleId: string, _prev: PosFormState, formData: FormData): Promise<PosFormState> {
   const { user, slug, companyId } = await requirePos(companySlug);
+  const rules = rulesFor(await getPosRules(slug), user.role);
+  if (!rules.cashierRefunds) return { error: "Refunds are done by a manager." };
+  if (rules.refundDays > 0) {
+    const sold = await prisma.posSale.findFirst({ where: { id: saleId, companyId }, select: { saleDate: true } });
+    if (sold && (todayDate().getTime() - sold.saleDate.getTime()) / 86_400_000 > rules.refundDays)
+      return { error: `Cashiers can refund sales up to ${rules.refundDays} days old. Ask a manager.` };
+  }
   let raw: unknown;
   try {
     raw = JSON.parse(String(formData.get("payload") ?? ""));
@@ -303,13 +323,13 @@ export async function refundSale(companySlug: string, saleId: string, _prev: Pos
         if (!line) throw new UserError("A line of this sale no longer exists.");
         const left = line.quantity - line.refundLines.reduce((n, r) => n + r.quantity, 0);
         if (w.quantity > left) throw new UserError(`Only ${left} × ${line.name} can still be returned.`);
-        return { saleLineId: line.id, productId: line.productId, quantity: w.quantity, amountHT: round2(Number(line.unitPriceHT) * w.quantity * (1 - discount)) };
+        const ttc = refundTTC(Number(line.unitPriceHT), w.quantity, discount * 100);
+        return { saleLineId: line.id, productId: line.productId, quantity: w.quantity, ttc, amountHT: round2(ttc / (1 + VAT_RATE)) };
       });
-      const totalHT = round2(refundLines.reduce((s, l) => s + l.amountHT, 0));
-      const vatAmount = round2(totalHT * VAT_RATE);
       const already = round2(sale.refunds.reduce((s, r) => s + Number(r.totalTTC), 0));
       // Never give back more than was paid (rounding on the last return).
-      const totalTTC = Math.min(round2(totalHT + vatAmount), round2(Number(sale.totalTTC) - already));
+      const totalTTC = Math.min(round2(refundLines.reduce((s, l) => s + l.ttc, 0)), round2(Number(sale.totalTTC) - already));
+      const totalHT = round2(totalTTC / (1 + VAT_RATE));
       const date = todayDate();
       const number = await nextNumber(tx, companyId, "RF", date.getUTCFullYear());
       const refund = await tx.posRefund.create({
@@ -343,4 +363,68 @@ export async function refundSale(companySlug: string, saleId: string, _prev: Pos
   }
   refresh(companyId, { stock: true, ledger: true });
   redirect(`/c/${slug}/pos/sales/${saleId}?refunded=1`);
+}
+
+// ── Prices and settings (admin / manager) ──
+
+const priceSchema = z.array(z.object({ id: z.string().min(1), shelfPrice: z.number().min(0).max(10_000_000).nullable() })).max(5000);
+
+/** Shop prices (incl. VAT) typed on the pricing page. Empty = sell at the catalogue price. */
+export async function savePosPrices(companySlug: string, payload: string): Promise<PosFormState> {
+  const { user, companyId } = await requirePos(companySlug);
+  if (!canManagePos(user.role)) return { error: "Only an admin or a manager can change prices." };
+  let raw: unknown;
+  try {
+    raw = JSON.parse(payload);
+  } catch {
+    return { error: "The prices couldn't be read." };
+  }
+  const parsed = priceSchema.safeParse(raw);
+  if (!parsed.success) return { error: "One of the prices isn't a valid amount." };
+  await prisma.$transaction(async (tx) => {
+    for (const r of parsed.data) await tx.product.update({ where: { id: r.id }, data: { posPriceHT: r.shelfPrice === null ? null : htForShelfPrice(r.shelfPrice) } });
+  }, TRANSACTION_OPTIONS);
+  updateTag(tags.products);
+  refresh(companyId);
+  return { saved: true };
+}
+
+const settingsSchema = z.object({
+  maxDiscountPct: z.coerce.number().min(0, "The discount can't be negative").max(100, "At most 100%"),
+  allowUsd: z.boolean(),
+  allowLbp: z.boolean(),
+  allowCard: z.boolean(),
+  cardOverpay: z.enum(["BLOCK", "CHANGE"]),
+  sellOutOfStock: z.boolean(),
+  customerRequiredAbove: z.coerce.number().min(0),
+  cashierRefunds: z.boolean(),
+  refundDays: z.coerce.number().int().min(0).max(3650),
+  blindClose: z.boolean(),
+  cashierSeesShiftTotals: z.boolean(),
+  receiptNote: z.string().trim().max(300).transform((v) => v || null),
+});
+
+export async function savePosSettings(companySlug: string, _prev: PosFormState, formData: FormData): Promise<PosFormState> {
+  const { user, slug, companyId } = await requirePos(companySlug);
+  if (!canManagePos(user.role)) return { error: "Only an admin or a manager can change the till settings." };
+  const on = (k: string) => formData.get(k) === "on";
+  const parsed = settingsSchema.safeParse({
+    maxDiscountPct: formData.get("maxDiscountPct") || 0,
+    allowUsd: on("allowUsd"),
+    allowLbp: on("allowLbp"),
+    allowCard: on("allowCard"),
+    cardOverpay: formData.get("cardOverpay"),
+    sellOutOfStock: on("sellOutOfStock"),
+    customerRequiredAbove: formData.get("customerRequiredAbove") || 0,
+    cashierRefunds: on("cashierRefunds"),
+    refundDays: formData.get("refundDays") || 0,
+    blindClose: on("blindClose"),
+    cashierSeesShiftTotals: on("cashierSeesShiftTotals"),
+    receiptNote: String(formData.get("receiptNote") ?? ""),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  if (!parsed.data.allowUsd && !parsed.data.allowLbp && !parsed.data.allowCard) return { error: "Keep at least one way to pay." };
+  await prisma.posSettings.upsert({ where: { companyId }, create: { companyId, ...parsed.data }, update: parsed.data });
+  refresh(companyId);
+  redirect(`/c/${slug}/pos/settings?saved=1`);
 }

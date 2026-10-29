@@ -43,6 +43,7 @@ export type CatalogueProduct = {
   supplierId: string | null;
   supplierName: string | null;
   priceHT: number;
+  posPriceHT: number | null;
   minQuantity: number;
   active: boolean;
   trackSerials: boolean;
@@ -70,6 +71,7 @@ export async function getCatalogue(): Promise<CatalogueProduct[]> {
     supplierId: p.supplierId,
     supplierName: p.supplier?.name ?? null,
     priceHT: Number(p.priceHT),
+    posPriceHT: p.posPriceHT === null ? null : Number(p.posPriceHT),
     minQuantity: p.minQuantity,
     active: p.active,
     trackSerials: p.trackSerials,

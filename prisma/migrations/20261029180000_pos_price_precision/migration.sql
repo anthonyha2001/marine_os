@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "PosSaleLine" ALTER COLUMN "unitPriceHT" SET DATA TYPE DECIMAL(12,4);
+
+-- AlterTable
+ALTER TABLE "Product" ALTER COLUMN "posPriceHT" SET DATA TYPE DECIMAL(12,4);
+
