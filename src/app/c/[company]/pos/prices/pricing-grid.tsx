@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { Printer } from "lucide-react";
 import { savePosPrices } from "@/lib/actions/pos";
 import type { PricingRow } from "@/lib/data/pos";
 import { VAT_RATE, formatMoney, round2, withVat } from "@/lib/money";
@@ -37,6 +38,8 @@ export function PricingGrid({ companySlug, rows }: { companySlug: string; rows: 
   const [sort, setSort] = useState<Sort>("name");
   const [target, setTarget] = useState("35");
   const [rounding, setRounding] = useState<Rounding>("00");
+  const [labelFormat, setLabelFormat] = useState<"roll" | "a4">("roll");
+  const [copies, setCopies] = useState("1");
   const [error, setError] = useState<string>();
   const [pending, startTransition] = useTransition();
   const { toast } = useFeedback();
@@ -184,7 +187,36 @@ export function PricingGrid({ companySlug, rows }: { companySlug: string; rows: 
             Price {selected.size || ""} selected
           </button>
         </div>
+        <div className="flex flex-wrap items-end gap-2 rounded-lg border border-border bg-surface-2 p-2">
+          <label className="text-[13px] font-medium text-slate-700">
+            Labels
+            <select value={labelFormat} onChange={(e) => setLabelFormat(e.target.value as "roll" | "a4")} className={inputClass}>
+              <option value="roll">Label printer 50 × 30 mm</option>
+              <option value="a4">A4 sheet (3 × 8)</option>
+            </select>
+          </label>
+          <label className="text-[13px] font-medium text-slate-700">
+            Copies
+            <select value={copies} onChange={(e) => setCopies(e.target.value)} className={inputClass}>
+              <option value="1">1 each</option>
+              <option value="2">2 each</option>
+              <option value="5">5 each</option>
+              <option value="10">10 each</option>
+              <option value="stock">One per item in stock</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            disabled={!selected.size || changed.length > 0}
+            onClick={() => window.open(`/c/${companySlug}/pos/prices/labels?ids=${[...selected].join(",")}&format=${labelFormat}&copies=${copies}&print=1`, "_blank", "noopener")}
+            title={changed.length ? "Save the prices first: labels show the saved prices" : undefined}
+            className={`${secondaryButtonSm} h-10 gap-1.5`}
+          >
+            <Printer className="size-3.5" aria-hidden /> Print labels{selected.size ? ` (${selected.size})` : ""}
+          </button>
+        </div>
       </div>
+      {changed.length > 0 && selected.size > 0 && <p className="mt-2 text-xs text-amber-700">Save the prices before printing labels: labels show the saved prices.</p>}
 
       <div className={`${cardClass} mt-4 overflow-x-auto`}>
         <table className="w-full min-w-[64rem] text-sm">
