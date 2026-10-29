@@ -42,6 +42,7 @@ export async function GET(request: Request, ctx: RouteContext<"/c/[company]/pos/
       <div class="rule"></div>
       ${row("Excl. VAT", formatMoney(refund.totalHT))}
       ${row("VAT 11%", formatMoney(refund.vatAmount))}
+      ${row("VAT in LBP", formatLbp(Math.round(refund.vatAmount * refund.rate)))}
       ${row("REFUNDED", formatMoney(refund.totalTTC), "big")}
       ${refund.method === "CASH_LBP" ? row("Paid back", formatLbp(refund.amountLbp)) : row("Paid back", REFUND_METHODS[refund.method])}
       <div class="rule"></div>
@@ -65,6 +66,7 @@ export async function GET(request: Request, ctx: RouteContext<"/c/[company]/pos/
       ${row("Subtotal excl. VAT", formatMoney(sale.subtotalHT))}
       ${sale.discountHT > 0 ? row(`Discount ${sale.discountPct}%`, `− ${formatMoney(sale.discountHT)}`) : ""}
       ${row("VAT 11%", formatMoney(sale.vatAmount))}
+      ${row("VAT in LBP", formatLbp(Math.round(sale.vatAmount * sale.rate)))}
       ${row("TOTAL", formatMoney(sale.totalTTC), "big")}
       ${row("", formatLbp(Math.ceil((sale.totalTTC * sale.rate) / 1000) * 1000))}
       <div class="rule"></div>

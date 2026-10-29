@@ -1,6 +1,7 @@
 import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { currentLbpRate } from "@/lib/lbp-rate";
 import { companyIdFor } from "@/lib/data/inventory";
 import { listInvoices } from "@/lib/data/sales";
 import { syncLedger } from "@/lib/ledger/posting";
@@ -214,10 +215,12 @@ async function loadCreditNotes(companyId: string) {
     include: { invoice: { select: { id: true, number: true } }, lines: { orderBy: { position: "asc" } }, createdBy: { select: { name: true } } },
     orderBy: [{ date: "desc" }, { number: "desc" }],
   });
+  const current = await currentLbpRate(prisma, companyId);
   return rows.map((c) => ({
     id: c.id,
     number: c.number,
     invoice: c.invoice,
+    lbpRate: c.lbpRate ? Number(c.lbpRate) : current,
     customerId: c.customerId,
     customerName: c.customerName,
     customerAddress: c.customerAddress,

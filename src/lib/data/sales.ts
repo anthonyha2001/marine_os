@@ -1,6 +1,7 @@
 import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { currentLbpRate } from "@/lib/lbp-rate";
 import { companyIdFor } from "@/lib/data/inventory";
 import type { CompanySlug } from "@/lib/permissions";
 import type { DiscountType, InvoiceStatus, OfferStatus, PaymentMode, PaymentPlan } from "@/lib/offers";
@@ -241,10 +242,13 @@ async function loadInvoice(companyId: string, id: string) {
     },
   });
   if (!i) return null;
+  // Invoices issued before a rate was set print the VAT at the company's current rate.
+  const lbpRate = i.lbpRate ? Number(i.lbpRate) : await currentLbpRate(prisma, companyId);
   return {
     id: i.id,
     number: i.number,
     offer: i.offer,
+    lbpRate,
     customerName: i.customerName,
     customerAttention: i.customerAttention,
     customerAddress: i.customerAddress,

@@ -5,6 +5,7 @@ import type { CompanyProfile } from "@/lib/data/sales";
 import type { LedgerMove } from "@/lib/ledger/reports";
 import { amountInWords } from "@/lib/offers";
 import { VAT_RATE } from "@/lib/money";
+import { formatLbp, formatRate } from "@/lib/pos";
 import type { CompanySlug } from "@/lib/permissions";
 import { BRAND, INK, Letterhead, MUTED, PageChrome, RULE, TitleBlock, companyDisplayName, lines, longDate, money, s, type Brand } from "./shared";
 
@@ -184,10 +185,19 @@ export function CreditNotePdf({ slug, note, company }: { slug: CompanySlug; note
                 <Text style={{ fontFamily: "Helvetica-Bold" }}>Total excl. VAT</Text>
                 <Text style={{ fontFamily: "Helvetica-Bold" }}>{money.format(note.totalHT)}</Text>
               </View>
-              <View style={[s.totalRow, { borderBottomWidth: 0.6, borderBottomColor: RULE, paddingBottom: 5 }]}>
+              <View style={[s.totalRow, note.applyVat && note.lbpRate ? {} : { borderBottomWidth: 0.6, borderBottomColor: RULE, paddingBottom: 5 }]}>
                 <Text style={{ color: MUTED }}>{note.applyVat ? `VAT ${VAT_RATE * 100}%` : "VAT"}</Text>
                 <Text>{note.applyVat ? money.format(note.vatAmount) : "Exempt"}</Text>
               </View>
+              {note.applyVat && note.lbpRate ? (
+                <View style={[s.totalRow, { borderBottomWidth: 0.6, borderBottomColor: RULE, paddingBottom: 5 }]}>
+                  <View>
+                    <Text style={{ color: MUTED }}>VAT in LBP</Text>
+                    <Text style={{ fontSize: 6.8, color: MUTED }}>at {formatRate(note.lbpRate)}</Text>
+                  </View>
+                  <Text>{formatLbp(Math.round(note.vatAmount * note.lbpRate))}</Text>
+                </View>
+              ) : null}
               <View style={[s.grandRow, { backgroundColor: brand.navy }]}>
                 <Text>TOTAL CREDITED (USD)</Text>
                 <Text>{money.format(note.totalTTC)}</Text>

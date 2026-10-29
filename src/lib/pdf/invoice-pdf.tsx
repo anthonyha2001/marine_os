@@ -3,6 +3,7 @@ import { Document, Page, Text, View } from "@react-pdf/renderer";
 import type { CompanyProfile, InvoiceDetail } from "@/lib/data/sales";
 import { amountInWords } from "@/lib/offers";
 import { VAT_RATE } from "@/lib/money";
+import { formatLbp, formatRate } from "@/lib/pos";
 import type { CompanySlug } from "@/lib/permissions";
 import {
   BRAND,
@@ -22,6 +23,7 @@ import {
 } from "./shared";
 
 export function InvoicePdf({ slug, invoice, company, bilingual = false }: { slug: CompanySlug; invoice: InvoiceDetail; company: CompanyProfile; bilingual?: boolean }) {
+  const vatLbp = invoice.applyVat && invoice.lbpRate ? Math.round(invoice.vatAmount * invoice.lbpRate) : null;
   const brand = BRAND[slug];
   const companyName = companyDisplayName(company);
   const title = invoice.applyVat ? "TAX INVOICE" : "INVOICE";
@@ -129,10 +131,19 @@ export function InvoicePdf({ slug, invoice, company, bilingual = false }: { slug
                 <T bi={bilingual} en="Total excl. VAT" style={{ fontFamily: "Helvetica-Bold" }} />
                 <Text style={{ fontFamily: "Helvetica-Bold" }}>{money.format(invoice.totalHT)}</Text>
               </View>
-              <View style={[s.totalRow, { borderBottomWidth: 0.6, borderBottomColor: RULE, paddingBottom: 5 }]}>
+              <View style={[s.totalRow, vatLbp === null ? { borderBottomWidth: 0.6, borderBottomColor: RULE, paddingBottom: 5 } : {}]}>
                 <T bi={bilingual} en={invoice.applyVat ? `VAT ${VAT_RATE * 100}%` : "VAT"} ar="الضريبة على القيمة المضافة" style={{ color: MUTED }} />
                 <Text>{invoice.applyVat ? money.format(invoice.vatAmount) : "Exempt"}</Text>
               </View>
+              {vatLbp !== null && (
+                <View style={[s.totalRow, { borderBottomWidth: 0.6, borderBottomColor: RULE, paddingBottom: 5 }]}>
+                  <View>
+                    <T bi={bilingual} en="VAT in LBP" style={{ color: MUTED }} />
+                    <Text style={{ fontSize: 6.8, color: MUTED }}>at {formatRate(invoice.lbpRate!)}</Text>
+                  </View>
+                  <Text>{formatLbp(vatLbp)}</Text>
+                </View>
+              )}
               <View style={[s.grandRow, { backgroundColor: brand.navy }]}>
                 <T bi={bilingual} en={invoice.status === "PAID" ? "TOTAL PAID (USD)" : "TOTAL DUE (USD)"} />
                 <Text>{money.format(invoice.totalTTC)}</Text>

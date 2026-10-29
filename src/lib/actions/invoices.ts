@@ -4,6 +4,9 @@ import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { posTag } from "@/lib/data/pos";
+import { canSetRate } from "@/lib/pos";
+import { currentLbpRate } from "@/lib/lbp-rate";
 import { requireModule } from "@/lib/auth";
 import { companyIdFor } from "@/lib/data/inventory";
 import { salesTags } from "@/lib/data/sales";
@@ -111,6 +114,7 @@ export async function createInvoicesFromOffer(companySlug: string, offerId: stri
             ...fromOffer(offer),
             companyId,
             number: await nextInvoiceNumber(tx, slug, today.getUTCFullYear()),
+            lbpRate: await currentLbpRate(tx, companyId),
             paymentTermId: term.id,
             invoiceDate: today,
             dueDate: new Date(today.getTime() + term.dueDays * 86400000),
@@ -189,6 +193,7 @@ export async function createCustomInvoice(
           ...fromOffer(offer),
           companyId,
           number: await nextInvoiceNumber(tx, slug, today.getUTCFullYear()),
+          lbpRate: await currentLbpRate(tx, companyId),
           invoiceDate: today,
           dueDate: new Date(today.getTime() + data.dueDays * 86400000),
           notes: data.notes ?? null,
@@ -314,4 +319,17 @@ export async function createStandaloneInvoice(companySlug: string, _prev: Custom
   updateTag(salesTags.invoices(companyId));
   updateTag(ledgerTag(companyId));
   redirect(`/c/${slug}/invoices/${invoice.id}`);
+}
+
+/** Set the LBP rate used to print VAT in LBP on new invoices (and by the till). */
+export async function saveLbpRate(companySlug: string, _prev: CustomInvoiceState, formData: FormData): Promise<CustomInvoiceState> {
+  const { user, slug } = await requireModule(companySlug, "invoices");
+  if (!canSetRate(user.role)) return { error: "Only a manager or the accountant can change the rate." };
+  const rate = Number(String(formData.get("lbpPerUsd") ?? "").replace(/,/g, ""));
+  if (!Number.isFinite(rate) || rate < 1000 || rate > 10_000_000) return { error: "Enter the rate in LBP for 1 USD, e.g. 89500." };
+  const companyId = await companyIdFor(slug);
+  await prisma.exchangeRate.create({ data: { companyId, lbpPerUsd: rate, setById: user.id } });
+  updateTag(posTag(companyId));
+  updateTag(salesTags.invoices(companyId));
+  redirect(`/c/${slug}/invoices?rateSaved=1`);
 }

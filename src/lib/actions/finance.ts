@@ -5,6 +5,7 @@ import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { currentLbpRate } from "@/lib/lbp-rate";
 import { toRecycleBin } from "@/lib/recycle-bin";
 import { deleteRefusal } from "@/lib/delete-rules";
 import { requireModule } from "@/lib/auth";
@@ -280,7 +281,7 @@ export async function createCreditNote(companySlug: string, _prev: FinanceFormSt
   const invoice = await prisma.invoice.findFirst({
     where: { id: data.invoiceId, companyId, status: { not: "CANCELLED" } },
     select: {
-      id: true, number: true, applyVat: true, totalTTC: true, customerId: true, customerName: true, customerAddress: true, customerTaxNumber: true,
+      id: true, number: true, applyVat: true, lbpRate: true, totalTTC: true, customerId: true, customerName: true, customerAddress: true, customerTaxNumber: true,
       creditNotes: { where: { status: "ISSUED" }, select: { totalTTC: true } },
     },
   });
@@ -293,6 +294,7 @@ export async function createCreditNote(companySlug: string, _prev: FinanceFormSt
   const alreadyCredited = round2(invoice.creditNotes.reduce((s, c) => s + Number(c.totalTTC), 0));
   const creditable = round2(Number(invoice.totalTTC) - alreadyCredited);
   if (totalTTC > creditable + 0.005) return { error: `At most ${money.format(creditable)} can still be credited on invoice ${invoice.number}.` };
+  const lbpRate = invoice.lbpRate ? Number(invoice.lbpRate) : await currentLbpRate(prisma, companyId);
 
   const when = toDate(data.date);
   const id = await prisma.$transaction(async (tx) => {
@@ -302,7 +304,7 @@ export async function createCreditNote(companySlug: string, _prev: FinanceFormSt
       data: {
         companyId, number, invoiceId: invoice.id, customerId: invoice.customerId, customerName: invoice.customerName,
         customerAddress: invoice.customerAddress, customerTaxNumber: invoice.customerTaxNumber, date: when, reason: data.reason,
-        applyVat: invoice.applyVat, totalHT, vatAmount, totalTTC, createdById: user.id, lines: { create: lines },
+        applyVat: invoice.applyVat, lbpRate, totalHT, vatAmount, totalTTC, createdById: user.id, lines: { create: lines },
       },
     });
     await postCreditNote(tx, {

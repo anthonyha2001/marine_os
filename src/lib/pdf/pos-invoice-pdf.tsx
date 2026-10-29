@@ -90,9 +90,16 @@ export function PosInvoicePdf({ slug, sale, company }: { slug: CompanySlug; sale
                 <Text style={{ fontFamily: "Helvetica-Bold" }}>Total excl. VAT</Text>
                 <Text style={{ fontFamily: "Helvetica-Bold" }}>{money.format(sale.totalHT)}</Text>
               </View>
-              <View style={[s.totalRow, { borderBottomWidth: 0.6, borderBottomColor: RULE, paddingBottom: 5 }]}>
+              <View style={s.totalRow}>
                 <Text style={{ color: MUTED }}>VAT {VAT_RATE * 100}%</Text>
                 <Text>{money.format(sale.vatAmount)}</Text>
+              </View>
+              <View style={[s.totalRow, { borderBottomWidth: 0.6, borderBottomColor: RULE, paddingBottom: 5 }]}>
+                <View>
+                  <Text style={{ color: MUTED }}>VAT in LBP</Text>
+                  <Text style={{ fontSize: 6.8, color: MUTED }}>at {formatRate(sale.rate)}</Text>
+                </View>
+                <Text>{formatLbp(Math.round(sale.vatAmount * sale.rate))}</Text>
               </View>
               <View style={[s.grandRow, { backgroundColor: brand.navy }]}>
                 <Text>TOTAL PAID (USD)</Text>

@@ -3,6 +3,7 @@ import { nextInvoiceNumber } from "@/lib/invoice-numbers";
 import { postInvoice } from "@/lib/ledger/posting";
 import { VAT_RATE, round2 } from "@/lib/money";
 import type { Tx } from "@/lib/prisma";
+import { currentLbpRate } from "@/lib/lbp-rate";
 import type { CompanySlug } from "@/lib/permissions";
 
 export type InvoiceLineInput = { title: string; description?: string | null; quantity: number; unitPrice: number };
@@ -63,6 +64,7 @@ export async function createInvoiceWithLines(
       invoiceDate: input.invoiceDate,
       dueDate: input.dueDate,
       applyVat: input.applyVat,
+      lbpRate: await currentLbpRate(tx, input.companyId),
       totalHT: t.totalHT,
       vatAmount: t.vatAmount,
       totalTTC: t.totalTTC,

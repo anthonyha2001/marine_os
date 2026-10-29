@@ -132,6 +132,7 @@ async function loadSales(companyId: string) {
       totalTTC: Number(r.totalTTC),
       method: r.method as "CASH_USD" | "CASH_LBP" | "CARD",
       amountLbp: Number(r.amountLbp),
+      rate: Number(r.rate),
     })),
   }));
 }

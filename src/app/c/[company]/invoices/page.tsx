@@ -1,15 +1,19 @@
 import { Suspense } from "react";
-import { Plus } from "lucide-react";
+import { Coins, Plus } from "lucide-react";
+import { prisma } from "@/lib/prisma";
+import { currentLbpRate } from "@/lib/lbp-rate";
+import { canSetRate, formatRate } from "@/lib/pos";
+import { LbpRateForm } from "./lbp-rate-form";
 import Link from "next/link";
 import { requireModule } from "@/lib/auth";
 import { invoiceSettlements } from "@/lib/data/ledger";
-import { getCatalogue } from "@/lib/data/inventory";
+import { companyIdFor, getCatalogue } from "@/lib/data/inventory";
 import { listCustomers, listInvoices, listOffers } from "@/lib/data/sales";
 import { vesselOptions } from "@/lib/data/vessels";
 import { formatMoney, round2 } from "@/lib/money";
 import { Modal } from "@/components/modal";
 import { COMPANIES } from "@/lib/permissions";
-import { cardClass, PageHeader, ButtonLink, ProgressBar, SearchBar } from "@/components/ui";
+import { cardClass, PageHeader, ButtonLink, ProgressBar, SearchBar, secondaryButton } from "@/components/ui";
 import { CustomInvoiceForm } from "./custom-invoice-form";
 import { StandaloneInvoiceForm } from "./standalone-invoice-form";
 import { LinkTabs } from "../finance/finance-ui";
@@ -22,10 +26,12 @@ async function InvoicesContent({
   searchParams,
 }: {
   params: Promise<{ company: string }>;
-  searchParams: Promise<{ q?: string; new?: string }>;
+  searchParams: Promise<{ q?: string; new?: string; rate?: string; rateSaved?: string }>;
 }) {
-  const [{ company }, { q = "", new: creating }] = await Promise.all([params, searchParams]);
-  const { slug } = await requireModule(company, "invoices");
+  const [{ company }, { q = "", new: creating, rate: editingRate, rateSaved }] = await Promise.all([params, searchParams]);
+  const { user, slug } = await requireModule(company, "invoices");
+  const lbpRate = await currentLbpRate(prisma, await companyIdFor(slug));
+  const mayRate = canSetRate(user.role);
   const needle = q.trim().toLowerCase();
   const custom = creating === "custom";
   const [raw, offers, settled, customers, vessels, catalogue] = await Promise.all([
@@ -59,8 +65,38 @@ async function InvoicesContent({
         eyebrow={COMPANIES[slug].name}
         title="Invoices"
         description="Three ways to invoice: from an offer (its payment plan), from a workshop job card, or a custom invoice with any lines."
-        action={<ButtonLink icon={Plus} href={`${base}?new=1`}>New invoice</ButtonLink>}
+        action={
+          <>
+            {mayRate ? (
+              <Link href={`${base}?rate=1`} scroll={false} className={secondaryButton} title="Rate used to print the VAT in LBP on new invoices">
+                <Coins className="size-4" aria-hidden /> {lbpRate ? formatRate(lbpRate) : "Set LBP rate"}
+              </Link>
+            ) : (
+              lbpRate && (
+                <span className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted">
+                  <Coins className="size-4" aria-hidden /> {formatRate(lbpRate)}
+                </span>
+              )
+            )}
+            <ButtonLink icon={Plus} href={`${base}?new=1`}>New invoice</ButtonLink>
+          </>
+        }
       />
+      {rateSaved && lbpRate && (
+        <p role="status" className="mt-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-success">
+          Rate saved: {formatRate(lbpRate)}. New invoices print their VAT in LBP at this rate.
+        </p>
+      )}
+      {!lbpRate && (
+        <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          No LBP rate yet: invoices can&apos;t show their VAT in Lebanese pounds. {mayRate ? "Set it with the rate button above." : "Ask a manager or the accountant to set it."}
+        </p>
+      )}
+      {editingRate && mayRate && (
+        <Modal title="LBP exchange rate" closeHref={base} size="md">
+          <LbpRateForm key={crypto.randomUUID()} companySlug={slug} current={lbpRate} />
+        </Modal>
+      )}
 
       {creating && (
         <Modal title="New invoice" closeHref={base} size={custom ? "xl" : "md"}>
@@ -180,7 +216,7 @@ async function InvoicesContent({
 export default function InvoicesPage({ params, searchParams }: PageProps<"/c/[company]/invoices">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading invoices…</p>}>
-      <InvoicesContent params={params} searchParams={searchParams as Promise<{ q?: string; new?: string }>} />
+      <InvoicesContent params={params} searchParams={searchParams as Promise<{ q?: string; new?: string; rate?: string; rateSaved?: string }>} />
     </Suspense>
   );
 }
