@@ -53,6 +53,7 @@ export function isRole(value: string): value is Role {
 // Modules (sections of the OS). Pages are placeholders until each is built.
 export const MODULES = {
   dashboard: { label: "Dashboard", path: "dashboard" },
+  owner: { label: "Owner dashboard", path: "owner" },
   inventory: { label: "Inventory", path: "inventory" },
   services: { label: "Services", path: "services" },
   purchases: { label: "Purchases", path: "purchases" },

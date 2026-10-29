@@ -6,24 +6,27 @@ export type MonthPoint = { label: string; invoiced: number; purchases: number };
 
 // Categorical slots 1–2 of the reference palette, validated on the white card surface
 // (CVD ΔE 24.7, normal-vision ΔE 33.6, both ≥ 3:1 contrast).
-const SERIES = [
-  { key: "invoiced", label: "Invoiced", color: "#2a78d6" },
-  { key: "purchases", label: "Purchases", color: "#eb6834" },
-] as const;
+const COLORS = { invoiced: "#2a78d6", purchases: "#eb6834" } as const;
+type Labels = { invoiced: string; purchases: string; empty: string };
+const DEFAULT_LABELS: Labels = { invoiced: "Invoiced", purchases: "Purchases", empty: "No invoices or purchases in the last 6 months" };
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
 
-/** Grouped columns: money invoiced vs purchases per month, with hover details and a table view. */
-export function MoneyChart({ data }: { data: MonthPoint[] }) {
+/** Grouped columns: two money series per month (invoiced vs purchases by default), with hover details and a table view. */
+export function MoneyChart({ data, labels = DEFAULT_LABELS }: { data: MonthPoint[]; labels?: Labels }) {
   const [hover, setHover] = useState<number | null>(null);
   const [asTable, setAsTable] = useState(false);
+  const SERIES = [
+    { key: "invoiced", label: labels.invoiced, color: COLORS.invoiced },
+    { key: "purchases", label: labels.purchases, color: COLORS.purchases },
+  ] as const;
 
   // Nothing to draw yet: say so instead of plotting an empty, meaningless scale.
   if (data.every((d) => d.invoiced === 0 && d.purchases === 0)) {
     return (
       <div className="flex h-56 flex-col items-center justify-center rounded-lg border border-dashed border-border text-center">
-        <p className="text-sm font-medium text-navy">No invoices or purchases in the last 6 months</p>
+        <p className="text-sm font-medium text-navy">{labels.empty}</p>
         <p className="mt-1 text-xs text-muted">The chart fills in as you invoice customers and record purchases.</p>
       </div>
     );
@@ -64,8 +67,8 @@ export function MoneyChart({ data }: { data: MonthPoint[] }) {
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted">
               <th className="py-1.5">Month</th>
-              <th className="py-1.5 text-right">Invoiced</th>
-              <th className="py-1.5 text-right">Purchases</th>
+              <th className="py-1.5 text-right">{labels.invoiced}</th>
+              <th className="py-1.5 text-right">{labels.purchases}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -80,7 +83,7 @@ export function MoneyChart({ data }: { data: MonthPoint[] }) {
         </table>
       ) : (
         <div className="relative">
-          <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Invoiced and purchases per month">
+          <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={`${labels.invoiced} and ${labels.purchases} per month`}>
             {ticks.map((t) => (
               <g key={t}>
                 <line x1={pad.left} x2={W - pad.right} y1={y(t)} y2={y(t)} stroke="#e8edf3" strokeWidth={1} />

@@ -1,4 +1,5 @@
 import {
+  Gauge,
   CalendarDays,
   CheckCheck,
   FileCheck2,
@@ -40,6 +41,7 @@ import type { NavIcon } from "@/lib/navigation";
 
 export const NAV_ICONS: Record<NavIcon, LucideIcon> = {
   dashboard: LayoutDashboard,
+  owner: Gauge,
   offers: FileText,
   invoices: Receipt,
   customers: Users,

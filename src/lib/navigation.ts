@@ -5,6 +5,7 @@ import { POS_COMPANIES } from "@/lib/pos";
 /** Icon names, mapped to lucide icons in the (client) sidebar. */
 export type NavIcon =
   | "dashboard"
+  | "owner"
   | "offers"
   | "invoices"
   | "customers"
@@ -53,7 +54,12 @@ export type NavItem = {
 export type NavGroup = { title?: string; items: NavItem[] };
 
 export const NAV: NavGroup[] = [
-  { items: [{ label: "Dashboard", path: "dashboard", module: "dashboard", icon: "dashboard", shortcut: "F8" }] },
+  {
+    items: [
+      { label: "Dashboard", path: "dashboard", module: "dashboard", icon: "dashboard", shortcut: "F8" },
+      { label: "Owner dashboard", path: "owner", module: "owner", icon: "owner" },
+    ],
+  },
   {
     title: "Sales",
     items: [
