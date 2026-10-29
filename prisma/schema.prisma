@@ -1269,3 +1269,20 @@ model Appointment {
   @@unique([companyId, number])
   @@index([companyId, date])
 }
+
+/** Who created, changed or deleted what, and when (written automatically). */
+model AuditLog {
+  id        String   @id @default(cuid())
+  companyId String? // null: shared records (products, customers, suppliers, vessels)
+  userId    String?
+  userName  String?
+  action    String // CREATE | UPDATE | DELETE
+  entity    String // Invoice, Offer, Product…
+  entityId  String?
+  label     String? // e.g. XM-INV-2026-0003, a product name
+  details   String? // what changed
+  createdAt DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([entity, entityId])
+}

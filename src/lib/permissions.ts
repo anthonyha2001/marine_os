@@ -54,6 +54,7 @@ export function isRole(value: string): value is Role {
 export const MODULES = {
   dashboard: { label: "Dashboard", path: "dashboard" },
   owner: { label: "Owner dashboard", path: "owner" },
+  audit: { label: "Audit log", path: "audit" },
   inventory: { label: "Inventory", path: "inventory" },
   services: { label: "Services", path: "services" },
   purchases: { label: "Purchases", path: "purchases" },

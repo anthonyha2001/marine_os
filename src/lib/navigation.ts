@@ -6,6 +6,7 @@ import { POS_COMPANIES } from "@/lib/pos";
 export type NavIcon =
   | "dashboard"
   | "owner"
+  | "audit"
   | "offers"
   | "invoices"
   | "customers"
@@ -136,6 +137,7 @@ export const NAV: NavGroup[] = [
     title: "Administration",
     items: [
       { label: "Team & roles", path: "team", module: "team", icon: "team" },
+      { label: "Audit log", path: "audit", module: "audit", icon: "audit" },
       { label: "Company details", path: "settings", module: "settings", icon: "company" },
     ],
   },

@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { auditQuery } from "@/lib/audit";
 
 // The database (Supabase, Sydney) is far away: the pooler closes idle connections, and the
 // network sometimes drops for a moment. Those errors happen before the query reaches the
@@ -15,7 +16,11 @@ function isRetryable(e: unknown) {
 }
 
 function createClient() {
-  return new PrismaClient().$extends({
+  const base = new PrismaClient();
+  const audit = auditQuery(base);
+  return base
+    .$extends({ query: { $allModels: { $allOperations: audit } } })
+    .$extends({
     query: {
       async $allOperations({ args, query }) {
         for (let attempt = 0; ; attempt++) {
