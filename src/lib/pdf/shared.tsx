@@ -1,7 +1,6 @@
 import "server-only";
 import fs from "fs";
 import path from "path";
-import { createContext, useContext } from "react";
 import { Font, Image, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { Style } from "@react-pdf/types";
 import type { CompanyProfile } from "@/lib/data/sales";
@@ -189,24 +188,26 @@ export function TitleBlock({
   title,
   subtitle,
   meta,
+  bilingual = false,
 }: {
   brand: Brand;
   title: string;
   subtitle: string;
   meta: [string, string][];
+  bilingual?: boolean;
 }) {
   return (
     <View style={s.titleRow}>
       {/* flex + padding: a long subtitle wraps instead of running into the reference table */}
       <View style={{ flex: 1, paddingRight: 18 }}>
         <Text style={[s.title, { color: brand.navy }]}>{title}</Text>
-        <TitleArabic title={title} color={brand.navy} />
+        <TitleArabic title={title} color={brand.navy} bi={bilingual} />
         <Text style={s.titleSub}>{subtitle}</Text>
       </View>
       <View style={s.meta}>
         {meta.map(([label, value]) => (
           <View key={label} style={s.metaRow}>
-            <T en={label} style={s.metaLabel} />
+            <T bi={bilingual} en={label} style={s.metaLabel} />
             <Text style={s.metaValue}>{value}</Text>
           </View>
         ))}
@@ -215,14 +216,12 @@ export function TitleBlock({
   );
 }
 
-function TitleArabic({ title, color }: { title: string; color: string }) {
-  const bilingual = useContext(BilingualContext);
-  if (!bilingual || !AR[title]) return null;
-  return <Text style={{ fontFamily: "Cairo", fontWeight: "bold", fontSize: 15, color, marginTop: 2 }}>{AR[title]}</Text>;
+function TitleArabic({ title, color, bi }: { title: string; color: string; bi: boolean }) {
+  if (!bi || !AR[title]) return null;
+  return <Text style={{ fontFamily: "Cairo", fontWeight: "bold", fontSize: 15, color, marginTop: 4, marginBottom: 2, lineHeight: 1.7 }}>{AR[title]}</Text>;
 }
 
-export function SectionHeading({ brand, children }: { brand: Brand; children: string }) {
-  const bilingual = useContext(BilingualContext);
+export function SectionHeading({ brand, children, bilingual = false }: { brand: Brand; children: string; bilingual?: boolean }) {
   return (
     <Text style={[s.h2, { color: brand.navy, borderBottomColor: brand.accent }]} minPresenceAhead={40}>
       {children}
@@ -231,11 +230,11 @@ export function SectionHeading({ brand, children }: { brand: Brand; children: st
   );
 }
 
-export function BankDetails({ brand, company }: { brand: Brand; company: CompanyProfile }) {
+export function BankDetails({ brand, company, bilingual = false }: { brand: Brand; company: CompanyProfile; bilingual?: boolean }) {
   if (!company.bankDetails) return null;
   return (
     <View wrap={false}>
-      <SectionHeading brand={brand}>Bank details</SectionHeading>
+      <SectionHeading brand={brand} bilingual={bilingual}>Bank details</SectionHeading>
       {lines(company.bankDetails).map((l) => (
         <Text key={l} style={{ fontSize: 8.6 }}>{l}</Text>
       ))}
@@ -298,17 +297,13 @@ export const AR: Record<string, string> = {
   "CUSTOMER STAMP": "ختم الزبون",
 };
 
-/** Whether the document being rendered is bilingual (set once at the top of each PDF). */
-export const BilingualContext = createContext(false);
-
 /**
  * A label: the English text, plus the Arabic translation underneath on bilingual documents.
  * `style` sets the cell (width, alignment, colour…); the Arabic line is smaller and in Cairo.
  */
-export function T({ en, ar, style }: { en: string; ar?: string; style?: Style | Style[] }) {
-  const bilingual = useContext(BilingualContext);
+export function T({ en, ar, style, bi = false }: { en: string; ar?: string; style?: Style | Style[]; bi?: boolean }) {
   const arabic = ar ?? AR[en];
-  if (!bilingual || !arabic) return <Text style={style}>{en}</Text>;
+  if (!bi || !arabic) return <Text style={style}>{en}</Text>;
   return (
     <View style={style}>
       <Text>{en}</Text>

@@ -7,7 +7,6 @@ import type { CompanySlug } from "@/lib/permissions";
 import {
   BRAND,
   BankDetails,
-  BilingualContext,
   T,
   INK,
   Letterhead,
@@ -36,7 +35,6 @@ export function InvoicePdf({ slug, invoice, company, bilingual = false }: { slug
       creator="Marine OS"
       producer="Marine OS"
     >
-      <BilingualContext.Provider value={bilingual}>
       <Page size="A4" style={s.page} wrap>
         <PageChrome brand={brand} company={company} docLabel="Invoice" number={invoice.number} marking={invoice.marking} />
         {cancelled && (
@@ -62,6 +60,7 @@ export function InvoicePdf({ slug, invoice, company, bilingual = false }: { slug
         <Letterhead brand={brand} company={company} />
 
         <TitleBlock
+          bilingual={bilingual}
           brand={brand}
           title={title}
           subtitle={invoice.offer ? `ISSUED AGAINST OFFER ${invoice.offer.number}` : "FOR SERVICES AND SUPPLIES"}
@@ -75,7 +74,7 @@ export function InvoicePdf({ slug, invoice, company, bilingual = false }: { slug
 
         <View style={s.parties}>
           <View style={[s.party, { backgroundColor: brand.tint }]}>
-            <T en="BILL TO" style={[s.partyLabel, { color: brand.accent }]} />
+            <T bi={bilingual} en="BILL TO" style={[s.partyLabel, { color: brand.accent }]} />
             <Text style={s.partyName}>{invoice.customerName}</Text>
             {invoice.customerAttention && <Text style={s.partyLine}>Attn: {invoice.customerAttention}</Text>}
             {lines(invoice.customerAddress).map((l) => (
@@ -86,7 +85,7 @@ export function InvoicePdf({ slug, invoice, company, bilingual = false }: { slug
             {invoice.customerTaxNumber && <Text style={s.partyLine}>VAT No. {invoice.customerTaxNumber}</Text>}
           </View>
           <View style={[s.party, { backgroundColor: "#f5f6f8" }]}>
-            <T en="FROM" style={[s.partyLabel, { color: MUTED }]} />
+            <T bi={bilingual} en="FROM" style={[s.partyLabel, { color: MUTED }]} />
             <Text style={s.partyName}>{companyName}</Text>
             {company.taxNumber && <Text style={s.partyLine}>VAT No. {company.taxNumber}</Text>}
             {company.email && <Text style={s.partyLine}>{company.email}</Text>}
@@ -103,11 +102,11 @@ export function InvoicePdf({ slug, invoice, company, bilingual = false }: { slug
 
         <View>
           <View style={[s.th, { backgroundColor: brand.navy }]} fixed>
-            <T en="No." style={s.cNo} />
-            <T en="Description" style={s.cDesc} />
-            <T en="Qty" style={s.cQty} />
-            <T en="Unit price" style={s.cPrice} />
-            <T en="Amount (USD)" style={s.cAmt} />
+            <T bi={bilingual} en="No." style={s.cNo} />
+            <T bi={bilingual} en="Description" style={s.cDesc} />
+            <T bi={bilingual} en="Qty" style={s.cQty} />
+            <T bi={bilingual} en="Unit price" style={s.cPrice} />
+            <T bi={bilingual} en="Amount (USD)" style={s.cAmt} />
           </View>
           {invoice.lines.map((line, i) => (
             <View key={line.id} style={s.tr} wrap={false}>
@@ -127,15 +126,15 @@ export function InvoicePdf({ slug, invoice, company, bilingual = false }: { slug
           <View style={s.totalsWrap}>
             <View style={s.totals}>
               <View style={s.totalRow}>
-                <T en="Total excl. VAT" style={{ fontFamily: "Helvetica-Bold" }} />
+                <T bi={bilingual} en="Total excl. VAT" style={{ fontFamily: "Helvetica-Bold" }} />
                 <Text style={{ fontFamily: "Helvetica-Bold" }}>{money.format(invoice.totalHT)}</Text>
               </View>
               <View style={[s.totalRow, { borderBottomWidth: 0.6, borderBottomColor: RULE, paddingBottom: 5 }]}>
-                <T en={invoice.applyVat ? `VAT ${VAT_RATE * 100}%` : "VAT"} ar={`ض.ق.م${invoice.applyVat ? ` ${VAT_RATE * 100}%` : ""}`} style={{ color: MUTED }} />
+                <T bi={bilingual} en={invoice.applyVat ? `VAT ${VAT_RATE * 100}%` : "VAT"} ar="الضريبة على القيمة المضافة" style={{ color: MUTED }} />
                 <Text>{invoice.applyVat ? money.format(invoice.vatAmount) : "Exempt"}</Text>
               </View>
               <View style={[s.grandRow, { backgroundColor: brand.navy }]}>
-                <T en={invoice.status === "PAID" ? "TOTAL PAID (USD)" : "TOTAL DUE (USD)"} />
+                <T bi={bilingual} en={invoice.status === "PAID" ? "TOTAL PAID (USD)" : "TOTAL DUE (USD)"} />
                 <Text>{money.format(invoice.totalTTC)}</Text>
               </View>
             </View>
@@ -157,16 +156,15 @@ export function InvoicePdf({ slug, invoice, company, bilingual = false }: { slug
 
         {invoice.notes && <Text style={[s.paragraph, { marginTop: 12 }]}>{invoice.notes}</Text>}
 
-        <BankDetails brand={brand} company={company} />
+        <BankDetails brand={brand} company={company} bilingual={bilingual} />
 
         <View style={[s.signatures, { justifyContent: "flex-end" }]} wrap={false}>
           <View style={{ width: 240 }}>
             <Text style={[s.signLabel, { color: brand.navy }]}>For {companyName}</Text>
-            <T en="Authorised signature and stamp" style={s.signLine} />
+            <T bi={bilingual} en="Authorised signature and stamp" style={s.signLine} />
           </View>
         </View>
       </Page>
-      </BilingualContext.Provider>
     </Document>
   );
 }

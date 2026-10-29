@@ -99,7 +99,12 @@ export async function OfferView({
           <OfferResponse where={where} />
         </section>
       )}
-      {responded.at && !open && <p className="text-sm text-muted">Answered on {dayFormat.format(responded.at)}.</p>}
+      {responded.at && !open && (
+        <p className={`rounded-lg border px-4 py-3 text-sm ${offer.status === "ACCEPTED" ? "border-green-200 bg-green-50 text-success" : "border-border bg-surface-2 text-navy"}`}>
+          {offer.status === "ACCEPTED" ? "Thank you — your acceptance was received" : "Your answer was received"} on {dayFormat.format(responded.at)}
+          {responded.name ? ` (${responded.name})` : ""}. We&apos;ll be in touch.
+        </p>
+      )}
     </div>
   );
 }
