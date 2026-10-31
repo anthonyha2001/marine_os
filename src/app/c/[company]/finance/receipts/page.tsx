@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { payHref } from "@/lib/url";
 import Link from "next/link";
 import { HandCoins } from "lucide-react";
 import { requireModule } from "@/lib/auth";
@@ -39,7 +40,7 @@ async function ReceiptsContent({ params, searchParams }: { params: Promise<{ com
         eyebrow={`${COMPANIES[slug].name} · Finance`}
         title="Customer receipts"
         description="Money received from customers, against invoices or on account. New customer payments are entered under Vouchers, as receipt vouchers (RV)."
-        action={canAccessModule(user, slug, "accounting") && <ButtonLink icon={HandCoins} href={`/c/${slug}/finance/vouchers?new=CUSTOMER`}>Customer payment</ButtonLink>}
+        action={canAccessModule(user, slug, "accounting") && <ButtonLink icon={HandCoins} href={payHref(`/c/${slug}/finance/receipts`, "CUSTOMER")}>Customer payment</ButtonLink>}
       />
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
         <StatCard label="Received this month" value={formatMoney(thisMonth)} icon={HandCoins} />

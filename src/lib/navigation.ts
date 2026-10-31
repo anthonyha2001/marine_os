@@ -1,6 +1,7 @@
 // Sidebar sections, page tabs, "+ New" menu and keyboard shortcuts. One list drives them all, so they never disagree.
 import { modulesFor, type CompanySlug, type CustomAccess, type ModuleKey, type Role } from "@/lib/permissions";
 import { POS_COMPANIES } from "@/lib/pos";
+import type { PayLinkKind } from "@/lib/url";
 
 /** Icon names, mapped to lucide icons in the (client) sidebar. */
 export type NavIcon =
@@ -58,6 +59,7 @@ export type NavItem = {
   shortcut?: string; // "F2" or "Shift+F2" (KeyboardEvent.key, optional Shift)
   hidden?: boolean; // shortcut / search / "+ New" only, not a tab
   create?: boolean; // listed in the top bar's "+ New" menu
+  pay?: PayLinkKind; // opens the payment pop-up on the current page instead of going to `path`
   companies?: CompanySlug[]; // only in these companies (default: all)
 };
 
@@ -150,9 +152,10 @@ export const NAV: NavGroup[] = [
       { label: "Vouchers", path: "finance/vouchers", module: "accounting", icon: "vouchers" },
       { label: "Cheques", path: "finance/cheques", module: "accounting", icon: "cheques" },
       { label: "Cash & bank", path: "finance/cash", module: "accounting", icon: "cash" },
-      { label: "Customer payment", path: "finance/vouchers?new=CUSTOMER", module: "accounting", hidden: true, create: true },
-      { label: "Pay a supplier", path: "finance/vouchers?new=SUPPLIER", module: "accounting", hidden: true, create: true },
-      { label: "Expense payment", path: "finance/vouchers?new=PAYMENT", module: "accounting", hidden: true, create: true },
+      { label: "Customer payment", path: "finance/vouchers?new=CUSTOMER", module: "accounting", hidden: true, create: true, pay: "CUSTOMER" },
+      { label: "Pay a supplier", path: "finance/vouchers?new=SUPPLIER", module: "accounting", hidden: true, create: true, pay: "SUPPLIER" },
+      { label: "Expense payment", path: "finance/vouchers?new=PAYMENT", module: "accounting", hidden: true, create: true, pay: "PAYMENT" },
+      { label: "Transfer cash ↔ bank", path: "finance/vouchers?new=TRANSFER", module: "accounting", hidden: true, create: true, pay: "TRANSFER" },
     ],
   },
   {

@@ -5,6 +5,7 @@ import { dayFormat } from "@/lib/dates";
 import { JOB_STATUS, JOB_TONE, getJobCard, type JobCardRow } from "@/lib/data/workshop";
 import { VAT_RATE, formatMoney, round2 } from "@/lib/money";
 import type { CompanySlug } from "@/lib/permissions";
+import { withParams } from "@/lib/url";
 import { InvoiceJobForm, JobActions, JobQuickActions } from "@/app/c/[company]/workshop/[jobId]/job-actions";
 import { Modal } from "@/components/modal";
 import { Badge, cardClass, primaryButton, secondaryButton, secondaryButtonSm } from "@/components/ui";
@@ -12,18 +13,6 @@ import { Badge, cardClass, primaryButton, secondaryButton, secondaryButtonSm } f
 // Job cards in pop-ups, so quick actions never take you away from the page you are on.
 
 const KIND = { PART: "Part", LABOR: "Labour", SERVICE: "Service" } as const;
-
-/** Adds or replaces query values on a path ("/x?a=1" + {b: "2"} → "/x?a=1&b=2"). */
-export function withParams(href: string, values: Record<string, string | null>) {
-  const [path, query = ""] = href.split("?");
-  const p = new URLSearchParams(query);
-  for (const [k, v] of Object.entries(values)) {
-    if (v === null) p.delete(k);
-    else p.set(k, v);
-  }
-  const qs = p.toString();
-  return qs ? `${path}?${qs}` : path;
-}
 
 /** One job card as a card: who, what, status, total, and quick buttons. */
 export function JobCardTile({ slug, job, openHref }: { slug: CompanySlug; job: JobCardRow; openHref: string }) {

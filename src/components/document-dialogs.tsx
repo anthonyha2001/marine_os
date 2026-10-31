@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { payHref } from "@/lib/url";
 import { ExternalLink, FileDown, HandCoins, ReceiptText, Truck } from "lucide-react";
 import { billStatus } from "@/lib/accounting";
 import { listPurchasePayments } from "@/lib/data/accounting";
@@ -113,7 +114,7 @@ export async function PurchaseDialog({ slug, id, closeHref, canPay, canOpen }: {
             </Link>
           )}
           {canPay && balance > 0 && (
-            <Link href={`/c/${slug}/finance/vouchers?new=SUPPLIER&bill=${purchase.id}`} className={primaryButton}>
+            <Link href={payHref(closeHref, "SUPPLIER", { bill: purchase.id })} scroll={false} className={primaryButton}>
               <Truck className="size-4" aria-hidden /> Pay (PV)
             </Link>
           )}
@@ -187,7 +188,7 @@ export async function InvoiceDialog({ slug, id, closeHref, canReceive, canOpen }
             </Link>
           )}
           {canReceive && balance > 0 && (
-            <Link href={`/c/${slug}/finance/vouchers?new=CUSTOMER&invoice=${invoice.id}`} className={primaryButton}>
+            <Link href={payHref(closeHref, "CUSTOMER", { invoice: invoice.id })} scroll={false} className={primaryButton}>
               <HandCoins className="size-4" aria-hidden /> Receive payment (RV)
             </Link>
           )}

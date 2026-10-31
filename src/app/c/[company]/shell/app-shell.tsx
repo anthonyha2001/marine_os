@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { X } from "lucide-react";
 import type { NavGroup } from "@/lib/navigation";
 import { FeedbackProvider } from "@/components/feedback";
 import { InstallApp } from "@/components/install-app";
 import { KeyboardShortcuts } from "../keyboard-shortcuts";
 import { CommandPalette } from "./command-palette";
+import { PayDialog } from "./pay-dialog";
 import { RowKeys } from "./row-keys";
 import { SectionTabs } from "./section-tabs";
 import { Sidebar } from "./sidebar";
@@ -24,6 +25,7 @@ export function AppShell({
   user,
   notices,
   initialCollapsed,
+  canPay,
   children,
 }: {
   base: string;
@@ -34,6 +36,7 @@ export function AppShell({
   user: { name: string; email: string; roleLabel: string };
   notices: Notice[];
   initialCollapsed: boolean;
+  canPay: boolean; // accounting: payment pop-ups (?pay=…) open on any page
   children: React.ReactNode;
 }) {
   const [drawer, setDrawer] = useState(false);
@@ -90,6 +93,11 @@ export function AppShell({
       <CommandPalette companySlug={company.slug} base={base} groups={allGroups} />
       <KeyboardShortcuts base={base} groups={allGroups} />
       <RowKeys />
+      {canPay && (
+        <Suspense>
+          <PayDialog companySlug={company.slug} />
+        </Suspense>
+      )}
       <InstallApp />
     </FeedbackProvider>
     </div>

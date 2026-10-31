@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { CornerDownLeft, Search } from "lucide-react";
 import { globalSearch, type SearchResult } from "@/lib/actions/search";
 import type { NavGroup } from "@/lib/navigation";
+import { payHref } from "@/lib/url";
 
 /**
  * Ctrl+K search: jump to any screen, or find a product, service, customer, supplier, offer,
@@ -45,6 +46,7 @@ function PaletteDialog({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const setOpen = (value: boolean) => !value && onClose();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -60,9 +62,9 @@ function PaletteDialog({
   const screens: SearchResult[] = useMemo(
     () =>
       groups.flatMap((g) =>
-        g.items.map((i) => ({ group: "Go to", label: i.label, detail: i.shortcut, href: `${base}/${i.path}` })),
+        g.items.map((i) => ({ group: "Go to", label: i.label, detail: i.shortcut, href: i.pay ? payHref(pathname, i.pay) : `${base}/${i.path}` })),
       ),
-    [groups, base],
+    [groups, base, pathname],
   );
 
   const q = query.trim().toLowerCase();

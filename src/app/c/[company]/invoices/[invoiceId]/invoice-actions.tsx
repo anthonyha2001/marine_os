@@ -2,6 +2,7 @@
 
 import { useEffect, useTransition } from "react";
 import Link from "next/link";
+import { payHref } from "@/lib/url";
 import { Ban, FileMinus, HandCoins } from "lucide-react";
 import { cancelInvoice } from "@/lib/actions/invoices";
 import { useFeedback } from "@/components/feedback";
@@ -70,7 +71,7 @@ export function InvoiceActions({
   return (
     <div className="flex flex-wrap gap-2">
       {receivable && (
-        <Link href={`/c/${companySlug}/finance/vouchers?new=CUSTOMER&invoice=${invoiceId}`} className={primaryButton}>
+        <Link href={payHref(`/c/${companySlug}/invoices/${invoiceId}`, "CUSTOMER", { invoice: invoiceId })} scroll={false} className={primaryButton}>
           <HandCoins className="size-4" aria-hidden /> Receive payment (RV)
         </Link>
       )}

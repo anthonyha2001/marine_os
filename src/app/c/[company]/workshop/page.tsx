@@ -3,7 +3,8 @@ import { Hammer, Plus } from "lucide-react";
 import { requireModule } from "@/lib/auth";
 import { JOB_STATUS, listJobCards, type JobStatus } from "@/lib/data/workshop";
 import { COMPANIES, canAccessModule } from "@/lib/permissions";
-import { JobCardDialog, JobCardTile, withParams } from "@/components/job-dialogs";
+import { JobCardDialog, JobCardTile } from "@/components/job-dialogs";
+import { withParams } from "@/lib/url";
 import { ButtonLink, EmptyState, PageHeader, SearchBar, cardClass } from "@/components/ui";
 import { LinkTabs } from "../finance/finance-ui";
 

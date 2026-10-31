@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { payHref } from "@/lib/url";
 import { notFound } from "next/navigation";
 import { CalendarDays, FileText, Hammer, HandCoins, Pencil, Receipt, Sailboat, ScrollText } from "lucide-react";
 import { requireModule } from "@/lib/auth";
@@ -148,8 +149,8 @@ async function CustomerContent({
                 <Hammer className="size-4" aria-hidden /> Job card
               </Link>
             )}
-            {may.accounting && due > 0 && (
-              <Link href={`${c}/finance/vouchers?new=CUSTOMER`} className={secondaryButton}>
+            {may.accounting && (
+              <Link href={payHref(base, "CUSTOMER", { customer: customer.id })} scroll={false} className={secondaryButton}>
                 <HandCoins className="size-4" aria-hidden /> Receive payment
               </Link>
             )}

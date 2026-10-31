@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { payHref } from "@/lib/url";
 import { requireModule } from "@/lib/auth";
 import { billStatus } from "@/lib/accounting";
 import { listBills } from "@/lib/data/accounting";
@@ -52,6 +53,7 @@ async function AccountingContent({
   ]);
   const money = moneyBalances(ledger).filter((a) => a.active || a.balance !== 0);
   const fin = `/c/${slug}/finance`;
+  const here = `/c/${slug}/accounting`;
   const base = `/c/${slug}/accounting`;
   const today = new Date();
   const todayIso = today.toISOString().slice(0, 10);
@@ -87,17 +89,17 @@ async function AccountingContent({
         description="Cash and bank, what the company owes its suppliers and what its customers owe it. Amounts include VAT."
         action={
           <>
-            <Link href={`${fin}/vouchers?new=PAYMENT`} className={primaryButton}>
+            <Link href={payHref(here, "PAYMENT")} scroll={false} className={primaryButton}>
               <ArrowUpRight className="size-4" aria-hidden /> Payment voucher
             </Link>
-            <Link href={`${fin}/vouchers?new=RECEIPT`} className={secondaryButton}>
+            <Link href={payHref(here, "RECEIPT")} scroll={false} className={secondaryButton}>
               <ArrowDownLeft className="size-4" aria-hidden /> Cash in
             </Link>
-            <Link href={`${fin}/vouchers?new=TRANSFER`} className={secondaryButton}>
+            <Link href={payHref(here, "TRANSFER")} scroll={false} className={secondaryButton}>
               <ArrowLeftRight className="size-4" aria-hidden /> Transfer
             </Link>
             {showReceivables && (
-              <Link href={`${fin}/vouchers?new=CUSTOMER`} className={secondaryButton}>
+              <Link href={payHref(here, "CUSTOMER")} scroll={false} className={secondaryButton}>
                 <HandCoins className="size-4" aria-hidden /> Customer payment
               </Link>
             )}
@@ -201,7 +203,7 @@ async function AccountingContent({
                   </td>
                   <td className="px-4 py-3 text-right">
                     {b.balance > 0 && (
-                      <Link href={`${fin}/vouchers?new=SUPPLIER&bill=${b.id}`} className={secondaryButtonSm}>
+                      <Link href={payHref(here, "SUPPLIER", { bill: b.id })} scroll={false} className={secondaryButtonSm}>
                         Pay (PV)
                       </Link>
                     )}

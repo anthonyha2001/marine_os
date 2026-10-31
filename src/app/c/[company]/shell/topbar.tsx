@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Bell, Check, ChevronDown, ChevronRight, Keyboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Plus, Search } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
 import type { NavGroup } from "@/lib/navigation";
+import { payHref } from "@/lib/url";
 import { Dropdown } from "./dropdown";
 
 import type { Notice } from "@/lib/data/notices";
@@ -108,7 +109,7 @@ export function Topbar({
                   <div key={g.title} className="py-1">
                     <p className="px-4 pb-1 pt-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted">{g.title}</p>
                     {g.items.map((i) => (
-                      <Link key={i.path} href={`${base}/${i.path}`} onClick={close} data-nav-row className="flex items-center justify-between px-4 py-2 text-sm text-slate-700 hover:bg-surface-2 hover:text-navy">
+                      <Link key={i.path} href={i.pay ? payHref(pathname, i.pay) : `${base}/${i.path}`} scroll={!i.pay} onClick={close} data-nav-row className="flex items-center justify-between px-4 py-2 text-sm text-slate-700 hover:bg-surface-2 hover:text-navy">
                         {i.label}
                         {i.shortcut && <kbd className="rounded border border-border px-1.5 font-mono text-[10px] text-muted">{i.shortcut}</kbd>}
                       </Link>

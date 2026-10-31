@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { payHref } from "@/lib/url";
 import { FileDown } from "lucide-react";
 import { deleteSupplierPayment } from "@/lib/actions/accounting";
 import { PAYMENT_METHODS, billStatus } from "@/lib/accounting";
@@ -46,7 +47,7 @@ export async function PaymentsSection({
           <ProgressBar value={purchase.totalTTC > 0 ? paid / purchase.totalTTC : 1} label="Paid" className="mt-2 max-w-sm" />
         </div>
         {canRecord && balance > 0 && (
-          <Link href={`/c/${slug}/finance/vouchers?new=SUPPLIER&bill=${purchase.id}`} className={secondaryButton}>
+          <Link href={payHref(`/c/${slug}/purchases/${purchase.id}`, "SUPPLIER", { bill: purchase.id })} scroll={false} className={secondaryButton}>
             Pay (PV)
           </Link>
         )}

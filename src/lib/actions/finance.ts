@@ -20,7 +20,7 @@ import { nextNumber } from "@/lib/ledger/numbering";
 import { UnbalancedEntryError, postCreditNote, postEntry, postReceipt, postVoucher, removeEntries, reverseEntries } from "@/lib/ledger/posting";
 import { VAT_RATE, round2 } from "@/lib/money";
 
-export type FinanceFormState = { error?: string };
+export type FinanceFormState = { error?: string; savedId?: string }; // savedId: saved in a pop-up (form sent with "stay")
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date");
@@ -124,6 +124,7 @@ export async function recordReceipt(companySlug: string, _prev: FinanceFormState
   }
 
   refresh(companyId, true);
+  if (formData.get("stay")) return { savedId: receiptId };
   redirect(`/c/${slug}/finance/vouchers?saved=${receiptId}`);
 }
 
@@ -228,6 +229,7 @@ export async function createVoucher(companySlug: string, _prev: FinanceFormState
   }, TRANSACTION_OPTIONS);
 
   refresh(companyId);
+  if (formData.get("stay")) return { savedId: id };
   redirect(`/c/${slug}/finance/vouchers?saved=${id}`);
 }
 

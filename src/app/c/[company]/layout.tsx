@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { requireCompany } from "@/lib/auth";
 import { noticesFor } from "@/lib/data/notices";
 import { navFor, visibleNav } from "@/lib/navigation";
-import { COMPANIES, ROLE_LABELS, allowedCompanies } from "@/lib/permissions";
+import { COMPANIES, ROLE_LABELS, allowedCompanies, canAccessModule } from "@/lib/permissions";
 import { AppShell } from "./shell/app-shell";
 
 async function Shell({ params, children }: { params: Promise<{ company: string }>; children: React.ReactNode }) {
@@ -22,6 +22,7 @@ async function Shell({ params, children }: { params: Promise<{ company: string }
       companies={allowedCompanies(user).map(option)}
       user={{ name: user.name, email: user.email, roleLabel: ROLE_LABELS[user.role] }}
       notices={notices}
+      canPay={canAccessModule(user, slug, "accounting")}
       initialCollapsed={jar.get("sidebar")?.value === "collapsed"}
     >
       {children}

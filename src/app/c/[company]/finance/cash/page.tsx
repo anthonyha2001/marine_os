@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { payHref } from "@/lib/url";
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Wallet } from "lucide-react";
 import { requireModule } from "@/lib/auth";
 import { dayFormat } from "@/lib/dates";
@@ -23,6 +24,7 @@ async function CashContent({ params, searchParams }: { params: Promise<{ company
   const { fromStr, toStr, period } = periodFrom(search);
   const book = selected ? accountLedger(ledger, selected.id, period) : null;
   const fin = `/c/${slug}/finance`;
+  const here = `${fin}/cash`;
 
   return (
     <>
@@ -32,13 +34,13 @@ async function CashContent({ params, searchParams }: { params: Promise<{ company
         description="Balance of every cash box and bank account, and the cash book: every movement in and out, with a running balance."
         action={
           <>
-            <Link href={`${fin}/vouchers?new=PAYMENT`} className={primaryButton}>
+            <Link href={payHref(here, "PAYMENT")} scroll={false} className={primaryButton}>
               <ArrowUpRight className="size-4" aria-hidden /> Pay (PV)
             </Link>
-            <Link href={`${fin}/vouchers?new=RECEIPT`} className={secondaryButton}>
+            <Link href={payHref(here, "RECEIPT")} scroll={false} className={secondaryButton}>
               <ArrowDownLeft className="size-4" aria-hidden /> Cash in (RV)
             </Link>
-            <Link href={`${fin}/vouchers?new=TRANSFER`} className={secondaryButton}>
+            <Link href={payHref(here, "TRANSFER")} scroll={false} className={secondaryButton}>
               <ArrowLeftRight className="size-4" aria-hidden /> Transfer
             </Link>
           </>

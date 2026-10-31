@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { recordSupplierPayment, type PaymentFormState } from "@/lib/actions/accounting";
 import type { MoneyAccountOption } from "@/lib/data/ledger";
 import { today } from "@/lib/dates";
@@ -19,13 +19,18 @@ export function SupplierPaymentForm({
   bills,
   accounts,
   defaultBillId,
+  onSaved,
 }: {
   companySlug: string;
   bills: OpenBillOption[];
   accounts: MoneyAccountOption[];
   defaultBillId?: string;
+  onSaved?: (id: string) => void; // in a pop-up: stay on the page and report the new id
 }) {
   const [state, formAction, pending] = useActionState<PaymentFormState, FormData>(recordSupplierPayment.bind(null, companySlug), {});
+  useEffect(() => {
+    if (state.savedId) onSaved?.(state.savedId);
+  }, [state, onSaved]);
   const start = bills.find((b) => b.id === defaultBillId);
   const [supplierId, setSupplierId] = useState(start?.supplierId ?? "");
   const [billId, setBillId] = useState(start?.id ?? "");
@@ -47,6 +52,7 @@ export function SupplierPaymentForm({
 
   return (
     <form action={formAction} data-save-shortcut className="space-y-4">
+      {onSaved && <input type="hidden" name="stay" value="1" />}
       <div className="grid gap-4 sm:grid-cols-2">
         <label className={labelClass}>
           Supplier *

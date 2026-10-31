@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { createVoucher, type FinanceFormState } from "@/lib/actions/finance";
 import type { MoneyAccountOption } from "@/lib/data/ledger";
 import { today } from "@/lib/dates";
@@ -29,13 +29,18 @@ export function VoucherForm({
   kind,
   moneyAccounts,
   counterAccounts,
+  onSaved,
 }: {
   companySlug: string;
   kind: VoucherKind;
   moneyAccounts: MoneyAccountOption[];
   counterAccounts: CounterAccountOption[];
+  onSaved?: (id: string) => void; // in a pop-up: stay on the page and report the new id
 }) {
   const [state, formAction, pending] = useActionState<FinanceFormState, FormData>(createVoucher.bind(null, companySlug), {});
+  useEffect(() => {
+    if (state.savedId) onSaved?.(state.savedId);
+  }, [state, onSaved]);
   const [amount, setAmount] = useState("");
   const [withVat, setWithVat] = useState(false);
   const first = useFocusOnShow<HTMLInputElement>();
@@ -46,6 +51,7 @@ export function VoucherForm({
 
   return (
     <form action={formAction} data-save-shortcut className="space-y-4">
+      {onSaved && <input type="hidden" name="stay" value="1" />}
       <input type="hidden" name="kind" value={kind} />
       <div className="grid gap-4 sm:grid-cols-2">
         {kind !== "TRANSFER" ? (

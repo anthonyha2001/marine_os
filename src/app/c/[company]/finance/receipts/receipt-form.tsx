@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { recordReceipt, type FinanceFormState } from "@/lib/actions/finance";
 import type { MoneyAccountOption } from "@/lib/data/ledger";
 import { formatMoney, round2 } from "@/lib/money";
@@ -21,12 +21,16 @@ export function ReceiptForm({
   invoices,
   customers = [],
   defaultInvoiceId,
+  defaultCustomerId,
+  onSaved,
 }: {
   companySlug: string;
   accounts: MoneyAccountOption[];
   invoices: OpenInvoiceOption[];
   customers?: { id: string; name: string }[];
   defaultInvoiceId?: string;
+  defaultCustomerId?: string; // "on account" starts with this customer
+  onSaved?: (id: string) => void; // in a pop-up: stay on the page and report the new id
 }) {
   const [mode, setMode] = useState<"invoice" | "account">(invoices.length ? "invoice" : "account");
   const [invoiceId, setInvoiceId] = useState(invoices.find((i) => i.id === defaultInvoiceId)?.id ?? invoices[0]?.id ?? "");
@@ -34,11 +38,15 @@ export function ReceiptForm({
   const [amount, setAmount] = useState(invoice ? String(invoice.balance) : "");
   const amountInput = useFocusOnShow<HTMLInputElement>();
   const [state, formAction, pending] = useActionState<FinanceFormState, FormData>(recordReceipt.bind(null, companySlug), {});
+  useEffect(() => {
+    if (state.savedId) onSaved?.(state.savedId);
+  }, [state, onSaved]);
   const value = Number(amount) || 0;
   const tooMuch = mode === "invoice" && !!invoice && value > invoice.balance + 0.001;
 
   return (
     <form action={formAction} data-save-shortcut className="space-y-4">
+      {onSaved && <input type="hidden" name="stay" value="1" />}
       <div className="inline-flex rounded-lg border border-border bg-surface-2 p-0.5 text-sm" role="tablist">
         {(["invoice", "account"] as const).map((m) => (
           <button
@@ -90,7 +98,7 @@ export function ReceiptForm({
       ) : (
         <label className={labelClass}>
           Customer *
-          <select name="customerId" required defaultValue="" className={inputClass}>
+          <select name="customerId" required defaultValue={defaultCustomerId ?? ""} className={inputClass}>
             <option value="" disabled>
               Choose a customer
             </option>

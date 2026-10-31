@@ -16,7 +16,7 @@ import { nextNumber } from "@/lib/ledger/numbering";
 import { postSupplierPayment, removeEntries } from "@/lib/ledger/posting";
 import { round2 } from "@/lib/money";
 
-export type PaymentFormState = { error?: string };
+export type PaymentFormState = { error?: string; savedId?: string }; // savedId: saved in a pop-up (form sent with "stay")
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
@@ -101,6 +101,7 @@ export async function recordSupplierPayment(
 
   updateTag(payablesTag(companyId));
   updateTag(ledgerTag(companyId));
+  if (formData.get("stay")) return { savedId: paymentId };
   redirect(`/c/${slug}/finance/vouchers?saved=${paymentId}`);
 }
 
