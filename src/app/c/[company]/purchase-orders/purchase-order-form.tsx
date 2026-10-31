@@ -95,10 +95,8 @@ export function PurchaseOrderForm({
         data-save-shortcut
         data-dirty={isDirty}
         onInput={() => setDirty(true)}
-        onKeyDown={(e) => {
-          // Enter in a single-line field (e.g. a scanner) must not submit the whole order.
-          if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault();
-        }}
+        // Enter moves to the next field (components/enter-keys.tsx) but never posts the document.
+        data-enter-no-submit
         className="mt-6 space-y-6"
       >
         <section className="grid gap-4 rounded-2xl border border-border bg-surface p-5 sm:grid-cols-2 lg:grid-cols-4">

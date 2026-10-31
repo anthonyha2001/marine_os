@@ -86,9 +86,8 @@ export function PurchaseForm({
         data-save-shortcut
         data-dirty={dirty}
         // Stop Enter (e.g. a scanner in the wrong field) from submitting the whole purchase.
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault();
-        }}
+        // Enter moves to the next field (components/enter-keys.tsx) but never posts the document.
+        data-enter-no-submit
         className="mt-6 space-y-6"
       >
         {fromOrder && (

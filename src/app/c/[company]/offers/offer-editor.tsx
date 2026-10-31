@@ -464,10 +464,8 @@ export function OfferEditor({
       action={formAction}
       data-save-shortcut
       data-dirty={dirty}
-      onKeyDown={(e) => {
-        // Enter in a single-line field must not submit the whole offer.
-        if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault();
-      }}
+      // Enter moves to the next field (components/enter-keys.tsx) but never posts the document.
+      data-enter-no-submit
       className="mt-6 space-y-6"
     >
       {offer?.locked && (

@@ -94,7 +94,6 @@ export function CountSheet({ companySlug, count }: { companySlug: string; count:
                         setDirty(true);
                         setValues((x) => ({ ...x, [l.id]: e.target.value }));
                       }}
-                      onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
                       aria-label={`Counted ${l.name}`}
                       className={`${inputClass} h-9 w-24 text-right tabular`}
                     />

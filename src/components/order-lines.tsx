@@ -138,7 +138,10 @@ export function OrderLinesTable({
 
   // Enter on a quantity/price cell goes back to the scan box for the next product.
   const backToSearch = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") searchInput.current?.focus();
+    if (e.key === "Enter") {
+      e.preventDefault();
+      searchInput.current?.focus();
+    }
   };
 
   return (
