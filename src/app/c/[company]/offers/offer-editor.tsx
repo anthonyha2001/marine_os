@@ -199,6 +199,8 @@ export function OfferEditor({
   const [highlight, setHighlight] = useState(0);
   const [dirty, setDirty] = useState(false);
   const customerInput = useFocusOnShow<HTMLInputElement>(!offer);
+  const [customerOpen, setCustomerOpen] = useState(false);
+  const [customerHighlight, setCustomerHighlight] = useState(0);
   const searchInput = useRef<HTMLInputElement>(null);
 
   const set = <K extends keyof typeof header>(key: K, value: (typeof header)[K]) => {
@@ -313,7 +315,35 @@ export function OfferEditor({
         customerPhone: c.phone ?? "",
       }),
     }));
+    setCustomerOpen(false);
     setDirty(true);
+  }
+
+  // Suggestions while typing a name that isn't linked to a saved customer yet.
+  const customerMatches = useMemo(() => {
+    const words = header.customerName.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (!customerOpen || header.customerId || !words.length) return [];
+    return customers
+      .filter((c) => {
+        const text = [c.name, c.contactName, c.phone, c.email].filter(Boolean).join(" ").toLowerCase();
+        const compact = text.replace(/\s+/g, ""); // so 03123456 finds "03 123 456"
+        return words.every((w) => text.includes(w) || compact.includes(w));
+      })
+      .slice(0, 8);
+  }, [customers, customerOpen, header.customerId, header.customerName]);
+
+  function onCustomerKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!customerMatches.length) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const step = e.key === "ArrowDown" ? 1 : customerMatches.length - 1;
+      setCustomerHighlight((i) => (i + step) % customerMatches.length);
+    } else if (e.key === "Enter") {
+      e.preventDefault(); // pick the customer, don't submit the offer
+      pickCustomer(customerMatches[Math.min(customerHighlight, customerMatches.length - 1)].id);
+    } else if (e.key === "Escape") {
+      setCustomerOpen(false);
+    }
   }
 
   const numeric = lines.map((l) => ({
@@ -422,30 +452,59 @@ export function OfferEditor({
         <div className="space-y-4 rounded-2xl border border-border bg-surface p-5">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-navy">Customer</h2>
-            <select
-              value={header.customerId}
-              onChange={(e) => pickCustomer(e.target.value)}
-              className="max-w-[14rem] rounded-lg border border-border bg-surface px-2 py-1.5 text-sm"
-              aria-label="Saved customer"
-            >
-              <option value="">New / not saved</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            {header.customerId && (
+              <span className="text-sm text-muted">
+                Saved customer ·{" "}
+                <button type="button" onClick={() => pickCustomer("")} className="text-brand hover:underline">
+                  Unlink
+                </button>
+              </span>
+            )}
           </div>
-          <label className={labelClass}>
-            Company / organisation *
-            <input
-              ref={customerInput}
-              value={header.customerName}
-              onChange={(e) => set("customerName", e.target.value)}
-              className={inputClass}
-              required
-            />
-          </label>
+          <div className="relative">
+            <label className={labelClass}>
+              Company / organisation *
+              <input
+                ref={customerInput}
+                value={header.customerName}
+                onChange={(e) => {
+                  set("customerName", e.target.value);
+                  setCustomerOpen(true);
+                  setCustomerHighlight(0);
+                }}
+                onBlur={() => setCustomerOpen(false)}
+                onKeyDown={onCustomerKey}
+                className={inputClass}
+                placeholder="Search saved customers, or type a new name"
+                autoComplete="off"
+                role="combobox"
+                aria-expanded={customerMatches.length > 0}
+                aria-controls="customer-matches"
+                required
+              />
+            </label>
+            {customerMatches.length > 0 && (
+              <ul id="customer-matches" role="listbox" aria-label="Saved customers" className="absolute left-0 right-0 top-full z-20 mt-1 max-h-72 overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-lg">
+                {customerMatches.map((c, i) => (
+                  <li key={c.id} role="option" aria-selected={i === customerHighlight}>
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => pickCustomer(c.id)}
+                      onMouseEnter={() => setCustomerHighlight(i)}
+                      className={`block w-full rounded-md px-3 py-2 text-left text-sm ${i === customerHighlight ? "bg-surface-2" : ""}`}
+                    >
+                      <span className="font-medium text-navy">{c.name}</span>
+                      {(c.contactName || c.phone || c.email) && (
+                        <span className="block text-xs text-muted">{[c.contactName, c.phone, c.email].filter(Boolean).join(" · ")}</span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className={labelClass}>
               Attention (contact person)
