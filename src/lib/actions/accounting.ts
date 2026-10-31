@@ -21,34 +21,34 @@ export type PaymentFormState = { error?: string };
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
 const paymentSchema = z.object({
+  purchaseId: z.string().min(1, "Choose the bill to pay"),
   amount: z.coerce.number({ message: "Enter an amount" }).positive("The amount must be more than 0"),
   paidAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter the payment date"),
   method: z.string().refine(isPaymentMethod, "Choose how it was paid"),
   moneyAccountId: z.string().min(1, "Choose the cash box or bank account it was paid from"),
   reference: z.string().trim().max(200).optional(),
   notes: z.string().trim().max(2000).optional(),
-  returnTo: z.enum(["accounting", "purchase"]).default("accounting"),
 });
 
-/** Record a (possibly partial) payment to a supplier against a purchase, and post it. */
+/** A payment voucher: a (possibly partial) payment to a supplier against a purchase, posted. */
 export async function recordSupplierPayment(
   companySlug: string,
-  purchaseId: string,
   _prev: PaymentFormState,
   formData: FormData,
 ): Promise<PaymentFormState> {
   const { user, slug } = await requireModule(companySlug, "accounting");
   const parsed = paymentSchema.safeParse({
+    purchaseId: formData.get("purchaseId") ?? "",
     amount: formData.get("amount"),
     paidAt: formData.get("paidAt") ?? "",
     method: formData.get("method") ?? "",
     moneyAccountId: formData.get("moneyAccountId") ?? "",
     reference: formData.get("reference") || undefined,
     notes: formData.get("notes") || undefined,
-    returnTo: formData.get("returnTo") || "accounting",
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const data = parsed.data;
+  const { purchaseId } = data;
 
   const companyId = await companyIdFor(slug);
   const [purchase, account] = await Promise.all([
@@ -66,7 +66,7 @@ export async function recordSupplierPayment(
   if (amount > balance) return { error: `Only ${money.format(balance)} is left to pay on this bill.` };
 
   const paidAt = new Date(`${data.paidAt}T00:00:00Z`);
-  await prisma.$transaction(async (tx) => {
+  const paymentId = await prisma.$transaction(async (tx) => {
     // Numbered as a payment voucher (PV), in the same series as the vouchers page.
     const number = await nextNumber(tx, companyId, "PV", paidAt.getUTCFullYear());
     const payment = await tx.supplierPayment.create({
@@ -96,11 +96,12 @@ export async function recordSupplierPayment(
       invoiceNumber: purchase.invoiceNumber,
       createdById: user.id,
     });
+    return payment.id;
   }, TRANSACTION_OPTIONS);
 
   updateTag(payablesTag(companyId));
   updateTag(ledgerTag(companyId));
-  redirect(data.returnTo === "purchase" ? `/c/${slug}/purchases/${purchaseId}?paid=1` : `/c/${slug}/accounting?paid=1`);
+  redirect(`/c/${slug}/finance/vouchers?saved=${paymentId}`);
 }
 
 /** Remove a payment recorded by mistake (and its journal entry). */

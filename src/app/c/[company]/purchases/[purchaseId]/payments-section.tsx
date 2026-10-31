@@ -3,14 +3,11 @@ import { FileDown } from "lucide-react";
 import { deleteSupplierPayment } from "@/lib/actions/accounting";
 import { PAYMENT_METHODS, billStatus } from "@/lib/accounting";
 import { listPurchasePayments } from "@/lib/data/accounting";
-import { listMoneyAccounts } from "@/lib/data/ledger";
 import { formatMoney, round2 } from "@/lib/money";
 import type { CompanySlug } from "@/lib/permissions";
 import { DeleteButton } from "@/components/delete-button";
-import { Modal } from "@/components/modal";
 import { cardClass, secondaryButton, ProgressBar } from "@/components/ui";
 import { BillStatusBadge } from "../../accounting/bill-status";
-import { RecordPaymentForm } from "../../accounting/record-payment-form";
 import { CancelButton, CancelledNote } from "@/components/cancel-button";
 import { cancelSupplierPayment } from "@/lib/actions/cancel";
 
@@ -21,7 +18,6 @@ export async function PaymentsSection({
   slug,
   purchase,
   canRecord,
-  paying,
   admin = false,
   mayCancel = false,
 }: {
@@ -30,13 +26,11 @@ export async function PaymentsSection({
   mayCancel?: boolean;
   purchase: { id: string; invoiceNumber: string; supplierName: string; totalTTC: number; dueDate: Date };
   canRecord: boolean;
-  paying: boolean;
 }) {
   const payments = await listPurchasePayments(slug, purchase.id);
   const paid = round2(payments.filter((p) => p.status === "POSTED").reduce((s, p) => s + p.amount, 0));
   const balance = round2(purchase.totalTTC - paid);
   const status = billStatus(purchase.totalTTC, paid, purchase.dueDate);
-  const pageUrl = `/c/${slug}/purchases/${purchase.id}`;
 
   return (
     <section className={`${cardClass} mt-6 p-5`}>
@@ -52,8 +46,8 @@ export async function PaymentsSection({
           <ProgressBar value={purchase.totalTTC > 0 ? paid / purchase.totalTTC : 1} label="Paid" className="mt-2 max-w-sm" />
         </div>
         {canRecord && balance > 0 && (
-          <Link href={`${pageUrl}?pay=1`} scroll={false} className={secondaryButton}>
-            Record payment
+          <Link href={`/c/${slug}/finance/vouchers?new=SUPPLIER&bill=${purchase.id}`} className={secondaryButton}>
+            Pay (PV)
           </Link>
         )}
       </div>
@@ -113,22 +107,6 @@ export async function PaymentsSection({
             ))}
           </tbody>
         </table>
-      )}
-
-      {paying && canRecord && balance > 0 && (
-        <Modal title="Record a supplier payment" closeHref={pageUrl} size="md">
-          <RecordPaymentForm
-            key={crypto.randomUUID()}
-            companySlug={slug}
-            purchaseId={purchase.id}
-            supplierName={purchase.supplierName}
-            invoiceNumber={purchase.invoiceNumber}
-            total={purchase.totalTTC}
-            balance={balance}
-            returnTo="purchase"
-            accounts={await listMoneyAccounts(slug)}
-          />
-        </Modal>
       )}
     </section>
   );

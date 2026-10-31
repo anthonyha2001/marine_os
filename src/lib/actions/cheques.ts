@@ -80,15 +80,15 @@ export async function receiveCheque(companySlug: string, _prev: ChequeFormState,
       }
       const a = await systemAccounts(companyId, tx);
       const date = toDate(d.issueDate);
-      const rcNumber = await nextNumber(tx, companyId, "RC", date.getUTCFullYear());
+      const rvNumber = await nextNumber(tx, companyId, "RV", date.getUTCFullYear());
       const receipt = await tx.customerReceipt.create({
         select: { id: true },
         data: {
-          companyId, number: rcNumber, invoiceId: invoice?.id ?? null, customerId: customer.id, customerName: customer.name, amount, receivedAt: date,
+          companyId, number: rvNumber, invoiceId: invoice?.id ?? null, customerId: customer.id, customerName: customer.name, amount, receivedAt: date,
           method: "CHEQUE", moneyAccountId: a.CHEQUES_IN, reference: `Cheque ${d.chequeNumber}${d.bank ? ` · ${d.bank}` : ""} due ${d.dueDate}`, notes: d.notes, createdById: user.id,
         },
       });
-      await postReceipt(tx, { id: receipt.id, companyId, number: rcNumber, amount, receivedAt: date, moneyAccountId: a.CHEQUES_IN, customerId: customer.id, customerName: customer.name, invoiceNumber: invoice?.number ?? null, createdById: user.id });
+      await postReceipt(tx, { id: receipt.id, companyId, number: rvNumber, amount, receivedAt: date, moneyAccountId: a.CHEQUES_IN, customerId: customer.id, customerName: customer.name, invoiceNumber: invoice?.number ?? null, createdById: user.id });
       if (invoice) await refreshInvoiceStatus(tx, invoice.id);
       await tx.cheque.create({
         data: {

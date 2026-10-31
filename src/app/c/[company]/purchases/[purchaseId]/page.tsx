@@ -13,12 +13,10 @@ const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "long", timeZon
 
 async function PurchaseDetail({
   params,
-  searchParams,
 }: {
   params: Promise<{ company: string; purchaseId: string }>;
-  searchParams: Promise<{ pay?: string; paid?: string }>;
 }) {
-  const [{ company, purchaseId }, { pay, paid }] = await Promise.all([params, searchParams]);
+  const { company, purchaseId } = await params;
   const { user, slug } = await requireModule(company, "purchases");
   // Only finds purchases of this company, so another company's invoice can't be opened by URL.
   const purchase = await getPurchase(slug, purchaseId);
@@ -61,19 +59,12 @@ async function PurchaseDetail({
         </p>
       )}
 
-      {paid && (
-        <p role="status" className="mt-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-success">
-          Payment recorded.
-        </p>
-      )}
-
       <PaymentsSection
         slug={slug}
         purchase={{ id: purchase.id, invoiceNumber: purchase.invoiceNumber, supplierName: purchase.supplierName, totalTTC: purchase.totalTTC, dueDate: purchase.dueDate }}
         canRecord={canAccessModule(user, slug, "accounting")}
         admin={isAdmin(user)}
         mayCancel={can(user, "cancelEntries")}
-        paying={pay === "1"}
       />
 
       <LandedCostsSection slug={slug} purchaseId={purchase.id} />
@@ -117,10 +108,10 @@ async function PurchaseDetail({
   );
 }
 
-export default function PurchaseDetailPage({ params, searchParams }: PageProps<"/c/[company]/purchases/[purchaseId]">) {
+export default function PurchaseDetailPage({ params }: PageProps<"/c/[company]/purchases/[purchaseId]">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading…</p>}>
-      <PurchaseDetail params={params} searchParams={searchParams as Promise<{ pay?: string; paid?: string }>} />
+      <PurchaseDetail params={params} />
     </Suspense>
   );
 }

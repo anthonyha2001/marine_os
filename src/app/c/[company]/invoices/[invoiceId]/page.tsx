@@ -5,14 +5,12 @@ import { notFound } from "next/navigation";
 import { requireModule } from "@/lib/auth";
 import { deleteReceipt } from "@/lib/actions/finance";
 import { PAYMENT_METHODS } from "@/lib/accounting";
-import { listCreditNotes, listMoneyAccounts, listReceipts } from "@/lib/data/ledger";
+import { listCreditNotes, listReceipts } from "@/lib/data/ledger";
 import { getInvoice } from "@/lib/data/sales";
 import { formatMoney, round2, VAT_RATE } from "@/lib/money";
-import { COMPANIES, can, isAdmin } from "@/lib/permissions";
+import { COMPANIES, can, canAccessModule, isAdmin } from "@/lib/permissions";
 import { DeleteButton } from "@/components/delete-button";
-import { Modal } from "@/components/modal";
 import { Badge, PageHeader, ProgressBar, cardClass } from "@/components/ui";
-import { ReceiptForm } from "../../finance/receipts/receipt-form";
 import { InvoiceStatusBadge } from "../status-badge";
 import { InvoiceActions } from "./invoice-actions";
 import { CancelButton, CancelledNote } from "@/components/cancel-button";
@@ -22,12 +20,10 @@ const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "long", timeZon
 
 async function InvoiceDetail({
   params,
-  searchParams,
 }: {
   params: Promise<{ company: string; invoiceId: string }>;
-  searchParams: Promise<{ pay?: string; paid?: string }>;
 }) {
-  const [{ company, invoiceId }, { pay, paid: justPaid }] = await Promise.all([params, searchParams]);
+  const { company, invoiceId } = await params;
   const { user, slug } = await requireModule(company, "invoices");
   const admin = isAdmin(user);
   const mayCancel = can(user, "cancelEntries");
@@ -40,7 +36,6 @@ async function InvoiceDetail({
   const paid = round2(receipts.filter((r) => r.status === "POSTED").reduce((s, r) => s + r.amount, 0));
   const credited = round2(notes.filter((c) => c.status === "ISSUED").reduce((s, c) => s + c.totalTTC, 0));
   const balance = invoice.status === "CANCELLED" ? 0 : Math.max(0, round2(invoice.totalTTC - paid - credited));
-  const pageUrl = `/c/${slug}/invoices/${invoice.id}`;
 
   const facts: [string, React.ReactNode][] = [
     ["Customer", invoice.customerName],
@@ -74,6 +69,7 @@ async function InvoiceDetail({
             invoiceId={invoice.id}
             status={invoice.status}
             balance={balance}
+            canReceive={canAccessModule(user, slug, "accounting")}
             creditable={round2(invoice.totalTTC - credited)}
             hasSettlements={receipts.length > 0 || notes.some((c) => c.status === "ISSUED")}
           />
@@ -83,12 +79,6 @@ async function InvoiceDetail({
       <div className="mt-3">
         <InvoiceStatusBadge status={invoice.status} dueDate={invoice.dueDate} partial={paid + credited > 0} />
       </div>
-
-      {justPaid && (
-        <p role="status" className="mt-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-success">
-          Payment recorded.
-        </p>
-      )}
 
       <dl className={`${cardClass} mt-6 grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3`}>
         {facts.map(([label, value]) => (
@@ -212,26 +202,14 @@ async function InvoiceDetail({
         </section>
       )}
 
-      {pay && balance > 0 && (
-        <Modal title={`Record a payment · ${invoice.number}`} closeHref={pageUrl} size="md">
-          <ReceiptForm
-            key={crypto.randomUUID()}
-            companySlug={slug}
-            accounts={await listMoneyAccounts(slug)}
-            invoices={[{ id: invoice.id, number: invoice.number, customerName: invoice.customerName, totalTTC: invoice.totalTTC, balance }]}
-            fixedInvoiceId={invoice.id}
-            returnTo="invoice"
-          />
-        </Modal>
-      )}
     </>
   );
 }
 
-export default function InvoicePage({ params, searchParams }: PageProps<"/c/[company]/invoices/[invoiceId]">) {
+export default function InvoicePage({ params }: PageProps<"/c/[company]/invoices/[invoiceId]">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading…</p>}>
-      <InvoiceDetail params={params} searchParams={searchParams as Promise<{ pay?: string; paid?: string }>} />
+      <InvoiceDetail params={params} />
     </Suspense>
   );
 }

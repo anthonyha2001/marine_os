@@ -100,7 +100,9 @@ async function OfferPage({
       )}
       {canAccessModule(user, slug, "invoices") && (
         <>
-          <InvoicingPanel companySlug={slug} offer={offer} />
+          <div id="invoicing" className="scroll-mt-4">
+            <InvoicingPanel companySlug={slug} offer={offer} />
+          </div>
           {invoice === "custom" && (
             <Modal title={`Custom invoice for ${offer.number}`} closeHref={`/c/${slug}/offers/${offer.id}`} size="md">
               <CustomInvoiceForm

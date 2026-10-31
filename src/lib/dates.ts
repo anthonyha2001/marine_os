@@ -26,3 +26,15 @@ export function parseDayEnd(value: string | undefined) {
 
 export const dayFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "UTC" });
 export const isoDay = (d: Date) => d.toISOString().slice(0, 10);
+
+/** Whole days from today (business time zone) to a date; negative when it has passed. */
+export function daysUntil(date: Date) {
+  return Math.round((Date.parse(isoDay(date)) - Date.parse(businessToday())) / 86_400_000);
+}
+export const isOverdue = (date: Date) => daysUntil(date) < 0;
+/** "overdue by 3 days", "due today", "due in 12 days". */
+export function dueInWords(date: Date) {
+  const days = daysUntil(date);
+  const n = (x: number) => `${x} day${x === 1 ? "" : "s"}`;
+  return days < 0 ? `overdue by ${n(-days)}` : days === 0 ? "due today" : `due in ${n(days)}`;
+}

@@ -14,6 +14,7 @@ export function InvoiceActions({
   invoiceId,
   status,
   balance,
+  canReceive,
   creditable,
   hasSettlements,
 }: {
@@ -21,10 +22,12 @@ export function InvoiceActions({
   invoiceId: string;
   status: InvoiceStatus;
   balance: number;
+  canReceive: boolean;
   creditable: number;
   hasSettlements: boolean;
 }) {
   const pdfUrl = `/c/${companySlug}/invoices/${invoiceId}/pdf`;
+  const receivable = status !== "CANCELLED" && balance > 0 && canReceive;
   const [pending, startTransition] = useTransition();
   const { confirm, toast } = useFeedback();
 
@@ -66,13 +69,13 @@ export function InvoiceActions({
 
   return (
     <div className="flex flex-wrap gap-2">
-      {status !== "CANCELLED" && balance > 0 && (
-        <Link href={`/c/${companySlug}/invoices/${invoiceId}?pay=1`} scroll={false} className={primaryButton}>
-          <HandCoins className="size-4" aria-hidden /> Record payment
+      {receivable && (
+        <Link href={`/c/${companySlug}/finance/vouchers?new=CUSTOMER&invoice=${invoiceId}`} className={primaryButton}>
+          <HandCoins className="size-4" aria-hidden /> Receive payment (RV)
         </Link>
       )}
-      <a href={pdfUrl} target="_blank" rel="noopener" className={`${status !== "CANCELLED" && balance > 0 ? secondaryButton : primaryButton} gap-2`}>
-        Open PDF <Kbd className={status !== "CANCELLED" && balance > 0 ? "" : "border-white/30 bg-white/10 text-white"}>Ctrl P</Kbd>
+      <a href={pdfUrl} target="_blank" rel="noopener" className={`${receivable ? secondaryButton : primaryButton} gap-2`}>
+        Open PDF <Kbd className={receivable ? "" : "border-white/30 bg-white/10 text-white"}>Ctrl P</Kbd>
       </a>
       <a href={`${pdfUrl}?download=1`} className={secondaryButton}>
         Download PDF

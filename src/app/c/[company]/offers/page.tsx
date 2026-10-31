@@ -8,10 +8,12 @@ import { requireModule } from "@/lib/auth";
 import { listOffers } from "@/lib/data/sales";
 import { formatMoney } from "@/lib/money";
 
-import { COMPANIES, can, isAdmin } from "@/lib/permissions";
+import { COMPANIES, can, canAccessModule, isAdmin } from "@/lib/permissions";
 import { cardClass, PageHeader, ButtonLink, SearchBar, secondaryButton } from "@/components/ui";
 import { deleteOffer } from "@/lib/actions/offers";
 import { DeleteButton } from "@/components/delete-button";
+import { OfferDialog } from "@/components/document-dialogs";
+import { OpenRow } from "@/components/open-row";
 import { StatusSelect } from "./status-select";
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "UTC" });
@@ -21,9 +23,9 @@ async function OffersContent({
   searchParams,
 }: {
   params: Promise<{ company: string }>;
-  searchParams: Promise<{ q?: string; clauses?: string }>;
+  searchParams: Promise<{ q?: string; clauses?: string; view?: string }>;
 }) {
-  const [{ company }, { q = "", clauses }] = await Promise.all([params, searchParams]);
+  const [{ company }, { q = "", clauses, view }] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "offers");
   const mayDelete = (status: string) => isAdmin(user) || (status === "DRAFT" && can(user, "deleteDrafts"));
   const needle = q.trim().toLowerCase();
@@ -77,7 +79,7 @@ async function OffersContent({
               {offers.map((o) => {
                 const expired = o.status !== "ACCEPTED" && o.status !== "REJECTED" && o.validUntil.toISOString().slice(0, 10) < today;
                 return (
-                  <tr key={o.id} className="hover:bg-background/60">
+                  <OpenRow key={o.id} href={`${base}?${q ? `q=${encodeURIComponent(q)}&` : ""}view=${o.id}`} className="hover:bg-background/60">
                     <td className="px-4 py-3">
                       <Link href={`${base}/${o.id}`} className="font-mono font-medium text-brand hover:underline">
                         {o.number}
@@ -101,13 +103,15 @@ async function OffersContent({
                         />
                       )}
                     </td>
-                  </tr>
+                  </OpenRow>
                 );
               })}
             </tbody>
           </table>
         )}
       </div>
+
+      {view && <OfferDialog slug={slug} id={view} closeHref={q ? `${base}?q=${encodeURIComponent(q)}` : base} canInvoice={canAccessModule(user, slug, "invoices")} />}
 
       {clauses && (
         <Modal title="Standard clauses" closeHref={base} size="lg">
@@ -124,7 +128,7 @@ async function OffersContent({
 export default function OffersPage({ params, searchParams }: PageProps<"/c/[company]/offers">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading offers…</p>}>
-      <OffersContent params={params} searchParams={searchParams as Promise<{ q?: string; clauses?: string }>} />
+      <OffersContent params={params} searchParams={searchParams as Promise<{ q?: string; clauses?: string; view?: string }>} />
     </Suspense>
   );
 }

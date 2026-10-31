@@ -4,15 +4,13 @@ import { requireModule } from "@/lib/auth";
 import { billStatus } from "@/lib/accounting";
 import { listBills } from "@/lib/data/accounting";
 import { listPurchaseOrders } from "@/lib/data/purchase-orders";
-import { getLedger, invoicesWithBalance, listMoneyAccounts } from "@/lib/data/ledger";
+import { getLedger, invoicesWithBalance } from "@/lib/data/ledger";
 import { moneyBalances } from "@/lib/ledger/reports";
 import { formatMoney, round2 } from "@/lib/money";
 import { COMPANIES, canAccessModule } from "@/lib/permissions";
-import { Modal } from "@/components/modal";
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, HandCoins } from "lucide-react";
 import { PageHeader, cardClass, primaryButton, secondaryButton, secondaryButtonSm, ProgressBar } from "@/components/ui";
 import { BillStatusBadge } from "./bill-status";
-import { RecordPaymentForm } from "./record-payment-form";
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "UTC" });
 
@@ -41,9 +39,9 @@ async function AccountingContent({
   searchParams,
 }: {
   params: Promise<{ company: string }>;
-  searchParams: Promise<{ bills?: string; pay?: string; paid?: string }>;
+  searchParams: Promise<{ bills?: string }>;
 }) {
-  const [{ company }, { bills: billsView = "open", pay, paid }] = await Promise.all([params, searchParams]);
+  const [{ company }, { bills: billsView = "open" }] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "accounting");
   const showReceivables = canAccessModule(user, slug, "invoices");
   const [bills, orders, invoices, ledger] = await Promise.all([
@@ -80,7 +78,6 @@ async function AccountingContent({
   const overdueCollect = round2(unpaid.filter((i) => i.dueDate.toISOString().slice(0, 10) < todayIso).reduce((s, i) => s + i.balance, 0));
   const net = round2(toCollect - toPay);
 
-  const paying = pay ? withStatus.find((b) => b.id === pay) : undefined;
 
   return (
     <>
@@ -100,19 +97,13 @@ async function AccountingContent({
               <ArrowLeftRight className="size-4" aria-hidden /> Transfer
             </Link>
             {showReceivables && (
-              <Link href={`${fin}/receipts?new=1`} className={secondaryButton}>
+              <Link href={`${fin}/vouchers?new=CUSTOMER`} className={secondaryButton}>
                 <HandCoins className="size-4" aria-hidden /> Customer payment
               </Link>
             )}
           </>
         }
       />
-
-      {paid && (
-        <p role="status" className="mt-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-success">
-          Payment recorded.
-        </p>
-      )}
 
       <SectionTitle title="Cash & bank">
         <Link href={`${fin}/cash`} className="text-sm text-brand hover:underline">
@@ -210,8 +201,8 @@ async function AccountingContent({
                   </td>
                   <td className="px-4 py-3 text-right">
                     {b.balance > 0 && (
-                      <Link href={`${base}?${billsView === "all" ? "bills=all&" : ""}pay=${b.id}`} scroll={false} className={secondaryButtonSm}>
-                        Record payment
+                      <Link href={`${fin}/vouchers?new=SUPPLIER&bill=${b.id}`} className={secondaryButtonSm}>
+                        Pay (PV)
                       </Link>
                     )}
                   </td>
@@ -341,22 +332,6 @@ async function AccountingContent({
           </div>
         </>
       )}
-
-      {paying && paying.balance > 0 && (
-        <Modal title="Record a supplier payment" closeHref={billsView === "all" ? `${base}?bills=all` : base} size="md">
-          <RecordPaymentForm
-            key={crypto.randomUUID()}
-            companySlug={slug}
-            purchaseId={paying.id}
-            supplierName={paying.supplierName}
-            invoiceNumber={paying.invoiceNumber}
-            total={paying.total}
-            balance={paying.balance}
-            returnTo="accounting"
-            accounts={await listMoneyAccounts(slug)}
-          />
-        </Modal>
-      )}
     </>
   );
 }
@@ -364,7 +339,7 @@ async function AccountingContent({
 export default function AccountingPage({ params, searchParams }: PageProps<"/c/[company]/accounting">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading accounting…</p>}>
-      <AccountingContent params={params} searchParams={searchParams as Promise<{ bills?: string; pay?: string; paid?: string }>} />
+      <AccountingContent params={params} searchParams={searchParams as Promise<{ bills?: string }>} />
     </Suspense>
   );
 }

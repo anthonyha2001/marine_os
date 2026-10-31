@@ -1,26 +1,23 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { HandCoins, Plus } from "lucide-react";
+import { HandCoins } from "lucide-react";
 import { requireModule } from "@/lib/auth";
 import { deleteReceipt } from "@/lib/actions/finance";
 import { PAYMENT_METHODS } from "@/lib/accounting";
 import { businessToday, dayFormat } from "@/lib/dates";
-import { invoicesWithBalance, listMoneyAccounts, listReceipts } from "@/lib/data/ledger";
-import { listCustomers } from "@/lib/data/sales";
+import { invoicesWithBalance, listReceipts } from "@/lib/data/ledger";
 import { formatMoney, round2 } from "@/lib/money";
 import { COMPANIES } from "@/lib/permissions";
 import { DeleteButton } from "@/components/delete-button";
-import { Modal } from "@/components/modal";
 import { ButtonLink, EmptyState, PageHeader, SearchBar, StatCard, cardClass, tdClass, thClass } from "@/components/ui";
-import { ReceiptForm } from "./receipt-form";
 import { CancelButton, CancelledNote } from "@/components/cancel-button";
 import { cancelReceipt } from "@/lib/actions/cancel";
-import { can, isAdmin } from "@/lib/permissions";
+import { can, canAccessModule, isAdmin } from "@/lib/permissions";
 
-type Search = { q?: string; new?: string; saved?: string };
+type Search = { q?: string };
 
 async function ReceiptsContent({ params, searchParams }: { params: Promise<{ company: string }>; searchParams: Promise<Search> }) {
-  const [{ company }, { q = "", new: creating, saved }] = await Promise.all([params, searchParams]);
+  const [{ company }, { q = "" }] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "invoices");
   const base = `/c/${slug}/finance/receipts`;
   const admin = isAdmin(user);
@@ -41,14 +38,9 @@ async function ReceiptsContent({ params, searchParams }: { params: Promise<{ com
       <PageHeader
         eyebrow={`${COMPANIES[slug].name} · Finance`}
         title="Customer receipts"
-        description="Money received from customers, against invoices or on account. Each receipt posts to cash or bank and reduces what the customer owes."
-        action={<ButtonLink icon={Plus} href={`${base}?new=1`}>New receipt</ButtonLink>}
+        description="Money received from customers, against invoices or on account. New customer payments are entered under Vouchers, as receipt vouchers (RV)."
+        action={canAccessModule(user, slug, "accounting") && <ButtonLink icon={HandCoins} href={`/c/${slug}/finance/vouchers?new=CUSTOMER`}>Customer payment</ButtonLink>}
       />
-      {saved && (
-        <p role="status" className="mt-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-success">
-          Receipt recorded.
-        </p>
-      )}
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
         <StatCard label="Received this month" value={formatMoney(thisMonth)} icon={HandCoins} />
         <StatCard label="Still to collect" value={formatMoney(toCollect)} hint={`${open.filter((i) => i.balance > 0).length} open invoices`} href={`/c/${slug}/invoices`} />
@@ -62,7 +54,7 @@ async function ReceiptsContent({ params, searchParams }: { params: Promise<{ com
           <EmptyState
             icon={HandCoins}
             title={q ? "No receipts match this search" : "No receipts yet"}
-            description="Record a payment from an invoice, or here for an advance on account."
+            description="Customer payments are entered under Vouchers."
           />
         ) : (
           <table className="w-full min-w-[56rem] text-sm">
@@ -123,26 +115,7 @@ async function ReceiptsContent({ params, searchParams }: { params: Promise<{ com
           </table>
         )}
       </div>
-
-      {creating && (
-        <Modal title="New customer receipt" closeHref={base} size="md">
-          <NewReceipt slug={slug} open={open.filter((i) => i.balance > 0)} />
-        </Modal>
-      )}
     </>
-  );
-}
-
-async function NewReceipt({ slug, open }: { slug: Parameters<typeof listMoneyAccounts>[0]; open: Awaited<ReturnType<typeof invoicesWithBalance>> }) {
-  const [accounts, customers] = await Promise.all([listMoneyAccounts(slug), listCustomers()]);
-  return (
-    <ReceiptForm
-      key={crypto.randomUUID()}
-      companySlug={slug}
-      accounts={accounts}
-      invoices={open.map((i) => ({ id: i.id, number: i.number, customerName: i.customerName, totalTTC: i.totalTTC, balance: i.balance }))}
-      customers={customers.map((c) => ({ id: c.id, name: c.name }))}
-    />
   );
 }
 

@@ -7,14 +7,18 @@ import { LbpRateForm } from "./lbp-rate-form";
 import Link from "next/link";
 import { requireModule } from "@/lib/auth";
 import { invoiceSettlements } from "@/lib/data/ledger";
+import { listJobCards } from "@/lib/data/workshop";
 import { companyIdFor, getCatalogue } from "@/lib/data/inventory";
 import { listCustomers, listInvoices, listOffers } from "@/lib/data/sales";
 import { vesselOptions } from "@/lib/data/vessels";
-import { formatMoney, round2 } from "@/lib/money";
+import { VAT_RATE, formatMoney, round2 } from "@/lib/money";
+import { InvoiceDialog } from "@/components/document-dialogs";
 import { Modal } from "@/components/modal";
-import { COMPANIES } from "@/lib/permissions";
+import { OpenRow } from "@/components/open-row";
+import { COMPANIES, canAccessModule } from "@/lib/permissions";
 import { cardClass, PageHeader, ButtonLink, ProgressBar, SearchBar, secondaryButton } from "@/components/ui";
 import { CustomInvoiceForm } from "./custom-invoice-form";
+import { JobInvoicePicker } from "./job-invoice-picker";
 import { StandaloneInvoiceForm } from "./standalone-invoice-form";
 import { LinkTabs } from "../finance/finance-ui";
 import { InvoiceStatusBadge } from "./status-badge";
@@ -26,21 +30,23 @@ async function InvoicesContent({
   searchParams,
 }: {
   params: Promise<{ company: string }>;
-  searchParams: Promise<{ q?: string; new?: string; rate?: string; rateSaved?: string }>;
+  searchParams: Promise<{ q?: string; new?: string; rate?: string; rateSaved?: string; view?: string }>;
 }) {
-  const [{ company }, { q = "", new: creating, rate: editingRate, rateSaved }] = await Promise.all([params, searchParams]);
+  const [{ company }, { q = "", new: creating, rate: editingRate, rateSaved, view }] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "invoices");
   const lbpRate = await currentLbpRate(prisma, await companyIdFor(slug));
   const mayRate = canSetRate(user.role);
   const needle = q.trim().toLowerCase();
   const custom = creating === "custom";
-  const [raw, offers, settled, customers, vessels, catalogue] = await Promise.all([
+  const fromJob = creating === "job";
+  const [raw, offers, settled, customers, vessels, catalogue, jobs] = await Promise.all([
     listInvoices(slug),
-    creating && !custom ? listOffers(slug) : [],
+    creating && !custom && !fromJob ? listOffers(slug) : [],
     invoiceSettlements(slug),
     custom ? listCustomers() : [],
     custom ? vesselOptions() : [],
     custom ? getCatalogue() : [],
+    fromJob ? listJobCards(slug) : [],
   ]);
   const all = raw.map((i) => {
     const s = settled.get(i.id) ?? { paid: 0, credited: 0 };
@@ -64,7 +70,7 @@ async function InvoicesContent({
       <PageHeader
         eyebrow={COMPANIES[slug].name}
         title="Invoices"
-        description="Three ways to invoice: from an offer (its payment plan), from a workshop job card, or a custom invoice with any lines."
+        description="Three ways to invoice: from an offer (its payment plan), from a workshop job card, or a custom invoice with any lines. Double-click an invoice to see what's inside."
         action={
           <>
             {mayRate ? (
@@ -102,9 +108,10 @@ async function InvoicesContent({
         <Modal title="New invoice" closeHref={base} size={custom ? "xl" : "md"}>
           <div className="mb-4">
             <LinkTabs
-              active={custom ? "custom" : "offer"}
+              active={custom ? "custom" : fromJob ? "job" : "offer"}
               tabs={[
                 { key: "offer", label: "From an offer", href: `${base}?new=offer` },
+                { key: "job", label: "From a job card", href: `${base}?new=job` },
                 { key: "custom", label: "Custom invoice", href: `${base}?new=custom` },
               ]}
             />
@@ -116,6 +123,18 @@ async function InvoicesContent({
               customers={customers.map((c) => ({ id: c.id, name: c.name }))}
               vessels={vessels}
               catalogue={catalogue.filter((c) => c.active).map((c) => ({ id: c.id, code: c.code, name: c.name, type: c.type, priceHT: c.priceHT }))}
+            />
+          ) : fromJob ? (
+            <JobInvoicePicker
+              companySlug={slug}
+              jobs={jobs
+                .filter((j) => j.status !== "CANCELLED" && j.toInvoiceHT > 0)
+                .map((j) => ({
+                  id: j.id,
+                  number: j.number,
+                  customerName: j.customerName,
+                  amount: `${formatMoney(j.toInvoiceHT)} excl. VAT · ${formatMoney(round2(j.toInvoiceHT * (j.applyVat ? 1 + VAT_RATE : 1)))} to pay`,
+                }))}
             />
           ) : (
           <CustomInvoiceForm
@@ -137,6 +156,8 @@ async function InvoicesContent({
           )}
         </Modal>
       )}
+
+      {view && <InvoiceDialog slug={slug} id={view} closeHref={q ? `${base}?q=${encodeURIComponent(q)}` : base} canReceive={canAccessModule(user, slug, "accounting")} canOpen />}
 
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         {[
@@ -177,7 +198,7 @@ async function InvoicesContent({
             </thead>
             <tbody className="divide-y divide-border">
               {invoices.map((i) => (
-                <tr key={i.id} className={`hover:bg-background/60 ${i.status === "CANCELLED" ? "opacity-60" : ""}`}>
+                <OpenRow key={i.id} href={`${base}?${q ? `q=${encodeURIComponent(q)}&` : ""}view=${i.id}`} className={`hover:bg-background/60 ${i.status === "CANCELLED" ? "opacity-60" : ""}`}>
                   <td className="px-4 py-3">
                     <Link href={`${base}/${i.id}`} className="font-mono font-medium text-brand hover:underline">
                       {i.number}
@@ -203,7 +224,7 @@ async function InvoicesContent({
                     {i.status !== "CANCELLED" && <ProgressBar value={i.totalTTC > 0 ? i.settled / i.totalTTC : 1} label="Settled" className="mt-1 min-w-24" />}
                   </td>
                   <td className="px-4 py-3 text-right font-semibold">{i.status === "CANCELLED" ? "—" : formatMoney(i.balance)}</td>
-                </tr>
+                </OpenRow>
               ))}
             </tbody>
           </table>
@@ -216,7 +237,7 @@ async function InvoicesContent({
 export default function InvoicesPage({ params, searchParams }: PageProps<"/c/[company]/invoices">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading invoices…</p>}>
-      <InvoicesContent params={params} searchParams={searchParams as Promise<{ q?: string; new?: string; rate?: string; rateSaved?: string }>} />
+      <InvoicesContent params={params} searchParams={searchParams as Promise<{ q?: string; new?: string; rate?: string; rateSaved?: string; view?: string }>} />
     </Suspense>
   );
 }

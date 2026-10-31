@@ -20,18 +20,16 @@ export function ReceiptForm({
   accounts,
   invoices,
   customers = [],
-  fixedInvoiceId,
-  returnTo,
+  defaultInvoiceId,
 }: {
   companySlug: string;
   accounts: MoneyAccountOption[];
   invoices: OpenInvoiceOption[];
   customers?: { id: string; name: string }[];
-  fixedInvoiceId?: string;
-  returnTo?: "invoice";
+  defaultInvoiceId?: string;
 }) {
-  const [mode, setMode] = useState<"invoice" | "account">(invoices.length || fixedInvoiceId ? "invoice" : "account");
-  const [invoiceId, setInvoiceId] = useState(fixedInvoiceId ?? invoices[0]?.id ?? "");
+  const [mode, setMode] = useState<"invoice" | "account">(invoices.length ? "invoice" : "account");
+  const [invoiceId, setInvoiceId] = useState(invoices.find((i) => i.id === defaultInvoiceId)?.id ?? invoices[0]?.id ?? "");
   const invoice = invoices.find((i) => i.id === invoiceId);
   const [amount, setAmount] = useState(invoice ? String(invoice.balance) : "");
   const amountInput = useFocusOnShow<HTMLInputElement>();
@@ -41,51 +39,44 @@ export function ReceiptForm({
 
   return (
     <form action={formAction} data-save-shortcut className="space-y-4">
-      {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
-      {!fixedInvoiceId && (
-        <div className="inline-flex rounded-lg border border-border bg-surface-2 p-0.5 text-sm" role="tablist">
-          {(["invoice", "account"] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              role="tab"
-              aria-selected={mode === m}
-              onClick={() => setMode(m)}
-              className={`rounded-md px-3 py-1.5 font-medium ${mode === m ? "bg-surface text-navy shadow-sm" : "text-muted hover:text-navy"}`}
-            >
-              {m === "invoice" ? "Against an invoice" : "On account / advance"}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="inline-flex rounded-lg border border-border bg-surface-2 p-0.5 text-sm" role="tablist">
+        {(["invoice", "account"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            role="tab"
+            aria-selected={mode === m}
+            onClick={() => setMode(m)}
+            className={`rounded-md px-3 py-1.5 font-medium ${mode === m ? "bg-surface text-navy shadow-sm" : "text-muted hover:text-navy"}`}
+          >
+            {m === "invoice" ? "Against an invoice" : "On account / advance"}
+          </button>
+        ))}
+      </div>
 
       {mode === "invoice" ? (
         <>
-          {fixedInvoiceId ? (
-            <input type="hidden" name="invoiceId" value={fixedInvoiceId} />
-          ) : (
-            <label className={labelClass}>
-              Invoice *
-              <select
-                name="invoiceId"
-                required
-                value={invoiceId}
-                onChange={(e) => {
-                  setInvoiceId(e.target.value);
-                  const next = invoices.find((i) => i.id === e.target.value);
-                  if (next) setAmount(String(next.balance));
-                }}
-                className={inputClass}
-              >
-                {invoices.length === 0 && <option value="">No unpaid invoices</option>}
-                {invoices.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.number} · {i.customerName} · {formatMoney(i.balance)} due
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
+          <label className={labelClass}>
+            Invoice *
+            <select
+              name="invoiceId"
+              required
+              value={invoiceId}
+              onChange={(e) => {
+                setInvoiceId(e.target.value);
+                const next = invoices.find((i) => i.id === e.target.value);
+                if (next) setAmount(String(next.balance));
+              }}
+              className={inputClass}
+            >
+              {invoices.length === 0 && <option value="">No unpaid invoices</option>}
+              {invoices.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.number} · {i.customerName} · {formatMoney(i.balance)} due
+                </option>
+              ))}
+            </select>
+          </label>
           {invoice && (
             <div className="rounded-lg bg-background p-3 text-sm">
               <p className="font-semibold text-navy">{invoice.customerName}</p>
@@ -149,7 +140,7 @@ export function ReceiptForm({
 
       <FormMessage error={state.error} />
       <button type="submit" disabled={pending || tooMuch || value <= 0} className={`${primaryButton} w-full gap-2`}>
-        {pending ? "Saving…" : "Record receipt"}
+        {pending ? "Saving…" : "Save receipt voucher"}
         <Kbd className="border-white/30 bg-white/10 text-white">Ctrl S</Kbd>
       </button>
     </form>

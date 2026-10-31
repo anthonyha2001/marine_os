@@ -47,12 +47,11 @@ const receiptSchema = z.object({
   moneyAccountId: z.string().min(1, "Choose the cash box or bank account it was paid into"),
   reference: optionalText(200),
   notes: optionalText(2000),
-  returnTo: z.string().optional(),
 });
 
-/** Money received from a customer: against an invoice (partial allowed) or on account. */
+/** Receipt voucher (RV) for money from a customer: against an invoice (partial allowed) or on account. */
 export async function recordReceipt(companySlug: string, _prev: FinanceFormState, formData: FormData): Promise<FinanceFormState> {
-  const { user, slug } = await requireModule(companySlug, "invoices");
+  const { user, slug } = await requireModule(companySlug, "accounting");
   const parsed = receiptSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const data = parsed.data;
@@ -78,6 +77,7 @@ export async function recordReceipt(companySlug: string, _prev: FinanceFormState
 
   const amount = round2(data.amount);
   const receivedAt = toDate(data.receivedAt);
+  let receiptId = "";
   try {
     await prisma.$transaction(async (tx) => {
       if (invoice) {
@@ -85,7 +85,7 @@ export async function recordReceipt(companySlug: string, _prev: FinanceFormState
         if (!bal || bal.balance <= 0) throw new UserError(`Invoice ${invoice.number} is already fully paid.`);
         if (amount > bal.balance + 0.005) throw new UserError(`Only ${money.format(bal.balance)} is left to pay on invoice ${invoice.number}.`);
       }
-      const number = await nextNumber(tx, companyId, "RC", receivedAt.getUTCFullYear());
+      const number = await nextNumber(tx, companyId, "RV", receivedAt.getUTCFullYear());
       const receipt = await tx.customerReceipt.create({
         select: { id: true },
         data: {
@@ -103,6 +103,7 @@ export async function recordReceipt(companySlug: string, _prev: FinanceFormState
           createdById: user.id,
         },
       });
+      receiptId = receipt.id;
       await postReceipt(tx, {
         id: receipt.id,
         companyId,
@@ -123,8 +124,7 @@ export async function recordReceipt(companySlug: string, _prev: FinanceFormState
   }
 
   refresh(companyId, true);
-  const back = data.returnTo === "invoice" && invoice ? `/c/${slug}/invoices/${invoice.id}?paid=1` : `/c/${slug}/finance/receipts?saved=1`;
-  redirect(back);
+  redirect(`/c/${slug}/finance/vouchers?saved=${receiptId}`);
 }
 
 export async function deleteReceipt(companySlug: string, receiptId: string): Promise<{ error?: string }> {
@@ -180,7 +180,7 @@ export async function createVoucher(companySlug: string, _prev: FinanceFormState
   if (data.kind === "TRANSFER" && (!counterIsMoney || counter.id === moneyAcc.id)) return { error: "Transfer to a different cash box or bank account." };
   if (data.kind !== "TRANSFER" && counterIsMoney) return { error: "To move money between cash and bank, use a transfer." };
   if (data.kind !== "TRANSFER" && (counter.kind === "RECEIVABLE" || counter.kind === "PAYABLE")) {
-    return { error: "Customer and supplier payments are recorded on the invoice or the supplier bill." };
+    return { error: "For customers and suppliers, use Customer payment or Pay a supplier on this page." };
   }
 
   const amount = round2(data.amount);

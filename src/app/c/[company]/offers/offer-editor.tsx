@@ -48,6 +48,8 @@ export type CustomerOption = {
   address: string | null;
 };
 
+const MAX_PICKER_ROWS = 100;
+
 const INCOTERMS: [string, string][] = [
   ["EXW", "Ex works"], ["FCA", "Free carrier"], ["FOB", "Free on board"], ["CFR", "Cost and freight"], ["CIF", "Cost, insurance and freight"],
   ["CPT", "Carriage paid to"], ["CIP", "Carriage and insurance paid to"], ["DAP", "Delivered at place"], ["DPU", "Delivered at place unloaded"], ["DDP", "Delivered duty paid"],
@@ -202,6 +204,8 @@ export function OfferEditor({
   const [customerOpen, setCustomerOpen] = useState(false);
   const [customerHighlight, setCustomerHighlight] = useState(0);
   const searchInput = useRef<HTMLInputElement>(null);
+  const pickerList = useRef<HTMLUListElement>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const set = <K extends keyof typeof header>(key: K, value: (typeof header)[K]) => {
     setHeader((h) => ({ ...h, [key]: value }));
@@ -220,18 +224,30 @@ export function OfferEditor({
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
-  const suggestions = useMemo(() => {
+  // The whole catalogue when browsing (nothing typed), narrowed down as you type.
+  const matching = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return [];
+    const words = q.split(/\s+/).filter(Boolean);
     return catalogue
-      .filter((c) => c.name.toLowerCase().includes(q) || c.code.startsWith(q) || c.barcodes.includes(q))
-      .slice(0, 8);
+      .filter((c) => {
+        if (!q || c.code.startsWith(q) || c.barcodes.includes(q)) return true;
+        const name = c.name.toLowerCase();
+        return words.every((w) => name.includes(w));
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [search, catalogue]);
+  const suggestions = useMemo(() => (pickerOpen ? matching.slice(0, MAX_PICKER_ROWS) : []), [matching, pickerOpen]);
+
+  // Keep the row chosen with the arrow keys in view.
+  useEffect(() => {
+    pickerList.current?.children[highlight]?.scrollIntoView({ block: "nearest" });
+  }, [highlight]);
 
   function addLine(line: Omit<Line, "key">) {
     setLines((ls) => [...ls, { ...line, key: nextKey.current++ }]);
     setSearch("");
     setHighlight(0);
+    setPickerOpen(false);
     setDirty(true);
     searchInput.current?.focus();
   }
@@ -279,11 +295,19 @@ export function OfferEditor({
     });
 
   function onSearchKey(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "ArrowDown") setHighlight((h) => Math.min(h + 1, suggestions.length - 1));
-    if (e.key === "ArrowUp") setHighlight((h) => Math.max(h - 1, 0));
+    if (e.key === "Escape") setPickerOpen(false);
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!pickerOpen) return setPickerOpen(true);
+      if (e.key === "ArrowDown") setHighlight((h) => Math.min(h + 1, suggestions.length - 1));
+      else setHighlight((h) => Math.max(h - 1, 0));
+    }
     if (e.key !== "Enter") return;
     const q = search.trim();
-    if (!q) return;
+    if (!q) {
+      if (suggestions[highlight]) fromCatalogue(suggestions[highlight]);
+      return;
+    }
     if (e.shiftKey) return sectionLine(q);
     const exact = catalogue.find((c) => c.code === q || c.barcodes.includes(q));
     const pick = exact ?? suggestions[highlight];
@@ -639,12 +663,28 @@ export function OfferEditor({
             onChange={(e) => {
               setSearch(e.target.value);
               setHighlight(0);
+              setPickerOpen(true);
             }}
+            onClick={() => setPickerOpen(true)}
+            onBlur={() => setPickerOpen(false)}
             onKeyDown={onSearchKey}
             data-shortcut-search
-            placeholder="Add a service or product by name or code, then Enter  ( / )"
+            autoComplete="off"
+            placeholder="Click to choose a product or service, or type a name or code  ( / )"
             className={`${inputClass} mt-0 min-w-[16rem] flex-1`}
           />
+          <button
+            type="button"
+            aria-expanded={pickerOpen}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              setPickerOpen((o) => !o);
+              searchInput.current?.focus();
+            }}
+            className={secondaryButton}
+          >
+            Browse products
+          </button>
           <button type="button" onClick={() => customLine()} className={secondaryButton}>
             + Custom line
           </button>
@@ -655,12 +695,19 @@ export function OfferEditor({
             <Kbd>Enter</Kbd> adds the selected item, or a custom line with what you typed if nothing matches.{" "}
             <Kbd>Shift Enter</Kbd> adds it as a section heading.
           </p>
+          {pickerOpen && !search.trim() && catalogue.length === 0 && (
+            <p className="absolute left-4 right-4 top-[3.75rem] z-10 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-muted shadow-lg">
+              No products or services yet. Add them under Stock or Services.
+            </p>
+          )}
           {suggestions.length > 0 && (
-            <ul className="absolute left-4 right-4 top-[3.75rem] z-10 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+            <ul ref={pickerList} className="absolute left-4 right-4 top-[3.75rem] z-10 max-h-80 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg">
               {suggestions.map((c, i) => (
                 <li key={c.id}>
                   <button
                     type="button"
+                    tabIndex={-1}
+                    onMouseDown={(e) => e.preventDefault()}
                     onMouseEnter={() => setHighlight(i)}
                     onClick={() => fromCatalogue(c)}
                     className={`flex w-full items-center justify-between gap-4 px-3 py-2 text-left text-sm ${i === highlight ? "bg-background" : ""}`}
@@ -678,6 +725,11 @@ export function OfferEditor({
                   </button>
                 </li>
               ))}
+              {matching.length > MAX_PICKER_ROWS && (
+                <li className="px-3 py-2 text-xs text-muted">
+                  Showing {MAX_PICKER_ROWS} of {matching.length}. Type a name or code to find the rest.
+                </li>
+              )}
             </ul>
           )}
         </div>

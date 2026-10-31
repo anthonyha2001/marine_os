@@ -132,7 +132,7 @@ async function loadVouchers(companyId: string) {
   "use cache";
   cacheTag(DATA_TAG, ledgerTag(companyId));
   cacheLife("hours");
-  const [rows, supplierPayments, payable] = await Promise.all([
+  const [rows, supplierPayments, receipts, payable, receivable] = await Promise.all([
     prisma.voucher.findMany({
       where: { companyId },
       include: {
@@ -150,15 +150,21 @@ async function loadVouchers(companyId: string) {
         createdBy: { select: { name: true } },
       },
     }),
+    prisma.customerReceipt.findMany({
+      where: { companyId },
+      include: { invoice: { select: { id: true, number: true } }, moneyAccount: { select: { code: true, name: true } }, createdBy: { select: { name: true } } },
+    }),
     prisma.ledgerAccount.findFirst({ where: { companyId, kind: "PAYABLE" }, select: { code: true, name: true } }),
+    prisma.ledgerAccount.findFirst({ where: { companyId, kind: "RECEIVABLE" }, select: { code: true, name: true } }),
   ]);
-  // Payments of supplier bills are payment vouchers too (PV series), recorded on the bill.
+  // Payments of supplier bills are payment vouchers too (PV series).
   const fromBills = supplierPayments.map((p) => ({
     id: p.id,
     number: p.number!,
     kind: "PAYMENT" as const,
     source: "SUPPLIER_PAYMENT" as const,
     purchaseId: p.purchase.id,
+    invoiceId: null as string | null,
     date: p.paidAt,
     moneyAccount: p.moneyAccount ? `${p.moneyAccount.code} ${p.moneyAccount.name}` : "—",
     counterAccount: payable ? `${payable.code} ${payable.name}` : "Suppliers",
@@ -174,6 +180,30 @@ async function loadVouchers(companyId: string) {
     status: p.status as "POSTED" | "CANCELLED",
     cancelReason: p.cancelReason,
     cancelledByName: p.cancelledByName,
+  }));
+  // Money from customers is a receipt voucher (RV series; older ones keep their RC numbers).
+  const fromCustomers = receipts.map((r) => ({
+    id: r.id,
+    number: r.number,
+    kind: "RECEIPT" as const,
+    source: "RECEIPT" as const,
+    purchaseId: null as string | null,
+    invoiceId: r.invoice?.id ?? null,
+    date: r.receivedAt,
+    moneyAccount: `${r.moneyAccount.code} ${r.moneyAccount.name}`,
+    counterAccount: receivable ? `${receivable.code} ${receivable.name}` : "Customers",
+    partyName: r.customerName as string | null,
+    description: `${r.invoice ? `Payment of invoice ${r.invoice.number}` : "Customer payment on account"}${r.notes ? ` · ${r.notes}` : ""}`,
+    amountHT: Number(r.amount),
+    vatAmount: 0,
+    amount: Number(r.amount),
+    method: r.method,
+    reference: r.reference,
+    createdByName: r.createdBy.name,
+    createdAt: r.createdAt,
+    status: r.status as "POSTED" | "CANCELLED",
+    cancelReason: r.cancelReason,
+    cancelledByName: r.cancelledByName,
   }));
   const vouchers = rows.map((v) => ({
     id: v.id,
@@ -191,13 +221,14 @@ async function loadVouchers(companyId: string) {
     reference: v.reference,
     createdByName: v.createdBy.name,
     createdAt: v.createdAt,
-    source: "VOUCHER" as "VOUCHER" | "SUPPLIER_PAYMENT",
+    source: "VOUCHER" as "VOUCHER" | "SUPPLIER_PAYMENT" | "RECEIPT",
     status: v.status as "POSTED" | "CANCELLED",
     cancelReason: v.cancelReason,
     cancelledByName: v.cancelledByName,
     purchaseId: null as string | null,
+    invoiceId: null as string | null,
   }));
-  return [...vouchers, ...fromBills].sort((a, b) => b.date.getTime() - a.date.getTime() || b.number.localeCompare(a.number));
+  return [...vouchers, ...fromBills, ...fromCustomers].sort((a, b) => b.date.getTime() - a.date.getTime() || b.number.localeCompare(a.number));
 }
 
 export async function listVouchers(slug: CompanySlug) {

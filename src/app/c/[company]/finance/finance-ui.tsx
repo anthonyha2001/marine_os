@@ -73,7 +73,7 @@ export function LinkTabs({ tabs, active }: { tabs: { key: string; label: string;
 }
 
 /** Link to the document behind a journal entry, when there is a page for it. */
-export function sourceHref(slug: string, sourceType: string, sourceId: string | null, ctx: { purchaseByPayment?: Map<string, string> } = {}) {
+export function sourceHref(slug: string, sourceType: string, sourceId: string | null) {
   if (!sourceId) return null;
   switch (sourceType) {
     case "INVOICE":
@@ -92,11 +92,9 @@ export function sourceHref(slug: string, sourceType: string, sourceId: string | 
     case "POS_SHIFT":
       return `/c/${slug}/pos/shifts/${sourceId}`;
     case "VOUCHER":
+    case "SUPPLIER_PAYMENT":
+    case "RECEIPT":
       return `/c/${slug}/finance/vouchers/${sourceId}/pdf`;
-    case "SUPPLIER_PAYMENT": {
-      const purchaseId = ctx.purchaseByPayment?.get(sourceId);
-      return purchaseId ? `/c/${slug}/purchases/${purchaseId}` : null;
-    }
     default:
       return null;
   }
