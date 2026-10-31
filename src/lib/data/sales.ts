@@ -214,6 +214,7 @@ async function loadInvoices(companyId: string) {
       customerId: true,
       customerName: true,
       invoiceDate: true,
+      vesselId: true,
       dueDate: true,
       status: true,
       totalTTC: true,

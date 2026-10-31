@@ -93,6 +93,7 @@ export const NAV: NavGroup[] = [
       { label: "Customers", path: "customers", module: "customers", icon: "customers" },
       { label: "Vessels", path: "vessels", module: "customers", icon: "vessels" },
       { label: "Customer statements", tab: "Statements", path: "finance/statements", module: "accounting", icon: "statements" },
+      { label: "Customer messages", tab: "Messages", path: "customers/messages", module: "customers", icon: "customers" },
       { label: "New customer", path: "customers?new=1", module: "customers", hidden: true, create: true },
       { label: "New vessel", path: "vessels?new=1", module: "customers", hidden: true, create: true },
     ],

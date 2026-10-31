@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { requireCompany } from "@/lib/auth";
 import { noticesFor } from "@/lib/data/notices";
+import { threadCounts } from "@/lib/data/portal-inbox";
 import { navFor, visibleNav } from "@/lib/navigation";
 import { COMPANIES, ROLE_LABELS, allowedCompanies, canAccessModule } from "@/lib/permissions";
 import { AppShell } from "./shell/app-shell";
@@ -10,7 +11,11 @@ async function Shell({ params, children }: { params: Promise<{ company: string }
   const { company } = await params;
   const { user, slug } = await requireCompany(company);
   const groups = navFor(user, slug);
-  const [notices, jar] = await Promise.all([noticesFor(user, slug), cookies()]);
+  const [notices, jar, threads] = await Promise.all([
+    noticesFor(user, slug),
+    cookies(),
+    canAccessModule(user, slug, "customers") ? threadCounts(slug) : { unread: 0 },
+  ]);
   const option = (s: keyof typeof COMPANIES) => ({ slug: s, name: COMPANIES[s].name, logo: COMPANIES[s].mark });
 
   return (
@@ -22,6 +27,7 @@ async function Shell({ params, children }: { params: Promise<{ company: string }
       companies={allowedCompanies(user).map(option)}
       user={{ name: user.name, email: user.email, roleLabel: ROLE_LABELS[user.role] }}
       notices={notices}
+      tabCounts={{ "customers/messages": threads.unread }}
       canPay={canAccessModule(user, slug, "accounting")}
       initialCollapsed={jar.get("sidebar")?.value === "collapsed"}
     >

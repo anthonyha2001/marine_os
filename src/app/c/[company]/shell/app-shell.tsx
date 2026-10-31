@@ -27,6 +27,7 @@ export function AppShell({
   notices,
   initialCollapsed,
   canPay,
+  tabCounts,
   children,
 }: {
   base: string;
@@ -38,6 +39,7 @@ export function AppShell({
   notices: Notice[];
   initialCollapsed: boolean;
   canPay: boolean; // accounting: payment pop-ups (?pay=…) open on any page
+  tabCounts: Record<string, number>; // red counters on page tabs, by page path (e.g. unread customer messages)
   children: React.ReactNode;
 }) {
   const [drawer, setDrawer] = useState(false);
@@ -86,7 +88,7 @@ export function AppShell({
           onToggleMenu={toggle}
         />
         <main className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
-          <SectionTabs base={base} groups={sidebarGroups} />
+          <SectionTabs base={base} groups={sidebarGroups} counts={tabCounts} />
           {children}
         </main>
       </div>

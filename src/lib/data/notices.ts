@@ -10,6 +10,7 @@ import { listTransfers } from "@/lib/data/stock-ops";
 import { isOpenCheque, listCheques } from "@/lib/data/cheques";
 import { listAppointments } from "@/lib/data/appointments";
 import { listJobCards, listWarranties, warrantyState } from "@/lib/data/workshop";
+import { threadCounts } from "@/lib/data/portal-inbox";
 import { formatMoney, round2 } from "@/lib/money";
 import { canAccessModule, type CompanySlug } from "@/lib/permissions";
 
@@ -42,6 +43,11 @@ export async function noticesFor(user: SessionUser, slug: CompanySlug): Promise<
     can("offers") ? listOffers(slug) : [],
   ]);
   const notices: Notice[] = [];
+
+  // Customers writing from their portal come first: they are waiting for an answer.
+  const threads = can("customers") ? await threadCounts(slug) : { unread: 0 };
+  if (threads.unread)
+    notices.push({ label: `${plural(threads.unread, "new customer message")}`, detail: "From the customer portal: questions, quotes, claims", href: `${base}/customers/messages`, tone: "red" });
 
   const overdueInvoices = invoices.filter((i) => i.balance > 0 && iso(i.dueDate) < todayIso);
   if (overdueInvoices.length) {

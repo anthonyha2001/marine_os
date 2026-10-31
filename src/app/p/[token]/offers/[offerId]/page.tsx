@@ -10,8 +10,8 @@ async function PortalOffer({ params }: { params: Promise<{ token: string; offerI
   if (!offer) return <p className="text-muted">This link is no longer valid. Please contact us.</p>;
   return (
     <>
-      <Link href={`/p/${token}`} className="text-sm text-brand hover:underline">
-        ← Back to my portal
+      <Link href={`/p/${token}/offers`} className="text-sm text-brand hover:underline">
+        ← Offers
       </Link>
       <div className="mt-4">
         <OfferView

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { activePage, type NavGroup } from "@/lib/navigation";
 
 /** The pages of the current sidebar section, as tabs above the page. Shown on list pages only, not on a document. */
-export function SectionTabs({ base, groups }: { base: string; groups: NavGroup[] }) {
+export function SectionTabs({ base, groups, counts = {} }: { base: string; groups: NavGroup[]; counts?: Record<string, number> }) {
   const pathname = usePathname();
   const current = activePage(groups, base, pathname);
   if (!current || current.group.items.length < 2 || current.href !== pathname) return null;
@@ -26,6 +26,7 @@ export function SectionTabs({ base, groups }: { base: string; groups: NavGroup[]
             }`}
           >
             {item.tab ?? item.label}
+            {(counts[item.path] ?? 0) > 0 && <span className="ml-1.5 rounded-full bg-danger px-1.5 py-0.5 text-[10px] font-semibold text-white">{counts[item.path]}</span>}
           </Link>
         );
       })}

@@ -21,8 +21,10 @@ async function SharedOffer({ params }: { params: Promise<{ shareToken: string }>
 
 export default function SharedOfferPage({ params }: PageProps<"/p/o/[shareToken]">) {
   return (
-    <Suspense fallback={<p className="text-muted">Loading…</p>}>
-      <SharedOffer params={params} />
-    </Suspense>
+    <div className="mx-auto max-w-4xl px-4 py-8">
+      <Suspense fallback={<p className="text-muted">Loading…</p>}>
+        <SharedOffer params={params} />
+      </Suspense>
+    </div>
   );
 }

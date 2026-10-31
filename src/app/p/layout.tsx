@@ -9,7 +9,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   return (
     <div data-company="xpert-marine" className="min-h-screen bg-background">
       <header className="border-b border-border bg-surface">
-        <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-4 py-3">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-4">
             <CompanyLogo slug="xpert-marine" className="h-9 w-auto" />
             <span className="h-6 w-px bg-border" aria-hidden />
@@ -19,7 +19,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         </div>
       </header>
       <FeedbackProvider>
-        <main className="mx-auto max-w-4xl px-4 py-8">{children}</main>
+        <main>{children}</main>
       </FeedbackProvider>
     </div>
   );

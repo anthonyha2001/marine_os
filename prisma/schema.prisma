@@ -66,6 +66,7 @@ model Company {
   websiteListings  WebsiteListing[]
   websiteImages    WebsiteImage[]
   websiteMessages  WebsiteMessage[]
+  portalThreads    PortalThread[]
 }
 
 model User {
@@ -127,18 +128,19 @@ model Customer {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  serials      ProductSerial[]
-  cheques      Cheque[]
-  offers       Offer[]
-  invoices     Invoice[]
-  receipts     CustomerReceipt[]
-  creditNotes  CreditNote[]
-  journalLines JournalLine[]
-  posSales     PosSale[]
-  vessels      Vessel[]
-  jobCards     JobCard[]
-  warranties   Warranty[]
-  appointments Appointment[]
+  serials       ProductSerial[]
+  cheques       Cheque[]
+  offers        Offer[]
+  invoices      Invoice[]
+  receipts      CustomerReceipt[]
+  creditNotes   CreditNote[]
+  journalLines  JournalLine[]
+  posSales      PosSale[]
+  vessels       Vessel[]
+  jobCards      JobCard[]
+  warranties    Warranty[]
+  appointments  Appointment[]
+  portalThreads PortalThread[]
 }
 
 model Offer {
@@ -991,15 +993,17 @@ model Vessel {
 }
 
 model VesselEngine {
-  id           String  @id @default(cuid())
+  id           String    @id @default(cuid())
   vesselId     String
-  vessel       Vessel  @relation(fields: [vesselId], references: [id], onDelete: Cascade)
+  vessel       Vessel    @relation(fields: [vesselId], references: [id], onDelete: Cascade)
   position     String // Port, Starboard, Main, Generator, Outboard…
   make         String?
   model        String?
   serialNumber String?
   year         Int?
   hours        Int? // last known running hours
+  hoursAt      DateTime? // when the hours were last updated
+  hoursBy      String? // who updated them (a staff name, or "Customer" from the portal)
   notes        String?
 
   @@index([vesselId])
@@ -1517,4 +1521,39 @@ model WebsiteMessage {
   createdAt     DateTime  @default(now())
 
   @@index([companyId, createdAt])
+}
+
+/// A conversation between a customer (portal) and one company: questions, quote requests,
+/// warranty claims, engine-hour updates. Staff answer from Customers → Messages.
+model PortalThread {
+  id             String          @id @default(cuid())
+  companyId      String
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customerId     String
+  customer       Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  subject        String
+  topic          String          @default("QUESTION") // QUESTION | QUOTE | CLAIM | SERVICE | INFO
+  vesselId       String?
+  warrantyId     String?
+  status         String          @default("OPEN") // OPEN | CLOSED
+  staffUnread    Boolean         @default(true)
+  customerUnread Boolean         @default(false)
+  lastMessageAt  DateTime        @default(now())
+  createdAt      DateTime        @default(now())
+  messages       PortalMessage[]
+
+  @@index([companyId, lastMessageAt])
+  @@index([customerId, lastMessageAt])
+}
+
+model PortalMessage {
+  id           String       @id @default(cuid())
+  threadId     String
+  thread       PortalThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  fromCustomer Boolean
+  authorName   String
+  body         String
+  createdAt    DateTime     @default(now())
+
+  @@index([threadId, createdAt])
 }
