@@ -11,7 +11,7 @@ export function SectionTabs({ base, groups }: { base: string; groups: NavGroup[]
   if (!current || current.group.items.length < 2 || current.href !== pathname) return null;
 
   return (
-    <nav aria-label={`${current.group.title} pages`} className="-mt-2 mb-5 flex gap-1 overflow-x-auto border-b border-border">
+    <nav aria-label={`${current.group.title} pages`} className="-mt-2 mb-5 flex gap-1 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-border)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {current.group.items.map((item) => {
         const href = `${base}/${item.path}`;
         const on = href === current.href;
@@ -21,7 +21,7 @@ export function SectionTabs({ base, groups }: { base: string; groups: NavGroup[]
             href={href}
             aria-current={on ? "page" : undefined}
             title={item.shortcut ? `${item.label} (${item.shortcut})` : undefined}
-            className={`-mb-px whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm font-medium transition ${
+            className={`whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm font-medium transition ${
               on ? "border-brand text-navy" : "border-transparent text-muted hover:border-slate-300 hover:text-navy"
             }`}
           >

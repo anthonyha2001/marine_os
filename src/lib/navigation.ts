@@ -69,7 +69,7 @@ export const NAV: NavGroup[] = [
     title: "Dashboard",
     icon: "dashboard",
     items: [
-      { label: "Dashboard", tab: "Today", path: "dashboard", module: "dashboard", icon: "dashboard", shortcut: "F8" },
+      { label: "Dashboard", tab: "Today", path: "dashboard", module: "dashboard", icon: "dashboard" },
       { label: "Owner dashboard", tab: "Owner view", path: "owner", module: "owner", icon: "owner" },
     ],
   },
@@ -77,10 +77,10 @@ export const NAV: NavGroup[] = [
     title: "Sales",
     icon: "offers",
     items: [
-      { label: "Offers", path: "offers", module: "offers", icon: "offers", shortcut: "Shift+F6" },
-      { label: "Invoices", path: "invoices", module: "invoices", icon: "invoices", shortcut: "Shift+F7" },
+      { label: "Offers", path: "offers", module: "offers", icon: "offers" },
+      { label: "Invoices", path: "invoices", module: "invoices", icon: "invoices" },
       { label: "Credit notes", path: "finance/credit-notes", module: "invoices", icon: "creditNotes" },
-      { label: "New offer", path: "offers/new", module: "offers", shortcut: "Shift+F2", hidden: true, create: true },
+      { label: "New offer", path: "offers/new", module: "offers", hidden: true, create: true },
       { label: "New invoice", path: "invoices?new=1", module: "invoices", hidden: true, create: true },
     ],
   },
@@ -88,7 +88,7 @@ export const NAV: NavGroup[] = [
     title: "Customers",
     icon: "customers",
     items: [
-      { label: "Customers", path: "customers", module: "customers", icon: "customers", shortcut: "Shift+F4" },
+      { label: "Customers", path: "customers", module: "customers", icon: "customers" },
       { label: "Vessels", path: "vessels", module: "customers", icon: "vessels" },
       { label: "Statements", path: "finance/statements", module: "accounting", icon: "statements" },
       { label: "New customer", path: "customers?new=1", module: "customers", hidden: true, create: true },
@@ -110,7 +110,7 @@ export const NAV: NavGroup[] = [
     title: "Point of sale",
     icon: "pos",
     items: [
-      { label: "Point of sale", tab: "Till", path: "pos", module: "sales", icon: "pos", shortcut: "Shift+F9", companies: POS_COMPANIES },
+      { label: "Point of sale", tab: "Till", path: "pos", module: "sales", icon: "pos", companies: POS_COMPANIES },
       { label: "Counter sales", tab: "Sales", path: "pos/sales", module: "sales", icon: "posSales", companies: POS_COMPANIES },
       { label: "Shifts & reports", tab: "Shifts", path: "pos/shifts", module: "sales", icon: "posShifts", companies: POS_COMPANIES },
       { label: "Prices & margins", tab: "Prices", path: "pos/prices", module: "posAdmin", icon: "posPrices", companies: POS_COMPANIES },
@@ -121,25 +121,25 @@ export const NAV: NavGroup[] = [
     title: "Purchasing",
     icon: "purchases",
     items: [
-      { label: "Purchase orders", path: "purchase-orders", module: "purchases", icon: "purchaseOrders", shortcut: "Shift+F3" },
-      { label: "Purchases", path: "purchases", module: "purchases", icon: "purchases", shortcut: "F7" },
-      { label: "Suppliers", path: "suppliers", module: "suppliers", icon: "suppliers", shortcut: "F4" },
+      { label: "Purchase orders", path: "purchase-orders", module: "purchases", icon: "purchaseOrders" },
+      { label: "Purchases", path: "purchases", module: "purchases", icon: "purchases" },
+      { label: "Suppliers", path: "suppliers", module: "suppliers", icon: "suppliers" },
       { label: "New purchase order", path: "purchase-orders/new", module: "purchases", hidden: true, create: true },
-      { label: "New purchase", path: "purchases/new", module: "purchases", shortcut: "F3", hidden: true, create: true },
+      { label: "New purchase", path: "purchases/new", module: "purchases", hidden: true, create: true },
     ],
   },
   {
     title: "Stock",
     icon: "stock",
     items: [
-      { label: "Stock", tab: "Products", path: "inventory", module: "inventory", icon: "stock", shortcut: "F6" },
-      { label: "Services", path: "services", module: "services", icon: "services", shortcut: "F10" },
+      { label: "Stock", tab: "Products", path: "inventory", module: "inventory", icon: "stock" },
+      { label: "Services", path: "services", module: "services", icon: "services" },
       { label: "Serial numbers", path: "inventory/serials", module: "inventory", icon: "serials" },
       { label: "Stock counts", path: "inventory/counts", module: "inventory", icon: "stockCounts" },
       { label: "Transfers", path: "inventory/transfers", module: "inventory", icon: "transfers" },
       // New product / New service open a pop-up on their list page.
-      { label: "New product", path: "inventory?new=1", module: "inventory", shortcut: "F2", hidden: true, create: true },
-      { label: "New service", path: "services?new=1", module: "services", shortcut: "F9", hidden: true, create: true },
+      { label: "New product", path: "inventory?new=1", module: "inventory", hidden: true, create: true },
+      { label: "New service", path: "services?new=1", module: "services", hidden: true, create: true },
     ],
   },
   {
@@ -159,7 +159,7 @@ export const NAV: NavGroup[] = [
     title: "Accounting",
     icon: "accounting",
     items: [
-      { label: "Accounting overview", tab: "Overview", path: "accounting", module: "accounting", icon: "accounting", shortcut: "Shift+F8" },
+      { label: "Accounting overview", tab: "Overview", path: "accounting", module: "accounting", icon: "accounting" },
       { label: "Reports", path: "finance/reports", module: "accounting", icon: "reports" },
       { label: "Profit", path: "finance/profit", module: "accounting", icon: "profit" },
       { label: "Journal", path: "finance/journal", module: "accounting", icon: "journal" },

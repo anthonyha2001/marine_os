@@ -8,7 +8,7 @@ import { Kbd } from "@/components/ui";
 
 /*
  * Global shortcuts for the company workspace.
- *   F2–F10, Shift+F2/F4/F6   jump to a screen (see src/lib/navigation.ts)
+ *   screen shortcuts   any `shortcut` set in src/lib/navigation.ts (none for now)
  *   Ctrl+S         save the form marked data-save-shortcut
  *   Ctrl+Shift+S   "save & add another" (button marked data-save-new)
  *   /              focus the search box marked data-shortcut-search
@@ -133,15 +133,19 @@ export function KeyboardShortcuts({ base, groups }: { base: string; groups: NavG
               </button>
             </div>
 
-            <h3 className="mt-5 text-xs font-semibold uppercase tracking-wider text-muted">Go to</h3>
-            <ul className="mt-2 divide-y divide-border">
-              {items.map((i) => (
-                <li key={i.path} className="flex items-center justify-between py-2 text-sm">
-                  {i.label}
-                  <Kbd className="text-xs">{i.shortcut}</Kbd>
-                </li>
-              ))}
-            </ul>
+            {items.length > 0 && (
+              <>
+                <h3 className="mt-5 text-xs font-semibold uppercase tracking-wider text-muted">Go to</h3>
+                <ul className="mt-2 divide-y divide-border">
+                  {items.map((i) => (
+                    <li key={i.path} className="flex items-center justify-between py-2 text-sm">
+                      {i.label}
+                      <Kbd className="text-xs">{i.shortcut}</Kbd>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
 
             <h3 className="mt-5 text-xs font-semibold uppercase tracking-wider text-muted">On forms</h3>
             <ul className="mt-2 divide-y divide-border">

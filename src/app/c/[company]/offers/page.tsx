@@ -61,7 +61,7 @@ async function OffersContent({
 
       <div className={`${cardClass} mt-4 overflow-x-auto`}>
         {offers.length === 0 ? (
-          <p className="p-10 text-center text-muted">{q ? "No offers match this search." : "No offers yet. Press Shift+F2 to create one."}</p>
+          <p className="p-10 text-center text-muted">{q ? "No offers match this search." : "No offers yet. Use + New to create one."}</p>
         ) : (
           <table className="w-full min-w-[52rem] text-left text-sm">
             <thead className="border-b border-border text-xs uppercase tracking-wider text-muted">

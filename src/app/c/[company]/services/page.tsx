@@ -45,7 +45,7 @@ async function ServicesContent({
 
       <div className={`${cardClass} mt-4 overflow-x-auto`}>
         {services.length === 0 ? (
-          <p className="p-10 text-center text-muted">{q ? "No services match this search." : "No services yet. Press F9 to add one."}</p>
+          <p className="p-10 text-center text-muted">{q ? "No services match this search." : "No services yet. Use + New to add one."}</p>
         ) : (
           <table className="w-full min-w-[44rem] text-left text-sm">
             <thead className="border-b border-border text-xs uppercase tracking-wider text-muted">

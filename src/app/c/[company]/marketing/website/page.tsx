@@ -47,14 +47,14 @@ async function Editor({ params, searchParams }: { params: Promise<{ company: str
         </span>
       </div>
 
-      <nav className="mt-6 flex gap-1 overflow-x-auto border-b border-border" aria-label="Website sections">
+      <nav className="mt-6 flex gap-1 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-border)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Website sections">
         {TABS.map(([key, label]) => (
           <Link
             key={key}
             href={`${base}?tab=${key}`}
             scroll={false}
             aria-current={tab === key ? "page" : undefined}
-            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium ${tab === key ? "border-brand text-brand" : "border-transparent text-muted hover:text-navy"}`}
+            className={`whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium ${tab === key ? "border-brand text-brand" : "border-transparent text-muted hover:text-navy"}`}
           >
             {label}
             {key === "messages" && unread > 0 && <span className="ml-1.5 rounded-full bg-danger px-1.5 py-0.5 text-[10px] font-semibold text-white">{unread}</span>}
