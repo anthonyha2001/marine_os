@@ -94,6 +94,7 @@ export function Topbar({
         {creates.length > 0 && (
           <Dropdown
             label="Create new"
+            openEvent="marine:new"
             width="w-64"
             button={
               <span className="flex h-8 items-center gap-1.5 rounded-lg bg-navy px-3 text-sm font-medium text-white shadow-sm">
@@ -107,7 +108,7 @@ export function Topbar({
                   <div key={g.title} className="py-1">
                     <p className="px-4 pb-1 pt-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted">{g.title}</p>
                     {g.items.map((i) => (
-                      <Link key={i.path} href={`${base}/${i.path}`} onClick={close} className="flex items-center justify-between px-4 py-2 text-sm text-slate-700 hover:bg-surface-2 hover:text-navy">
+                      <Link key={i.path} href={`${base}/${i.path}`} onClick={close} data-nav-row className="flex items-center justify-between px-4 py-2 text-sm text-slate-700 hover:bg-surface-2 hover:text-navy">
                         {i.label}
                         {i.shortcut && <kbd className="rounded border border-border px-1.5 font-mono text-[10px] text-muted">{i.shortcut}</kbd>}
                       </Link>

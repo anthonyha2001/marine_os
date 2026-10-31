@@ -94,7 +94,7 @@ async function CustomersContent({
       <section className={`${cardClass} mt-4 divide-y divide-border`}>
         {customers.length === 0 && <p className="p-10 text-center text-muted">No customers yet.</p>}
         {customers.map((c) => (
-          <Link key={c.id} href={`${base}/${c.id}`} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5 hover:bg-background/60">
+          <Link key={c.id} href={`${base}/${c.id}`} data-nav-row className="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5 hover:bg-background/60">
             <span>
               <span className="block font-medium text-navy">{c.name}</span>
               <span className="block text-xs text-muted">{[c.contactName, c.phone, c.email].filter(Boolean).join(" · ") || "No details"}</span>

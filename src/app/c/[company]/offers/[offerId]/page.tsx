@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Hammer } from "lucide-react";
 import { requireModule } from "@/lib/auth";
-import { createJobCardFromOffer } from "@/lib/actions/workshop";
+import { JobCardDialog, OfferJobsDialog } from "@/components/job-dialogs";
 import { reviseOffer } from "@/lib/actions/offers";
 import { ShareOfferButton } from "@/components/share-link";
 import { listJobCards } from "@/lib/data/workshop";
@@ -24,19 +24,23 @@ import { OfferToolbar } from "./offer-toolbar";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
+type Search = { saved?: string; invoiced?: string; invoice?: string; related?: string; job?: string };
+
 async function OfferPage({
   params,
   searchParams,
 }: {
   params: Promise<{ company: string; offerId: string }>;
-  searchParams: Promise<{ saved?: string; invoiced?: string; invoice?: string }>;
+  searchParams: Promise<Search>;
 }) {
-  const [{ company, offerId }, { saved, invoiced, invoice }] = await Promise.all([params, searchParams]);
+  const [{ company, offerId }, { saved, invoiced, invoice, related, job }] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "offers");
   const canWorkshop = canAccessModule(user, slug, "workshop");
   const [offer, data, jobs] = await Promise.all([getOffer(slug, offerId), offerEditorData(slug), canWorkshop ? listJobCards(slug) : []]);
   if (!offer) notFound();
   const offerJobs = jobs.filter((j) => j.offer?.id === offer.id);
+  const here = `/c/${slug}/offers/${offer.id}`;
+  const jobsHref = `${here}?related=jobs`;
 
   return (
     <>
@@ -54,12 +58,11 @@ async function OfferPage({
               </button>
             </form>
             {offer.status !== "REJECTED" && <ShareOfferButton companySlug={slug} offerId={offer.id} />}
-            {canWorkshop && offer.status === "ACCEPTED" && (
-              <form action={createJobCardFromOffer.bind(null, slug, offer.id)}>
-                <button type="submit" className={secondaryButton}>
-                  <Hammer className="size-4" aria-hidden /> Start job card
-                </button>
-              </form>
+            {canWorkshop && (offerJobs.length > 0 || offer.status === "ACCEPTED") && (
+              <Link href={jobsHref} scroll={false} className={secondaryButton}>
+                <Hammer className="size-4" aria-hidden /> Job cards
+                <span className={`rounded-full px-1.5 text-xs font-semibold ${offerJobs.length ? "bg-brand text-white" : "bg-surface-2 text-muted"}`}>{offerJobs.length}</span>
+              </Link>
             )}
             {offer.invoiceCount === 0 && (isAdmin(user) || (offer.status === "DRAFT" && can(user, "deleteDrafts"))) && (
               <DeleteButton
@@ -78,15 +81,18 @@ async function OfferPage({
           {offer.customerNote && <span className="block text-muted">“{offer.customerNote}”</span>}
         </p>
       )}
-      {offerJobs.length > 0 && (
-        <p className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted">
-          Job cards for this offer:
-          {offerJobs.map((j) => (
-            <Link key={j.id} href={`/c/${slug}/workshop/${j.id}`} className="font-mono text-xs text-brand hover:underline">
-              {j.number}
-            </Link>
-          ))}
-        </p>
+      {canWorkshop && related === "jobs" && !job && (
+        <OfferJobsDialog slug={slug} offer={offer} jobs={offerJobs} closeHref={here} selfHref={jobsHref} />
+      )}
+      {canWorkshop && related === "jobs" && job && (
+        <JobCardDialog
+          slug={slug}
+          id={job}
+          closeHref={jobsHref}
+          selfHref={`${jobsHref}&job=${job}`}
+          canInvoice={canAccessModule(user, slug, "invoices")}
+          invoicing={invoice === "1"}
+        />
       )}
       {invoiced && (
         <p role="status" className="mt-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-success">
@@ -149,7 +155,7 @@ async function OfferPage({
 export default function OfferDetailPage({ params, searchParams }: PageProps<"/c/[company]/offers/[offerId]">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading…</p>}>
-      <OfferPage params={params} searchParams={searchParams as Promise<{ saved?: string; invoiced?: string; invoice?: string }>} />
+      <OfferPage params={params} searchParams={searchParams as Promise<Search>} />
     </Suspense>
   );
 }

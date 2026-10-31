@@ -99,3 +99,10 @@ main table tbody tr {
 main table tbody tr:hover {
   background: #f8fafc;
 }
+
+/* Row picked with ↑ / ↓ (see shell/row-keys.tsx). */
+[data-row-active] {
+  background-color: var(--brand-soft) !important;
+  box-shadow: inset 3px 0 0 var(--brand);
+  scroll-margin: 7rem 0 1rem;
+}

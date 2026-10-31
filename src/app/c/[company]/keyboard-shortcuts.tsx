@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { matchesShortcut, type NavGroup } from "@/lib/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { activePage, matchesShortcut, visibleNav, type NavGroup } from "@/lib/navigation";
 import { useFeedback } from "@/components/feedback";
 import { Kbd } from "@/components/ui";
 
 /*
  * Global shortcuts for the company workspace.
  *   screen shortcuts   any `shortcut` set in src/lib/navigation.ts (none for now)
+ *   Ctrl + ← / →   previous / next tab of the section (the tabs at the top of the page)
+ *   Ctrl + N, Alt + N   create: the page's own "new" form, or the "+ New" menu
  *   Ctrl+S         save the form marked data-save-shortcut
  *   Ctrl+Shift+S   "save & add another" (button marked data-save-new)
  *   /              focus the search box marked data-shortcut-search
@@ -23,6 +25,9 @@ const FORM_SHORTCUTS: [string, string][] = [
   ["Enter", "Add a scanned barcode / product (on the scan fields)"],
   ["↑ ↓", "Choose a product in the purchase search list"],
   ["Ctrl + K", "Search everything / go to a page"],
+  ["Ctrl + N  (or Alt + N)", "Create something new"],
+  ["Ctrl + ← / →", "Previous / next tab"],
+  ["↑ ↓ then Enter", "Pick a row in a list and open it"],
   ["/", "Jump to the search box on the page"],
   ["?", "Show this list"],
   ["Esc", "Close this list / leave a field"],
@@ -46,6 +51,7 @@ function isTyping(target: EventTarget | null) {
 
 export function KeyboardShortcuts({ base, groups }: { base: string; groups: NavGroup[] }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [helpOpen, setHelpOpen] = useState(false);
   const { confirm } = useFeedback();
   const items = useMemo(() => groups.flatMap((g) => g.items).filter((i) => i.shortcut), [groups]);
@@ -68,16 +74,46 @@ export function KeyboardShortcuts({ base, groups }: { base: string; groups: NavG
         return;
       }
 
+      // Leave without saving? Asked before any shortcut moves away from a form being edited.
+      const go = (target: string) => {
+        if (!visible("form[data-dirty='true']")) return router.push(target);
+        void confirm({ title: "Leave without saving?", message: "You have unsaved changes on this page.", confirmLabel: "Leave", tone: "danger" }).then(
+          (ok) => ok && router.push(target),
+        );
+      };
+      const current = activePage(visibleNav(groups), base, pathname);
+
+      if (ctrl && !e.shiftKey && !e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight") && !isTyping(e.target)) {
+        if (!current) return;
+        const tabs = current.group.items.map((i) => `${base}/${i.path}`);
+        const next = tabs[tabs.indexOf(current.href) + (e.key === "ArrowRight" ? 1 : -1)];
+        e.preventDefault();
+        if (next) go(next);
+        return;
+      }
+
+      if (e.key.toLowerCase() === "n" && !e.shiftKey && ctrl !== e.altKey) {
+        e.preventDefault(); // a browser tab may still open a new window on Ctrl+N; Alt+N always works
+        // The page's own "new" (Offers → New offer); the section is looked up in the full list, where the create items are.
+        const page = current?.href.slice(base.length + 1);
+        const own = page
+          ? (groups.find((g) => g.title === current?.group.title)?.items ?? []).filter(
+              (i) => i.create && (i.path.startsWith(`${page}/`) || i.path.startsWith(`${page}?`)),
+            )
+          : [];
+        if (own.length === 1) go(`${base}/${own[0].path}`);
+        else {
+          window.dispatchEvent(new Event("marine:new"));
+          // Pick the first entry so ↑ / ↓ and Enter work straight away.
+          setTimeout(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" })), 60);
+        }
+        return;
+      }
+
       const item = !ctrl && !e.altKey ? items.find((i) => matchesShortcut(i.shortcut!, e)) : undefined;
       if (item) {
         e.preventDefault();
-        const dirty = visible("form[data-dirty='true']");
-        const target = `${base}/${item.path}`;
-        if (!dirty) router.push(target);
-        else
-          void confirm({ title: "Leave without saving?", message: "You have unsaved changes on this page.", confirmLabel: "Leave", tone: "danger" }).then(
-            (ok) => ok && router.push(target),
-          );
+        go(`${base}/${item.path}`);
         return;
       }
 
@@ -110,7 +146,7 @@ export function KeyboardShortcuts({ base, groups }: { base: string; groups: NavG
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("marine:shortcuts", onOpen);
     };
-  }, [items, base, router, helpOpen, confirm]);
+  }, [items, groups, base, pathname, router, helpOpen, confirm]);
 
   return (
     <>

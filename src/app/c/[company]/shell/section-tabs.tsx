@@ -11,7 +11,7 @@ export function SectionTabs({ base, groups }: { base: string; groups: NavGroup[]
   if (!current || current.group.items.length < 2 || current.href !== pathname) return null;
 
   return (
-    <nav aria-label={`${current.group.title} pages`} className="-mt-2 mb-5 flex gap-1 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-border)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <nav aria-label={`${current.group.title} pages`} className="sticky top-14 z-20 -mx-4 -mt-6 mb-5 flex gap-1 overflow-x-auto bg-background/95 px-4 pt-2 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-border)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {current.group.items.map((item) => {
         const href = `${base}/${item.path}`;
         const on = href === current.href;
@@ -20,7 +20,7 @@ export function SectionTabs({ base, groups }: { base: string; groups: NavGroup[]
             key={href}
             href={href}
             aria-current={on ? "page" : undefined}
-            title={item.shortcut ? `${item.label} (${item.shortcut})` : undefined}
+            title="Ctrl + ← / → to switch tabs"
             className={`whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm font-medium transition ${
               on ? "border-brand text-navy" : "border-transparent text-muted hover:border-slate-300 hover:text-navy"
             }`}

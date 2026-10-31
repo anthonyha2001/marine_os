@@ -7,6 +7,7 @@ import { FeedbackProvider } from "@/components/feedback";
 import { InstallApp } from "@/components/install-app";
 import { KeyboardShortcuts } from "../keyboard-shortcuts";
 import { CommandPalette } from "./command-palette";
+import { RowKeys } from "./row-keys";
 import { SectionTabs } from "./section-tabs";
 import { Sidebar } from "./sidebar";
 import { Topbar, type Notice } from "./topbar";
@@ -88,6 +89,7 @@ export function AppShell({
 
       <CommandPalette companySlug={company.slug} base={base} groups={allGroups} />
       <KeyboardShortcuts base={base} groups={allGroups} />
+      <RowKeys />
       <InstallApp />
     </FeedbackProvider>
     </div>

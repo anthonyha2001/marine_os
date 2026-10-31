@@ -5,7 +5,7 @@ import { Ban, CheckCircle2, Play, RotateCcw, Trash2 } from "lucide-react";
 import { deleteJobCard, invoiceJobCard, setJobCardStatus, type WorkshopFormState } from "@/lib/actions/workshop";
 import type { JobStatus } from "@/lib/data/workshop";
 import { useFeedback } from "@/components/feedback";
-import { FormMessage, Kbd, inputClass, labelClass, primaryButton, secondaryButton } from "@/components/ui";
+import { FormMessage, Kbd, inputClass, labelClass, primaryButton, secondaryButton, secondaryButtonSm } from "@/components/ui";
 
 /** Status buttons: start, done (parts leave stock), reopen, cancel, delete. */
 export function JobActions({ companySlug, jobId, number, status, hasInvoices }: { companySlug: string; jobId: string; number: string; status: JobStatus; hasInvoices: boolean }) {
@@ -80,10 +80,11 @@ export function JobActions({ companySlug, jobId, number, status, hasInvoices }: 
   );
 }
 
-export function InvoiceJobForm({ companySlug, jobId, amount }: { companySlug: string; jobId: string; amount: string }) {
+export function InvoiceJobForm({ companySlug, jobId, amount, returnTo }: { companySlug: string; jobId: string; amount: string; returnTo?: string }) {
   const [state, formAction, pending] = useActionState<WorkshopFormState, FormData>(invoiceJobCard.bind(null, companySlug, jobId), {});
   return (
     <form action={formAction} data-save-shortcut className="space-y-4">
+      {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
       <p className="rounded-lg bg-background p-3 text-sm">
         The invoice will list the job card&apos;s billable lines: <span className="font-semibold text-navy">{amount}</span>
       </p>
@@ -97,5 +98,43 @@ export function InvoiceJobForm({ companySlug, jobId, amount }: { companySlug: st
         <Kbd className="border-white/30 bg-white/10 text-white">Ctrl S</Kbd>
       </button>
     </form>
+  );
+}
+
+/** Small Start / Done / Reopen buttons for a job card shown as a card or in a pop-up. */
+export function JobQuickActions({ companySlug, jobId, number, status }: { companySlug: string; jobId: string; number: string; status: JobStatus }) {
+  const [pending, startTransition] = useTransition();
+  const { confirm, toast } = useFeedback();
+  const set = (next: JobStatus, ok: string) =>
+    startTransition(async () => {
+      const res = await setJobCardStatus(companySlug, jobId, next).catch(() => ({ error: "Something went wrong. Check your connection and try again." }));
+      if (res.error) toast.error(res.error);
+      else toast.success(ok);
+    });
+  return (
+    <>
+      {status === "OPEN" && (
+        <button type="button" disabled={pending} className={secondaryButtonSm} onClick={() => set("IN_PROGRESS", `${number}: work started.`)}>
+          <Play className="size-3.5" aria-hidden /> Start
+        </button>
+      )}
+      {(status === "OPEN" || status === "IN_PROGRESS") && (
+        <button
+          type="button"
+          disabled={pending}
+          className={secondaryButtonSm}
+          onClick={async () => {
+            if (await confirm({ title: `Mark ${number} as done?`, message: "Parts from the catalogue are taken out of stock.", confirmLabel: "Mark as done" })) set("DONE", `${number} done.`);
+          }}
+        >
+          <CheckCircle2 className="size-3.5 text-success" aria-hidden /> Done
+        </button>
+      )}
+      {status === "DONE" && (
+        <button type="button" disabled={pending} className={secondaryButtonSm} onClick={() => set("IN_PROGRESS", `${number} reopened.`)}>
+          <RotateCcw className="size-3.5" aria-hidden /> Reopen
+        </button>
+      )}
+    </>
   );
 }

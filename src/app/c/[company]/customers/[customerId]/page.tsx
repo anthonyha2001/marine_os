@@ -16,6 +16,8 @@ import { COMPANIES, canAccessModule } from "@/lib/permissions";
 import { PortalLinkButton } from "@/components/share-link";
 import { SendButton } from "@/components/send-button";
 import { Modal } from "@/components/modal";
+import { InvoiceDialog, OfferDialog } from "@/components/document-dialogs";
+import { JobCardDialog } from "@/components/job-dialogs";
 import { Badge, ButtonLink, PageHeader, StatCard, cardClass, secondaryButton, type Tone } from "@/components/ui";
 import { CustomerForm } from "../customer-form";
 
@@ -67,7 +69,7 @@ function Panel({
 function Row({ href, title, detail, right }: { href: string; title: string; detail: string; right: React.ReactNode }) {
   return (
     <li>
-      <Link href={href} className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-surface-2">
+      <Link href={href} scroll={false} data-nav-row className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-surface-2">
         <span className="min-w-0">
           <span className="block truncate text-sm font-medium text-navy">{title}</span>
           <span className="block truncate text-xs text-muted">{detail}</span>
@@ -78,12 +80,14 @@ function Row({ href, title, detail, right }: { href: string; title: string; deta
   );
 }
 
+type Search = { edit?: string; inv?: string; offer?: string; job?: string; invoice?: string };
+
 async function CustomerContent({
   params,
   searchParams,
 }: {
   params: Promise<{ company: string; customerId: string }>;
-  searchParams: Promise<{ edit?: string }>;
+  searchParams: Promise<Search>;
 }) {
   const [{ company, customerId }, search] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "customers");
@@ -183,7 +187,7 @@ async function CustomerContent({
             {top(myInvoices).map((i) => (
               <Row
                 key={i.id}
-                href={`${c}/invoices/${i.id}`}
+                href={`${base}?inv=${i.id}`}
                 title={i.number}
                 detail={`${day(i.invoiceDate)} · due ${day(i.dueDate)}`}
                 right={
@@ -206,7 +210,7 @@ async function CustomerContent({
             {top(myOffers).map((o) => (
               <Row
                 key={o.id}
-                href={`${c}/offers/${o.id}`}
+                href={`${base}?offer=${o.id}`}
                 title={o.number}
                 detail={`${day(o.offerDate)}${o.subject ? ` · ${o.subject}` : ""}`}
                 right={
@@ -237,7 +241,7 @@ async function CustomerContent({
             {top(myJobs).map((j) => (
               <Row
                 key={j.id}
-                href={`${c}/workshop/${j.id}`}
+                href={`${base}?job=${j.id}`}
                 title={j.number}
                 detail={`${day(j.openedAt)}${j.vessel ? ` · ${j.vessel.name}` : ""}${j.complaint ? ` · ${j.complaint}` : ""}`}
                 right={<Badge tone={JOB_TONE[j.status] ?? "gray"}>{JOB_STATUS[j.status]}</Badge>}
@@ -275,6 +279,11 @@ async function CustomerContent({
         )}
       </div>
 
+      {search.inv && may.invoices && <InvoiceDialog slug={slug} id={search.inv} closeHref={base} canReceive={may.accounting} canOpen />}
+      {search.offer && may.offers && <OfferDialog slug={slug} id={search.offer} closeHref={base} canInvoice={may.invoices} />}
+      {search.job && may.workshop && (
+        <JobCardDialog slug={slug} id={search.job} closeHref={base} selfHref={`${base}?job=${search.job}`} canInvoice={may.invoices} invoicing={search.invoice === "1"} />
+      )}
       {search.edit && (
         <Modal title={`Edit ${customer.name}`} closeHref={base} size="md">
           <div className={`${cardClass} p-5`}>
@@ -289,7 +298,7 @@ async function CustomerContent({
 export default function CustomerPage({ params, searchParams }: PageProps<"/c/[company]/customers/[customerId]">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading…</p>}>
-      <CustomerContent params={params} searchParams={searchParams as Promise<{ edit?: string }>} />
+      <CustomerContent params={params} searchParams={searchParams as Promise<Search>} />
     </Suspense>
   );
 }

@@ -12,6 +12,7 @@ export function OpenRow({ href, className, children }: { href?: string; classNam
   return (
     <tr
       className={`${className ?? ""} cursor-pointer`}
+      data-open-href={href}
       title="Double-click to see what's inside"
       onDoubleClick={(e) => {
         if ((e.target as HTMLElement).closest("a, button, input, select, textarea, label")) return;
