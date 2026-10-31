@@ -130,6 +130,7 @@ export function OfferEditor({
   offer,
   vessels = [],
   clauses = [],
+  defaultCustomerId,
 }: {
   vessels?: { id: string; customerId: string | null; label: string }[];
   clauses?: { id: string; title: string; text: string }[];
@@ -140,6 +141,7 @@ export function OfferEditor({
   defaultIntro: string;
   defaultTerms: string;
   offer?: OfferEditorValue;
+  defaultCustomerId?: string; // new offer started from a customer page
 }) {
   // Saved lines get keys 1..n; lines added later continue from n + 1.
   const nextKey = useRef((offer?.lines.length ?? 0) + 1);
@@ -158,18 +160,19 @@ export function OfferEditor({
   });
 
   const today = new Date();
+  const preset = offer ? undefined : customers.find((c) => c.id === defaultCustomerId);
   const [header, setHeader] = useState({
-    customerId: offer?.customerId ?? "",
+    customerId: offer?.customerId ?? preset?.id ?? "",
     vesselId: offer?.vesselId ?? "",
     incoterm: offer?.incoterm ?? "",
     deliveryPlace: offer?.deliveryPlace ?? "",
     leadTime: offer?.leadTime ?? "",
     warranty: offer?.warranty ?? "",
-    customerName: offer?.customerName ?? "",
-    customerAttention: offer?.customerAttention ?? "",
-    customerAddress: offer?.customerAddress ?? "",
-    customerEmail: offer?.customerEmail ?? "",
-    customerPhone: offer?.customerPhone ?? "",
+    customerName: offer?.customerName ?? preset?.name ?? "",
+    customerAttention: offer?.customerAttention ?? preset?.contactName ?? "",
+    customerAddress: offer?.customerAddress ?? preset?.address ?? "",
+    customerEmail: offer?.customerEmail ?? preset?.email ?? "",
+    customerPhone: offer?.customerPhone ?? preset?.phone ?? "",
     subject: offer?.subject ?? "",
     reference: offer?.reference ?? "",
     offerDate: offer?.offerDate ?? isoDate(today),

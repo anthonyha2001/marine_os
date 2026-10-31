@@ -71,6 +71,7 @@ async function loadOffers(companyId: string) {
     select: {
       id: true,
       number: true,
+      customerId: true,
       customerName: true,
       subject: true,
       offerDate: true,

@@ -1,8 +1,6 @@
 import { Suspense } from "react";
-import { SendButton } from "@/components/send-button";
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { PortalLinkButton } from "@/components/share-link";
 import { requireModule } from "@/lib/auth";
 import { customerBalances, type CustomerBalance } from "@/lib/data/ledger";
 import { listCustomers } from "@/lib/data/sales";
@@ -48,7 +46,7 @@ async function CustomersContent({
     <>
       <PageHeader
         title="Customers"
-        description="Shared by both companies. Customers typed on an offer are saved here automatically."
+        description="Shared by both companies. Click a customer to see their boats, offers, jobs, invoices and payments."
         action={<ButtonLink icon={Plus} href={`${base}?new=1`}>New customer</ButtonLink>}
       />
 
@@ -96,50 +94,25 @@ async function CustomersContent({
       <section className={`${cardClass} mt-4 divide-y divide-border`}>
         {customers.length === 0 && <p className="p-10 text-center text-muted">No customers yet.</p>}
         {customers.map((c) => (
-          <details key={c.id} className="group">
-            <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 px-5 py-4 hover:bg-background/60">
-              <span>
-                <span className="block font-medium text-navy">{c.name}</span>
-                <span className="block text-xs text-muted">
-                  {[c.contactName, c.phone, c.email].filter(Boolean).join(" · ") || "No details"}
+          <Link key={c.id} href={`${base}/${c.id}`} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5 hover:bg-background/60">
+            <span>
+              <span className="block font-medium text-navy">{c.name}</span>
+              <span className="block text-xs text-muted">{[c.contactName, c.phone, c.email].filter(Boolean).join(" · ") || "No details"}</span>
+            </span>
+            {showDue &&
+              (c.balance.due > 0 ? (
+                <span className="text-right">
+                  <span className="block text-sm font-semibold text-navy">{formatMoney(c.balance.due)} due</span>
+                  <span className={`block text-xs ${c.balance.overdue > 0 ? "font-medium text-danger" : "text-muted"}`}>
+                    {c.balance.overdue > 0
+                      ? `${formatMoney(c.balance.overdue)} overdue`
+                      : `${c.balance.unpaidCount} unpaid invoice${c.balance.unpaidCount === 1 ? "" : "s"}`}
+                  </span>
                 </span>
-              </span>
-              <span className="flex items-center gap-5">
-                {showDue &&
-                  (c.balance.due > 0 ? (
-                    <Link
-                      href={`/c/${slug}/invoices?q=${encodeURIComponent(c.name)}`}
-                      className="text-right hover:underline"
-                      title="See this customer's invoices"
-                    >
-                      <span className="block text-sm font-semibold text-navy">{formatMoney(c.balance.due)} due</span>
-                      <span className={`block text-xs ${c.balance.overdue > 0 ? "font-medium text-danger" : "text-muted"}`}>
-                        {c.balance.overdue > 0
-                          ? `${formatMoney(c.balance.overdue)} overdue`
-                          : `${c.balance.unpaidCount} unpaid invoice${c.balance.unpaidCount === 1 ? "" : "s"}`}
-                      </span>
-                    </Link>
-                  ) : (
-                    <span className="text-xs text-muted">Nothing due</span>
-                  ))}
-                <span className="text-xs font-medium text-brand group-open:hidden">Edit</span>
-                <span className="hidden text-xs font-medium text-muted group-open:inline">Close</span>
-              </span>
-            </summary>
-            <div className="max-w-2xl border-t border-border bg-background/40 p-5">
-              <div className="mb-4 flex flex-wrap items-center gap-4 text-sm">
-                <span className="flex items-center gap-1 text-muted">
-                  Customer portal: <PortalLinkButton companySlug={slug} customerId={c.id} hasLink={!!c.portalToken} token={c.portalToken} />
-                  <span className="text-xs">{c.portalToken ? "link active" : "no link yet"}</span>
-                </span>
-                <SendButton companySlug={slug} kind="portal" id={c.id} label="Send portal link" />
-                <Link href={`/c/${slug}/vessels?q=${encodeURIComponent(c.name)}`} className="text-brand hover:underline">
-                  Boats →
-                </Link>
-              </div>
-              <CustomerForm companySlug={slug} customer={c} />
-            </div>
-          </details>
+              ) : (
+                <span className="text-xs text-muted">Nothing due</span>
+              ))}
+          </Link>
         ))}
       </section>
     </>

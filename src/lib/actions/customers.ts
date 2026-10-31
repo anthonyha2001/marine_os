@@ -47,9 +47,10 @@ export async function saveCustomer(
   );
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
+  let createdId: string | null = null;
   try {
     if (customerId) await prisma.customer.update({ where: { id: customerId }, data: parsed.data });
-    else await prisma.customer.create({ data: parsed.data });
+    else createdId = (await prisma.customer.create({ data: parsed.data, select: { id: true } })).id;
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       return { error: `A customer called "${parsed.data.name}" already exists.` };
@@ -58,7 +59,7 @@ export async function saveCustomer(
   }
 
   updateTag(salesTags.customers);
-  // New customers are added from a pop-up: go back to the list, which closes it.
-  if (!customerId) redirect(`/c/${slug}/customers?added=${encodeURIComponent(parsed.data.name)}`);
+  // A new customer opens on their own page, ready for an offer, a boat or a job card.
+  if (createdId) redirect(`/c/${slug}/customers/${createdId}`);
   return { success: "Customer updated" };
 }

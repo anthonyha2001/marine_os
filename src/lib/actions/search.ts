@@ -63,7 +63,7 @@ export async function globalSearch(companySlug: string, query: string): Promise<
   push(
     customers
       .filter((c) => has(c.name, c.contactName, c.email, c.phone))
-      .map((c) => ({ group: "Customers", label: c.name, detail: c.contactName ?? undefined, href: `${base}/invoices?q=${encodeURIComponent(c.name)}` })),
+      .map((c) => ({ group: "Customers", label: c.name, detail: c.contactName ?? undefined, href: `${base}/customers/${c.id}` })),
   );
   push(
     suppliers

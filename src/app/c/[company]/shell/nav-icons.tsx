@@ -36,7 +36,7 @@ import {
   Truck,
   Users,
   Wrench,
-  type LucideIcon, SlidersHorizontal, Tags, ArchiveRestore, Globe, Megaphone } from "lucide-react";
+  type LucideIcon, SlidersHorizontal, Tags, ArchiveRestore, Globe, Megaphone, Coins, Settings } from "lucide-react";
 import type { NavIcon } from "@/lib/navigation";
 
 export const NAV_ICONS: Record<NavIcon, LucideIcon> = {
@@ -82,4 +82,6 @@ export const NAV_ICONS: Record<NavIcon, LucideIcon> = {
   posSettings: SlidersHorizontal,
   team: ShieldCheck,
   company: Building2,
+  money: Coins,
+  settings: Settings,
 };

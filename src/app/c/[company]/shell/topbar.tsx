@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Check, ChevronDown, ChevronRight, Keyboard, LogOut, Menu, Search } from "lucide-react";
+import { Bell, Check, ChevronDown, ChevronRight, Keyboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Plus, Search } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
 import type { NavGroup } from "@/lib/navigation";
 import { Dropdown } from "./dropdown";
@@ -30,6 +30,8 @@ export function Topbar({
   user,
   notices,
   onMenu,
+  collapsed,
+  onToggleMenu,
 }: {
   base: string;
   groups: NavGroup[];
@@ -38,6 +40,8 @@ export function Topbar({
   user: { name: string; email: string; roleLabel: string };
   notices: Notice[];
   onMenu: () => void;
+  collapsed: boolean;
+  onToggleMenu: () => void;
 }) {
   const pathname = usePathname();
   const rest = pathname.slice(base.length).split("/").filter(Boolean);
@@ -53,12 +57,22 @@ export function Topbar({
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase())
     .join("");
+  const creates = groups.map((g) => ({ title: g.title, items: g.items.filter((i) => i.create) })).filter((g) => g.items.length > 0);
   const urgent = notices.filter((n) => n.tone === "red").length;
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-surface/90 px-4 backdrop-blur sm:px-6">
       <button type="button" onClick={onMenu} className="rounded-lg p-2 text-slate-600 hover:bg-surface-2 lg:hidden" aria-label="Open menu">
         <Menu className="size-5" />
+      </button>
+      <button
+        type="button"
+        onClick={onToggleMenu}
+        title={collapsed ? "Show menu names" : "Shrink the menu to icons"}
+        aria-label={collapsed ? "Expand menu" : "Collapse menu"}
+        className="hidden rounded-lg p-2 text-slate-500 hover:bg-surface-2 hover:text-navy lg:block"
+      >
+        {collapsed ? <PanelLeftOpen className="size-[18px]" /> : <PanelLeftClose className="size-[18px]" />}
       </button>
 
       <nav aria-label="Breadcrumb" className="hidden min-w-0 items-center gap-1.5 text-sm md:flex">
@@ -77,6 +91,34 @@ export function Topbar({
       </nav>
 
       <div className="ml-auto flex items-center gap-1.5">
+        {creates.length > 0 && (
+          <Dropdown
+            label="Create new"
+            width="w-64"
+            button={
+              <span className="flex h-8 items-center gap-1.5 rounded-lg bg-navy px-3 text-sm font-medium text-white shadow-sm">
+                <Plus className="size-4" aria-hidden /> <span className="hidden sm:inline">New</span>
+              </span>
+            }
+          >
+            {(close) => (
+              <div className="max-h-[70vh] overflow-y-auto py-1.5">
+                {creates.map((g) => (
+                  <div key={g.title} className="py-1">
+                    <p className="px-4 pb-1 pt-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted">{g.title}</p>
+                    {g.items.map((i) => (
+                      <Link key={i.path} href={`${base}/${i.path}`} onClick={close} className="flex items-center justify-between px-4 py-2 text-sm text-slate-700 hover:bg-surface-2 hover:text-navy">
+                        {i.label}
+                        {i.shortcut && <kbd className="rounded border border-border px-1.5 font-mono text-[10px] text-muted">{i.shortcut}</kbd>}
+                      </Link>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Dropdown>
+        )}
+
         <button
           type="button"
           onClick={() => window.dispatchEvent(new Event("marine:search"))}

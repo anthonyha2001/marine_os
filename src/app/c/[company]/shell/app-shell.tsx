@@ -7,6 +7,7 @@ import { FeedbackProvider } from "@/components/feedback";
 import { InstallApp } from "@/components/install-app";
 import { KeyboardShortcuts } from "../keyboard-shortcuts";
 import { CommandPalette } from "./command-palette";
+import { SectionTabs } from "./section-tabs";
 import { Sidebar } from "./sidebar";
 import { Topbar, type Notice } from "./topbar";
 
@@ -21,6 +22,7 @@ export function AppShell({
   companies,
   user,
   notices,
+  initialCollapsed,
   children,
 }: {
   base: string;
@@ -30,15 +32,23 @@ export function AppShell({
   companies: CompanyOption[];
   user: { name: string; email: string; roleLabel: string };
   notices: Notice[];
+  initialCollapsed: boolean;
   children: React.ReactNode;
 }) {
   const [drawer, setDrawer] = useState(false);
+  const [collapsed, setCollapsed] = useState(initialCollapsed);
+  const toggle = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    // A cookie, so the server draws the menu at the right width (no jump on load).
+    document.cookie = `sidebar=${next ? "collapsed" : "open"}; path=/; max-age=31536000; samesite=lax`;
+  };
 
   return (
     <div data-company={company.slug} className="min-h-screen bg-background">
     <FeedbackProvider>
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 lg:block">
-        <Sidebar base={base} groups={sidebarGroups} logo={company.logo} companyName={company.name} />
+      <aside className={`fixed inset-y-0 left-0 z-40 hidden lg:block ${collapsed ? "w-[72px]" : "w-60"}`}>
+        <Sidebar base={base} groups={sidebarGroups} logo={company.logo} companyName={company.name} collapsed={collapsed} />
       </aside>
 
       {drawer && (
@@ -58,7 +68,7 @@ export function AppShell({
         </div>
       )}
 
-      <div className="lg:pl-64">
+      <div className={collapsed ? "lg:pl-[72px]" : "lg:pl-60"}>
         <Topbar
           base={base}
           groups={allGroups}
@@ -67,8 +77,13 @@ export function AppShell({
           user={user}
           notices={notices}
           onMenu={() => setDrawer(true)}
+          collapsed={collapsed}
+          onToggleMenu={toggle}
         />
-        <main className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+        <main className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
+          <SectionTabs base={base} groups={sidebarGroups} />
+          {children}
+        </main>
       </div>
 
       <CommandPalette companySlug={company.slug} base={base} groups={allGroups} />

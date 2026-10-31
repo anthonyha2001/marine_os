@@ -40,7 +40,7 @@ export function PageHeader({
         <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-navy">{title}</h1>
         {description && <p className="mt-1 max-w-3xl text-sm text-muted">{description}</p>}
       </div>
-      {action && <div className="flex shrink-0 flex-wrap items-center gap-2">{action}</div>}
+      {action && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2 sm:shrink-0">{action}</div>}
     </div>
   );
 }
