@@ -4,54 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
-/**
- * Site-wide motion: reveals .er-reveal elements as they scroll into view, and moves the
- * spotlight / tilt on [data-spot] cards with the pointer. One listener for the whole page.
- */
-export function SiteMotion() {
-  const pathname = usePathname();
-  useEffect(() => {
-    const items = document.querySelectorAll<HTMLElement>(".er-reveal:not([data-shown])");
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries)
-          if (e.isIntersecting) {
-            e.target.setAttribute("data-shown", "");
-            io.unobserve(e.target);
-          }
-      },
-      { rootMargin: "0px 0px -8% 0px", threshold: 0.08 },
-    );
-    items.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, [pathname]);
-
-  useEffect(() => {
-    if (window.matchMedia("(pointer: coarse)").matches) return;
-    const onMove = (e: PointerEvent) => {
-      const card = (e.target as HTMLElement).closest<HTMLElement>("[data-spot]");
-      if (!card) return;
-      const r = card.getBoundingClientRect();
-      const x = (e.clientX - r.left) / r.width;
-      const y = (e.clientY - r.top) / r.height;
-      card.style.setProperty("--er-x", `${x * 100}%`);
-      card.style.setProperty("--er-y", `${y * 100}%`);
-      if (card.hasAttribute("data-tilt")) card.style.transform = `perspective(900px) rotateX(${(0.5 - y) * 5}deg) rotateY(${(x - 0.5) * 6}deg) translateY(-4px)`;
-    };
-    const onLeave = (e: PointerEvent) => {
-      const card = (e.target as HTMLElement).closest<HTMLElement>("[data-tilt]");
-      if (card && !card.contains(e.relatedTarget as Node)) card.style.transform = "";
-    };
-    document.addEventListener("pointermove", onMove);
-    document.addEventListener("pointerout", onLeave);
-    return () => {
-      document.removeEventListener("pointermove", onMove);
-      document.removeEventListener("pointerout", onLeave);
-    };
-  }, []);
-  return null;
-}
-
 /** A number that counts up when it scrolls into view. */
 export function CountUp({ value, suffix = "" }: { value: number; suffix?: string }) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -135,7 +87,7 @@ export function Lightbox({ items }: { items: { src: string; title: string; capti
             style={{ "--er-delay": `${(i % 3) * 90}ms` } as React.CSSProperties}
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- photos served by /site-media */}
-            <img src={g.src} alt={g.title} loading="lazy" className="w-full transition duration-700 group-hover:scale-105" />
+            <img src={g.src} alt={g.title} loading="lazy" className="w-full transition duration-500 group-hover:opacity-90" />
             <span className="absolute inset-x-0 bottom-0 translate-y-2 bg-gradient-to-t from-black/75 to-transparent p-4 pt-12 opacity-0 transition duration-500 group-hover:translate-y-0 group-hover:opacity-100">
               <span className="block font-[family-name:var(--er-heading)] text-lg text-white">{g.title}</span>
               {g.caption && <span className="block text-sm text-white/75">{g.caption}</span>}

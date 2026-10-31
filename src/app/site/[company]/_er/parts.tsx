@@ -2,38 +2,20 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { mediaUrl } from "@/lib/data/website";
 
-// Small pieces shared by the Eliche Radice blocks.
-
-/** Two layers of moving waves along a section edge. */
-export function Waves({ className = "", flip = false }: { className?: string; flip?: boolean }) {
-  const path = "M0,32 C150,64 350,0 600,32 C850,64 1050,0 1200,32 L1200,80 L0,80 Z";
-  return (
-    <div className={`pointer-events-none absolute inset-x-0 ${flip ? "top-0 rotate-180" : "bottom-0"} h-16 overflow-hidden sm:h-20 ${className}`} aria-hidden>
-      <svg className="er-wave absolute bottom-0 h-full w-[200%] opacity-40" viewBox="0 0 2400 80" preserveAspectRatio="none" style={{ "--er-wave-speed": "26s" } as React.CSSProperties}>
-        <path d={path} fill="currentColor" />
-        <path d={path} transform="translate(1200 0)" fill="currentColor" />
-      </svg>
-      <svg className="er-wave absolute bottom-0 h-full w-[200%]" viewBox="0 0 2400 80" preserveAspectRatio="none" style={{ "--er-wave-speed": "16s" } as React.CSSProperties}>
-        <path d={path} transform="translate(0 10)" fill="currentColor" />
-        <path d={path} transform="translate(1200 10)" fill="currentColor" />
-      </svg>
-    </div>
-  );
-}
+// Small pieces shared by the Eliche Radice blocks: calm, editorial, professional.
 
 export type Tone = "light" | "white" | "dark";
 const TONES: Record<Tone, string> = {
   light: "bg-[var(--er-cream)] text-[var(--er-ink)]",
   white: "bg-white text-[var(--er-ink)]",
-  dark: "bg-[var(--er-navy)] text-white/80",
+  dark: "bg-[var(--er-navy)] text-white/75",
 };
 
 export function Section({ tone = "white", className = "", children, id }: { tone?: unknown; className?: string; children: React.ReactNode; id?: string }) {
   const t = (["light", "white", "dark"].includes(tone as string) ? tone : "white") as Tone;
   return (
-    <section id={id} data-tone={t} className={`group/section relative overflow-hidden ${TONES[t]} ${className}`}>
-      {t === "dark" && <div className="er-caustics pointer-events-none absolute inset-0" aria-hidden />}
-      <div className="relative mx-auto max-w-7xl px-5 py-20 sm:px-8 sm:py-28">{children}</div>
+    <section id={id} data-tone={t} className={`group/section relative ${TONES[t]} ${className}`}>
+      <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-24">{children}</div>
     </section>
   );
 }
@@ -41,34 +23,32 @@ export function Section({ tone = "white", className = "", children, id }: { tone
 export function Heading({ eyebrow, title, intro, center = false }: { eyebrow?: unknown; title?: unknown; intro?: unknown; center?: boolean }) {
   if (!eyebrow && !title && !intro) return null;
   return (
-    <div className={`er-reveal mb-12 max-w-3xl ${center ? "mx-auto text-center" : ""}`}>
-      {eyebrow ? (
-        <p className={`flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.28em] text-[var(--er-gold)] ${center ? "justify-center" : ""}`}>
-          <span className="h-px w-8 bg-[var(--er-gold)]" aria-hidden /> {String(eyebrow)}
-        </p>
+    <div className={`er-reveal mb-12 max-w-2xl ${center ? "mx-auto text-center" : ""}`}>
+      {eyebrow ? <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--er-gold)]">{String(eyebrow)}</p> : null}
+      {title ? (
+        <h2 className="mt-3 whitespace-pre-line font-[family-name:var(--er-heading)] text-3xl leading-tight text-[var(--er-navy)] group-data-[tone=dark]/section:text-white sm:text-4xl">{String(title)}</h2>
       ) : null}
-      {title ? <h2 className="mt-4 whitespace-pre-line font-[family-name:var(--er-heading)] text-4xl leading-[1.1] text-[var(--er-navy)] group-data-[tone=dark]/section:text-white sm:text-5xl">{String(title)}</h2> : null}
-      {intro ? <p className="mt-5 text-lg leading-relaxed opacity-80">{String(intro)}</p> : null}
+      {intro ? <p className="mt-4 text-base leading-relaxed opacity-75 sm:text-lg">{String(intro)}</p> : null}
     </div>
   );
 }
 
-/** A themed button (gold glow, solid or outline, as chosen in Design). */
+/** A themed button: solid accent (main) or a quiet outline (second). */
 export function Button({ href, label, variant = "primary", base }: { href?: unknown; label?: unknown; variant?: "primary" | "secondary"; base: string }) {
   if (!label || !href) return null;
   const to = resolveLink(String(href), base);
   const cls =
     variant === "primary"
-      ? "er-glow bg-[var(--er-gold)] text-[var(--er-navy)] [[data-buttons=outline]_&]:bg-transparent [[data-buttons=outline]_&]:text-[var(--er-gold)] [[data-buttons=outline]_&]:ring-1 [[data-buttons=outline]_&]:ring-[var(--er-gold)]"
-      : "border border-current/30 backdrop-blur hover:border-[var(--er-gold)] hover:text-[var(--er-gold)]";
+      ? "bg-[var(--er-gold)] text-[var(--er-navy)] hover:brightness-95 [[data-buttons=outline]_&]:bg-transparent [[data-buttons=outline]_&]:text-[var(--er-gold)] [[data-buttons=outline]_&]:ring-1 [[data-buttons=outline]_&]:ring-inset [[data-buttons=outline]_&]:ring-[var(--er-gold)]"
+      : "ring-1 ring-inset ring-current/25 hover:ring-current/60";
   const external = /^(https?:|mailto:|tel:)/.test(to);
   const inner = (
     <>
       {String(label)}
-      <ArrowRight className="size-4 transition-transform duration-300 group-hover/btn:translate-x-1" aria-hidden />
+      <ArrowRight className="size-4 transition-transform duration-300 group-hover/btn:translate-x-0.5" aria-hidden />
     </>
   );
-  const className = `group/btn inline-flex items-center gap-2.5 rounded-[var(--er-radius)] px-7 py-3.5 text-sm font-semibold tracking-wide transition ${cls}`;
+  const className = `group/btn inline-flex items-center gap-2 rounded-[var(--er-radius)] px-6 py-3 text-sm font-semibold transition ${cls}`;
   return external ? (
     <a href={to} className={className} target={to.startsWith("http") ? "_blank" : undefined} rel="noopener">
       {inner}

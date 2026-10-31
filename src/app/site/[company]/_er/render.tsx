@@ -6,7 +6,7 @@ import { ContactForm } from "../forms";
 import { whatsappLink } from "../site";
 import { ErBlock } from "./blocks";
 import { AccountForms } from "./account-forms";
-import { Heading, Section, Waves, img } from "./parts";
+import { Heading, Section, img } from "./parts";
 
 type Ctx = { site: SiteData; base: string };
 
@@ -28,16 +28,11 @@ export function ErPage({ site, base, slug }: Ctx & { slug: string }) {
 
 function SmallHero({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
-    <section className="relative isolate overflow-hidden bg-[var(--er-navy)] pb-24 pt-36 text-white">
-      <div className="er-caustics absolute inset-0 -z-10" aria-hidden />
-      <div className="absolute -right-32 -top-32 -z-10 size-96 rounded-full bg-[var(--er-gold)]/15 blur-3xl" aria-hidden />
-      <div className="mx-auto max-w-7xl px-5 sm:px-8">
-        <p className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.32em] text-[var(--er-gold)]">
-          <span className="h-px w-10 bg-[var(--er-gold)]" aria-hidden /> {eyebrow}
-        </p>
-        <h1 className="mt-5 font-[family-name:var(--er-heading)] text-4xl sm:text-6xl">{title}</h1>
+    <section className="bg-[var(--er-navy)] pb-14 pt-36 text-white">
+      <div className="mx-auto max-w-6xl px-5 sm:px-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--er-gold)]">{eyebrow}</p>
+        <h1 className="mt-4 font-[family-name:var(--er-heading)] text-3xl sm:text-5xl">{title}</h1>
       </div>
-      <Waves className="text-[var(--er-cream)]" />
     </section>
   );
 }

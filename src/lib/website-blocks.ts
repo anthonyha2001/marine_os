@@ -33,7 +33,7 @@ const tone: Field = { key: "tone", label: "Background", type: "select", options:
 export const BLOCKS = {
   hero: {
     label: "Hero",
-    description: "The big opening: title, text, buttons, photo or video, animated waves.",
+    description: "The opening of the page: title, text, buttons, and a photo or video behind.",
     fields: [
       { key: "size", label: "Size", type: "select", options: [["full", "Full screen (home)"], ["page", "Page banner"]] },
       { key: "eyebrow", label: "Small title above", type: "text" },
@@ -43,10 +43,8 @@ export const BLOCKS = {
       { key: "video", label: "Background video (link to an MP4)", type: "video", hint: "Plays silently in a loop; the photo shows while it loads" },
       ...button("primary", "Main button"),
       ...button("secondary", "Second button"),
-      { key: "waves", label: "Animated waves at the bottom", type: "toggle" },
-      { key: "propeller", label: "Turning propeller behind the title", type: "toggle" },
     ],
-    defaults: { size: "page", title: "", waves: true, propeller: false },
+    defaults: { size: "page", title: "" },
   },
   stats: {
     label: "Key numbers",
@@ -196,7 +194,7 @@ export const STARTER_PAGES: PageSeed[] = [
     title: "Home",
     inNav: true,
     blocks: [
-      { type: "hero", data: { size: "full", eyebrow: "Marine propellers · Lebanon", title: "Propellers built\nfor performance", text: "Supply, fitting, repair and balancing of propellers, shafts and running gear, with Italian expertise.", primaryLabel: "Book an appointment", primaryLink: "/book", secondaryLabel: "Discover the shop", secondaryLink: "/shop", waves: true, propeller: true } },
+      { type: "hero", data: { size: "full", eyebrow: "Marine propellers · Lebanon", title: "Propellers built\nfor performance", text: "Supply, fitting, repair and balancing of propellers, shafts and running gear, with Italian expertise.", primaryLabel: "Book an appointment", primaryLink: "/book", secondaryLabel: "Discover the shop", secondaryLink: "/shop" } },
       { type: "stats", data: { tone: "dark", items: [] } },
       { type: "services", data: { tone: "light", layout: "cards", eyebrow: "Services", title: "Everything below the waterline", intro: "From choosing the right propeller to bringing a damaged one back to life.", buttonLabel: "All services", buttonLink: "/services" } },
       { type: "split", data: { tone: "white", side: "right", eyebrow: "Our story", title: "Italian know-how, Lebanese waters", text: "Eliche Radice Lebanon brings Italian propeller expertise to local yachts, fishing boats and workboats. Every propeller is measured, repaired and balanced to the original specification.", points: [{ text: "Precise measurement of pitch and diameter" }, { text: "Dynamic balancing for a smooth, quiet ride" }, { text: "Honest advice: repair when it makes sense" }], buttonLabel: "Our story", buttonLink: "/about" } },
@@ -212,7 +210,7 @@ export const STARTER_PAGES: PageSeed[] = [
     title: "Our story",
     inNav: true,
     blocks: [
-      { type: "hero", data: { size: "page", eyebrow: "Our story", title: "Italian know-how,\nLebanese waters", waves: true } },
+      { type: "hero", data: { size: "page", eyebrow: "Our story", title: "Italian know-how,\nLebanese waters" } },
       { type: "split", data: { tone: "white", side: "left", title: "Who we are", text: "Eliche Radice Lebanon brings Italian propeller expertise to Lebanese waters. We help you choose the right propeller for your boat and keep it in top condition." } },
       { type: "stats", data: { tone: "dark", items: [] } },
       { type: "cta", data: { title: "Let's talk about your boat", primaryLabel: "Contact us", primaryLink: "/contact" } },
@@ -223,18 +221,18 @@ export const STARTER_PAGES: PageSeed[] = [
     title: "Services",
     inNav: true,
     blocks: [
-      { type: "hero", data: { size: "page", eyebrow: "Services", title: "Propellers, shafts\nand running gear", waves: true } },
+      { type: "hero", data: { size: "page", eyebrow: "Services", title: "Propellers, shafts\nand running gear" } },
       { type: "services", data: { tone: "light", layout: "list", title: "What we do" } },
       { type: "steps", data: { tone: "white", title: "How it works", items: [{ title: "Inspection", text: "We measure and assess the damage." }, { title: "Quote", text: "A clear price before we start." }, { title: "Repair", text: "Straightening, welding, polishing, balancing." }, { title: "Delivery", text: "Fitted and tested." }] } },
       { type: "faq", data: { tone: "light", title: "Questions", items: [{ q: "How long does a repair take?", a: "Most repairs take two to three working days. We tell you the date with the quote." }, { q: "Can a damaged propeller always be repaired?", a: "Most can. If a new one is better value, we tell you honestly." }] } },
       { type: "cta", data: { title: "Need a propeller checked?", primaryLabel: "Book an appointment", primaryLink: "/book" } },
     ],
   },
-  { slug: "shop", title: "Shop", inNav: true, blocks: [{ type: "hero", data: { size: "page", eyebrow: "The shop", title: "Propellers & parts", waves: true } }, { type: "products", data: { tone: "white", count: 0, title: "" } }] },
-  { slug: "gallery", title: "Gallery", inNav: true, blocks: [{ type: "hero", data: { size: "page", eyebrow: "Gallery", title: "Our work", waves: true } }, { type: "gallery", data: { tone: "dark", count: 0, title: "" } }] },
-  { slug: "charter", title: "Charter", inNav: true, blocks: [{ type: "hero", data: { size: "page", eyebrow: "Yacht charter", title: "Summer\non the water", waves: true } }, { type: "charter", data: { title: "Our fleet", intro: "Bookings open soon. Join the waiting list and we'll tell you first.", status: "Coming summer", buttonLabel: "Join the waiting list", items: [] } }] },
-  { slug: "book", title: "Book", inNav: false, blocks: [{ type: "hero", data: { size: "page", eyebrow: "Appointments", title: "Book an appointment", waves: true } }, { type: "booking", data: { title: "", text: "Tell us what you need and when suits you. We confirm quickly." } }] },
-  { slug: "contact", title: "Contact", inNav: true, blocks: [{ type: "hero", data: { size: "page", eyebrow: "Contact", title: "Talk to us", waves: true } }, { type: "contact", data: { showForm: true, showMap: true, title: "" } }] },
+  { slug: "shop", title: "Shop", inNav: true, blocks: [{ type: "hero", data: { size: "page", eyebrow: "The shop", title: "Propellers & parts" } }, { type: "products", data: { tone: "white", count: 0, title: "" } }] },
+  { slug: "gallery", title: "Gallery", inNav: true, blocks: [{ type: "hero", data: { size: "page", eyebrow: "Gallery", title: "Our work" } }, { type: "gallery", data: { tone: "dark", count: 0, title: "" } }] },
+  { slug: "charter", title: "Charter", inNav: true, blocks: [{ type: "hero", data: { size: "page", eyebrow: "Yacht charter", title: "Summer\non the water" } }, { type: "charter", data: { title: "Our fleet", intro: "Bookings open soon. Join the waiting list and we'll tell you first.", status: "Coming summer", buttonLabel: "Join the waiting list", items: [] } }] },
+  { slug: "book", title: "Book", inNav: false, blocks: [{ type: "hero", data: { size: "page", eyebrow: "Appointments", title: "Book an appointment" } }, { type: "booking", data: { title: "", text: "Tell us what you need and when suits you. We confirm quickly." } }] },
+  { slug: "contact", title: "Contact", inNav: true, blocks: [{ type: "hero", data: { size: "page", eyebrow: "Contact", title: "Talk to us" } }, { type: "contact", data: { showForm: true, showMap: true, title: "" } }] },
 ];
 
 /** Reserved addresses a custom page can't use. */

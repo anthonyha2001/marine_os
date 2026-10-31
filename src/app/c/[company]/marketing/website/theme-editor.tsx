@@ -9,7 +9,7 @@ import { Kbd, cardClass, inputClass, labelClass, primaryButton, secondaryButton 
 
 const COLORS: [keyof Theme, string, string][] = [
   ["navy", "Deep colour", "Dark sections, header, footer, titles"],
-  ["gold", "Accent", "Buttons, lines, highlights, glow"],
+  ["gold", "Accent", "Buttons, small titles, highlights"],
   ["cream", "Light background", "Light sections"],
   ["ink", "Text", "Body text on light sections"],
 ];
@@ -17,9 +17,9 @@ const CHOICES: { key: keyof Theme; label: string; options: [string, string][] }[
   { key: "headingFont", label: "Titles font", options: Object.entries(HEADING_FONTS) },
   { key: "bodyFont", label: "Text font", options: Object.entries(BODY_FONTS) },
   { key: "corners", label: "Corners", options: [["sharp", "Sharp"], ["soft", "Soft"], ["round", "Round"]] },
-  { key: "buttons", label: "Buttons", options: [["glow", "Gold with glow"], ["solid", "Gold, plain"], ["outline", "Outline"]] },
+  { key: "buttons", label: "Buttons", options: [["solid", "Filled"], ["outline", "Outline"]] },
   { key: "header", label: "Menu bar", options: [["glass", "Transparent, turns to glass when scrolling"], ["solid", "Always solid"]] },
-  { key: "motion", label: "Animations", options: [["full", "Full (waves, shimmer, floating)"], ["calm", "Calm (slower, fewer)"], ["off", "Off"]] },
+  { key: "motion", label: "Animations", options: [["full", "Gentle fade-in"], ["calm", "Minimal"], ["off", "None"]] },
 ];
 
 /** Marketing → Website → Design: the site's colours, fonts, corners and motion. */
@@ -88,7 +88,7 @@ export function ThemeEditor({ companySlug, theme, siteBase }: { companySlug: str
             <p className="mt-1 text-2xl text-white" style={{ fontFamily: HEADING_FONTS[t.headingFont] }}>
               Propellers built for performance
             </p>
-            <span className="mt-3 inline-block px-4 py-2 text-xs font-semibold" style={{ background: t.buttons === "outline" ? "transparent" : t.gold, color: t.buttons === "outline" ? t.gold : t.navy, border: `1px solid ${t.gold}`, borderRadius: radius, boxShadow: t.buttons === "glow" ? `0 0 24px -4px ${t.gold}` : undefined }}>
+            <span className="mt-3 inline-block px-4 py-2 text-xs font-semibold" style={{ background: t.buttons === "outline" ? "transparent" : t.gold, color: t.buttons === "outline" ? t.gold : t.navy, border: `1px solid ${t.gold}`, borderRadius: radius }}>
               Book an appointment
             </span>
           </div>

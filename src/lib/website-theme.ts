@@ -12,7 +12,7 @@ export type Theme = {
   headingFont: keyof typeof HEADING_FONTS;
   bodyFont: keyof typeof BODY_FONTS;
   corners: "sharp" | "soft" | "round";
-  buttons: "glow" | "solid" | "outline";
+  buttons: "solid" | "outline";
   motion: "full" | "calm" | "off";
   header: "glass" | "solid";
 };
@@ -25,7 +25,7 @@ export const DEFAULT_THEME: Theme = {
   headingFont: "playfair",
   bodyFont: "inter",
   corners: "soft",
-  buttons: "glow",
+  buttons: "solid",
   motion: "full",
   header: "glass",
 };
@@ -45,7 +45,7 @@ export function readTheme(raw: unknown): Theme {
     headingFont: pick(t.headingFont, Object.keys(HEADING_FONTS) as (keyof typeof HEADING_FONTS)[], DEFAULT_THEME.headingFont),
     bodyFont: pick(t.bodyFont, Object.keys(BODY_FONTS) as (keyof typeof BODY_FONTS)[], DEFAULT_THEME.bodyFont),
     corners: pick(t.corners, ["sharp", "soft", "round"] as const, DEFAULT_THEME.corners),
-    buttons: pick(t.buttons, ["glow", "solid", "outline"] as const, DEFAULT_THEME.buttons),
+    buttons: pick(t.buttons, ["solid", "outline"] as const, DEFAULT_THEME.buttons),
     motion: pick(t.motion, ["full", "calm", "off"] as const, DEFAULT_THEME.motion),
     header: pick(t.header, ["glass", "solid"] as const, DEFAULT_THEME.header),
   };

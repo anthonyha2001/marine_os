@@ -4,8 +4,7 @@ import { Clock, Mail, MapPin, MessageCircle, Phone, UserRound } from "lucide-rea
 import type { SiteData } from "@/lib/data/website";
 import { CORNER_RADIUS } from "@/lib/website-theme";
 import { whatsappLink } from "../site";
-import { MobileMenu, ScrollHeader, SiteMotion } from "./motion";
-import { Waves } from "./parts";
+import { MobileMenu, ScrollHeader } from "./motion";
 
 // The fonts a company can choose in Design. Each is only downloaded when the site uses it.
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--er-f-playfair", display: "swap" });
@@ -50,7 +49,6 @@ export function ErChrome({ site, base, preview, children }: { site: SiteData; ba
 
   return (
     <div className={`er-site ${FONT_VARS} flex min-h-screen flex-col bg-[var(--er-cream)] font-[family-name:var(--er-body)] text-[var(--er-ink)] antialiased`} data-motion={t.motion} data-buttons={t.buttons} style={style}>
-      <SiteMotion />
       {preview && (
         <div className="fixed inset-x-0 bottom-0 z-[70] bg-amber-400 px-4 py-2 text-center text-sm font-medium text-amber-950">
           Preview: visitors see “coming soon” until you publish it in Marketing → Website.
@@ -58,7 +56,7 @@ export function ErChrome({ site, base, preview, children }: { site: SiteData; ba
       )}
 
       <ScrollHeader solid={t.header === "solid"}>
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-5 sm:px-8">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-5 sm:px-8">
           <Link href={base || "/"} className="flex shrink-0 items-center gap-3" aria-label={`${site.name}, home`}>
             <span className="flex size-11 items-center justify-center rounded-full bg-white/95 p-1.5 shadow-lg shadow-black/20 ring-1 ring-[var(--er-gold)]/40 transition group-data-[scrolled]/header:size-10">
               {/* eslint-disable-next-line @next/next/no-img-element -- the logo is served as-is */}
@@ -68,9 +66,9 @@ export function ErChrome({ site, base, preview, children }: { site: SiteData; ba
           </Link>
           <nav aria-label="Website" className="hidden items-center gap-1 lg:flex">
             {nav.map((p) => (
-              <Link key={p.slug} href={link(p.slug)} className="group relative px-3 py-2 text-[13px] font-medium uppercase tracking-[0.16em] text-white/80 transition hover:text-white">
+              <Link key={p.slug} href={link(p.slug)} className="group relative px-3 py-2 text-sm font-medium text-white/80 transition hover:text-white">
                 {p.title}
-                <span className="absolute inset-x-3 -bottom-0.5 h-px origin-left scale-x-0 bg-[var(--er-gold)] transition-transform duration-500 group-hover:scale-x-100" aria-hidden />
+                <span className="absolute inset-x-3 -bottom-0.5 h-px origin-left scale-x-0 bg-white/60 transition-transform duration-300 group-hover:scale-x-100" aria-hidden />
               </Link>
             ))}
           </nav>
@@ -78,7 +76,7 @@ export function ErChrome({ site, base, preview, children }: { site: SiteData; ba
             <Link href={account} className="hidden items-center gap-2 rounded-[var(--er-radius)] border border-white/25 px-4 py-2.5 text-sm font-medium text-white transition hover:border-[var(--er-gold)] hover:text-[var(--er-gold)] sm:flex">
               <UserRound className="size-4" aria-hidden /> My account
             </Link>
-            <Link href={book} className="er-glow hidden rounded-[var(--er-radius)] bg-[var(--er-gold)] px-5 py-2.5 text-sm font-semibold text-[var(--er-navy)] sm:block">
+            <Link href={book} className="hidden rounded-[var(--er-radius)] bg-[var(--er-gold)] px-5 py-2.5 text-sm font-semibold text-[var(--er-navy)] transition hover:brightness-95 sm:block">
               Book
             </Link>
             <MobileMenu links={[{ href: base || "/", label: "Home" }, ...nav.map((p) => ({ href: link(p.slug), label: p.title }))]} account={account} book={book} />
@@ -88,10 +86,8 @@ export function ErChrome({ site, base, preview, children }: { site: SiteData; ba
 
       <main className="flex-1">{children}</main>
 
-      <footer className="relative overflow-hidden bg-[var(--er-navy)] text-white/70">
-        <Waves className="text-[var(--er-cream)]" flip />
-        <div className="er-caustics absolute inset-0" aria-hidden />
-        <div className="relative mx-auto grid max-w-7xl gap-12 px-5 pb-10 pt-20 sm:px-8 md:grid-cols-[1.5fr_1fr_1fr]">
+      <footer className="bg-[var(--er-navy)] text-white/65">
+        <div className="mx-auto grid max-w-6xl gap-12 px-5 pb-10 pt-16 sm:px-8 md:grid-cols-[1.5fr_1fr_1fr]">
           <div>
             <div className="flex items-center gap-3">
               <span className="flex size-14 items-center justify-center rounded-full bg-white p-2 ring-1 ring-[var(--er-gold)]/40">
@@ -112,7 +108,7 @@ export function ErChrome({ site, base, preview, children }: { site: SiteData; ba
             )}
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--er-gold)]">Explore</p>
+            <p className="text-sm font-semibold text-white">Explore</p>
             <ul className="mt-5 space-y-2.5">
               {nav.map((p) => (
                 <li key={p.slug}>
@@ -129,7 +125,7 @@ export function ErChrome({ site, base, preview, children }: { site: SiteData; ba
             </ul>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--er-gold)]">Contact</p>
+            <p className="text-sm font-semibold text-white">Contact</p>
             <ul className="mt-5 space-y-3 text-sm">
               {site.phone && (
                 <li className="flex gap-2.5">
@@ -162,15 +158,14 @@ export function ErChrome({ site, base, preview, children }: { site: SiteData; ba
             </ul>
           </div>
         </div>
-        <p className="relative border-t border-white/10 px-5 py-6 text-center text-xs text-white/40">
+        <p className="border-t border-white/10 px-5 py-6 text-center text-xs text-white/40">
           © {new Date().getFullYear()} {site.name}
         </p>
       </footer>
 
       {wa && (
-        <a href={wa} target="_blank" rel="noopener" aria-label="Chat on WhatsApp" className="er-float fixed bottom-6 right-6 z-40 flex size-14 items-center justify-center rounded-full bg-[#25d366] text-white shadow-xl shadow-black/30 transition hover:scale-110">
-          <span className="absolute inset-0 animate-ping rounded-full bg-[#25d366] opacity-25" aria-hidden />
-          <MessageCircle className="relative size-7" aria-hidden />
+        <a href={wa} target="_blank" rel="noopener" aria-label="Chat on WhatsApp" className="fixed bottom-6 right-6 z-40 flex size-13 items-center justify-center rounded-full bg-[#25d366] text-white shadow-lg shadow-black/20 transition hover:brightness-95">
+          <MessageCircle className="size-6" aria-hidden />
         </a>
       )}
     </div>

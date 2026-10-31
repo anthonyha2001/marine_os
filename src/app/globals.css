@@ -107,31 +107,20 @@ main table tbody tr:hover {
   scroll-margin: 7rem 0 1rem;
 }
 
-/* ---------- Eliche Radice website (app/site/[company]/_er): marine motion ---------- */
+/* ---------- Eliche Radice website (app/site/[company]/_er): quiet, professional motion ---------- */
 .er-site { --er-ease: cubic-bezier(0.22, 1, 0.36, 1); }
-.er-reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.9s var(--er-ease), transform 0.9s var(--er-ease); transition-delay: var(--er-delay, 0ms); }
-.er-reveal[data-shown] { opacity: 1; transform: none; }
-.er-glow { position: relative; isolation: isolate; transition: transform 0.35s var(--er-ease), box-shadow 0.35s var(--er-ease), background-color 0.3s; }
-.er-glow::after { content: ""; position: absolute; inset: -2px; z-index: -1; border-radius: inherit; background: radial-gradient(120% 120% at 50% 0%, var(--er-gold), transparent 70%); opacity: 0; filter: blur(14px); transition: opacity 0.4s; }
-.er-glow:hover { transform: translateY(-2px); }
-.er-glow:hover::after { opacity: 0.75; }
-.er-shimmer { background: linear-gradient(100deg, var(--er-gold) 20%, #fff6d6 40%, var(--er-gold) 60%); background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: er-shimmer 6s linear infinite; }
-@keyframes er-shimmer { to { background-position: -220% 0; } }
-.er-wave { animation: er-wave var(--er-wave-speed, 18s) linear infinite; }
-@keyframes er-wave { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-.er-spin { animation: er-spin 40s linear infinite; }
-@keyframes er-spin { to { transform: rotate(360deg); } }
-.er-float { animation: er-float 7s ease-in-out infinite; }
-@keyframes er-float { 50% { transform: translateY(-14px); } }
-.er-marquee { animation: er-wave 40s linear infinite; }
-.er-light { background: radial-gradient(600px circle at var(--er-x, 50%) var(--er-y, 50%), color-mix(in srgb, var(--er-gold) 22%, transparent), transparent 45%); }
-.er-caustics { background-image: radial-gradient(ellipse at 20% 30%, rgb(255 255 255 / 0.07), transparent 40%), radial-gradient(ellipse at 70% 60%, rgb(255 255 255 / 0.05), transparent 45%); background-size: 200% 200%; animation: er-caustics 16s ease-in-out infinite alternate; }
-@keyframes er-caustics { to { background-position: 100% 100%; } }
-.er-site[data-motion="calm"] .er-wave { --er-wave-speed: 40s; }
-.er-site[data-motion="calm"] .er-float, .er-site[data-motion="calm"] .er-caustics, .er-site[data-motion="calm"] .er-shimmer { animation: none; }
+/* Fade in as it scrolls into view, in CSS only (no script touching the page). Older browsers just show it. */
+@supports (animation-timeline: view()) {
+  .er-reveal:not([data-shown]) { animation: er-fade-up linear both; animation-timeline: view(); animation-range: entry 0% entry 35%; }
+}
+@keyframes er-fade-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.er-lift { transition: translate 0.35s var(--er-ease), box-shadow 0.35s var(--er-ease); }
+.er-lift:hover { translate: 0 -3px; }
+.er-marquee { animation: er-marquee 50s linear infinite; }
+@keyframes er-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.er-site[data-motion="calm"] .er-reveal { animation-name: er-fade !important; }
+@keyframes er-fade { from { opacity: 0; } to { opacity: 1; } }
 .er-site[data-motion="off"] *, .er-site[data-motion="off"] *::after { animation: none !important; transition: none !important; }
-.er-site[data-motion="off"] .er-reveal { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) {
   .er-site *, .er-site *::after { animation: none !important; transition-duration: 0.01ms !important; }
-  .er-site .er-reveal { opacity: 1; transform: none; }
 }
