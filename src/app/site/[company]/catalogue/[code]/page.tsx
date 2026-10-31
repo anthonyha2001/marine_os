@@ -8,7 +8,7 @@ import { isCompanySlug } from "@/lib/permissions";
 import { Picture, ProductGrid, SectionTitle } from "../../blocks";
 import { ContactForm } from "../../forms";
 import { siteContext, whatsappLink } from "../../site";
-import { ElicheProduct } from "../../_eliche/pages";
+import { ErProduct } from "../../_er/render";
 
 export async function generateMetadata({ params }: PageProps<"/site/[company]/catalogue/[code]">): Promise<Metadata> {
   const { company, code } = await params;
@@ -22,7 +22,7 @@ async function Product({ params }: { params: Promise<{ company: string; code: st
   if (!visible) return null;
   const product = site.showCatalogue ? site.listings.find((p) => p.code === code) : undefined;
   if (!product) notFound();
-  if (site.slug === "eliche-radice") return <ElicheProduct site={site} base={base} product={product} />;
+  if (site.slug === "eliche-radice") return <ErProduct site={site} base={base} product={product} />;
   const others = site.listings.filter((p) => p.productId !== product.productId).slice(0, 4);
   const wa = whatsappLink(site.whatsapp, `Hello ${site.name}, I'd like a quote for ${product.name} (ref. ${product.code}).`);
   return (

@@ -2,14 +2,14 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { CtaBand, PageHero, ServiceGrid } from "../blocks";
 import { siteContext } from "../site";
-import { ElicheServices } from "../_eliche/pages";
+import { ErPage } from "../_er/render";
 
 export const metadata: Metadata = { title: "Services" };
 
 async function Services({ params }: { params: Promise<{ company: string }> }) {
   const { site, base, visible } = await siteContext(params);
   if (!visible) return null;
-  if (site.slug === "eliche-radice") return <ElicheServices site={site} base={base} />;
+  if (site.slug === "eliche-radice") return <ErPage site={site} base={base} slug="services" />;
   return (
     <>
       <PageHero eyebrow="Services" title="What we can do for you" text={site.heroText} />

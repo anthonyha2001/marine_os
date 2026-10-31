@@ -4,12 +4,12 @@ import { ArrowRight, CalendarCheck, Mail, MapPin, Phone } from "lucide-react";
 import { mediaUrl } from "@/lib/data/website";
 import { CtaBand, Highlights, Picture, ProductGrid, SectionTitle, ServiceGrid } from "./blocks";
 import { siteContext } from "./site";
-import { ElicheHome } from "./_eliche/pages";
+import { ErPage } from "./_er/render";
 
 async function Home({ params }: { params: Promise<{ company: string }> }) {
   const { site, base, visible } = await siteContext(params);
   if (!visible) return null;
-  if (site.slug === "eliche-radice") return <ElicheHome site={site} base={base} />;
+  if (site.slug === "eliche-radice") return <ErPage site={site} base={base} slug="" />;
   const hero = mediaUrl(site.heroImageId);
   const services = site.services.filter((s) => s.published).slice(0, 6);
   const products = site.showCatalogue ? site.listings.slice(0, 8) : [];

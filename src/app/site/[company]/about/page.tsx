@@ -2,14 +2,14 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { CtaBand, Picture, SectionTitle } from "../blocks";
 import { siteContext } from "../site";
-import { ElicheAbout } from "../_eliche/pages";
+import { ErPage } from "../_er/render";
 
 export const metadata: Metadata = { title: "About us" };
 
 async function About({ params }: { params: Promise<{ company: string }> }) {
   const { site, base, visible } = await siteContext(params);
   if (!visible) return null;
-  if (site.slug === "eliche-radice") return <ElicheAbout site={site} base={base} />;
+  if (site.slug === "eliche-radice") return <ErPage site={site} base={base} slug="about" />;
   return (
     <>
       <section className="mx-auto grid max-w-6xl items-start gap-12 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-[1.2fr_1fr]">

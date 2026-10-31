@@ -1,8 +1,7 @@
 "use server";
 
-import { createHash } from "crypto";
+import { tooMany, visitorHash } from "@/lib/visitor";
 import { updateTag } from "next/cache";
-import { headers } from "next/headers";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireModule } from "@/lib/auth";
@@ -237,22 +236,11 @@ export async function setMessageHandled(companySlug: string, messageId: string, 
 
 export type PublicFormState = { error?: string; sent?: boolean };
 
-/** A one-way fingerprint of the visitor, to limit how many messages one source can send. */
-async function visitorHash() {
-  const h = await headers();
-  const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || h.get("x-real-ip") || "unknown";
-  return createHash("sha256").update(`${ip}|${process.env.AUTH_SECRET ?? ""}`).digest("hex").slice(0, 32);
-}
-
 async function publicCompany(slug: string) {
   if (!isCompanySlug(slug)) return null;
   return prisma.company.findUnique({ where: { slug }, select: { id: true } });
 }
 
-async function tooMany(companyId: string, ipHash: string) {
-  const since = new Date(Date.now() - 60 * 60 * 1000);
-  return (await prisma.websiteMessage.count({ where: { companyId, ipHash, createdAt: { gte: since } } })) >= 5;
-}
 
 const contactSchema = z.object({
   name: z.string().trim().min(2, "Please enter your name").max(120),

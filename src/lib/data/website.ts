@@ -5,6 +5,8 @@ import { DATA_TAG } from "@/lib/cache-tag";
 import { companyIdFor, tags } from "@/lib/data/inventory";
 import { getCompanyProfile } from "@/lib/data/sales";
 import { COMPANIES, type CompanySlug } from "@/lib/permissions";
+import { STARTER_PAGES, blockData, isBlockType, type BlockData, type BlockType } from "@/lib/website-blocks";
+import { readTheme } from "@/lib/website-theme";
 
 // The public websites of both companies, edited in Marketing → Website. Every read is cached
 // and refreshed by websiteTag when something is saved.
@@ -51,7 +53,7 @@ async function loadSite(slug: CompanySlug, companyId: string) {
   "use cache";
   cacheTag(DATA_TAG, websiteTag(companyId), tags.products, tags.stock(companyId), tags.purchases(companyId));
   cacheLife("hours");
-  const [settings, services, gallery, products, overrides, profile] = await Promise.all([
+  const [settings, services, gallery, products, overrides, profile, savedPages] = await Promise.all([
     prisma.websiteSettings.findUnique({ where: { companyId } }),
     prisma.websiteService.findMany({ where: { companyId }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] }),
     prisma.websiteGalleryItem.findMany({ where: { companyId }, orderBy: [{ position: "asc" }, { createdAt: "asc" }] }),
@@ -63,7 +65,30 @@ async function loadSite(slug: CompanySlug, companyId: string) {
     }),
     prisma.websiteListing.findMany({ where: { companyId } }),
     getCompanyProfile(slug),
+    prisma.websitePage.findMany({ where: { companyId }, orderBy: [{ position: "asc" }, { slug: "asc" }], include: { blocks: { orderBy: { position: "asc" } } } }),
   ]);
+  // Until the company edits its pages, the starter pages show (nothing saved yet).
+  const pages: SitePage[] = savedPages.length
+    ? savedPages.map((p) => ({
+        id: p.id,
+        slug: p.slug,
+        title: p.title,
+        inNav: p.inNav,
+        published: p.published,
+        seoTitle: p.seoTitle,
+        seoDescription: p.seoDescription,
+        blocks: p.blocks.filter((b) => isBlockType(b.type)).map((b) => ({ id: b.id, type: b.type as BlockType, hidden: b.hidden, data: blockData(b.type as BlockType, b.data) })),
+      }))
+    : STARTER_PAGES.map((p) => ({
+        id: `starter-${p.slug || "home"}`,
+        slug: p.slug,
+        title: p.title,
+        inNav: p.inNav,
+        published: true,
+        seoTitle: null,
+        seoDescription: null,
+        blocks: p.blocks.map((b, i) => ({ id: `starter-${p.slug || "home"}-${i}`, type: b.type, hidden: false, data: blockData(b.type, b.data) })),
+      }));
   const byProduct = new Map(overrides.map((o) => [o.productId, o]));
   const catalogue = products.map((p) => {
     const o = byProduct.get(p.id);
@@ -116,6 +141,9 @@ async function loadSite(slug: CompanySlug, companyId: string) {
     showGallery: s?.showGallery ?? true,
     showBooking: s?.showBooking ?? true,
     raw: s,
+    theme: readTheme(s?.theme),
+    pages,
+    pagesSaved: savedPages.length > 0,
     services: (services.length ? services : d.services.map((x, i) => ({ id: `default-${i}`, ...x, imageId: null, published: true, position: i }))).map((x) => ({
       id: x.id,
       title: x.title,
@@ -134,6 +162,13 @@ async function loadSite(slug: CompanySlug, companyId: string) {
 }
 
 export type SiteData = Awaited<ReturnType<typeof loadSite>>;
+export type SiteBlock = { id: string; type: BlockType; hidden: boolean; data: BlockData };
+export type SitePage = { id: string; slug: string; title: string; inNav: boolean; published: boolean; seoTitle: string | null; seoDescription: string | null; blocks: SiteBlock[] };
+
+/** A page of the site by its address ("" = home), if it exists and is published. */
+export function findPage(site: SiteData, slug: string) {
+  return site.pages.find((p) => p.slug === slug && p.published) ?? null;
+}
 
 export async function getSite(slug: CompanySlug) {
   return loadSite(slug, await companyIdFor(slug));

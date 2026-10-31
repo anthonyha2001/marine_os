@@ -7,7 +7,7 @@ import { APPOINTMENT_SLOTS } from "@/lib/data/portal";
 import { PageHero } from "../blocks";
 import { BookingForm } from "../forms";
 import { siteContext } from "../site";
-import { ElicheBook } from "../_eliche/pages";
+import { ErPage } from "../_er/render";
 
 export const metadata: Metadata = { title: "Book a service" };
 
@@ -17,7 +17,7 @@ async function Book({ params }: { params: Promise<{ company: string }> }) {
   if (!site.showBooking) notFound();
   const tomorrow = new Date(`${businessToday()}T00:00:00Z`);
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-  if (site.slug === "eliche-radice") return <ElicheBook site={site} base={base} slots={APPOINTMENT_SLOTS} minDate={tomorrow.toISOString().slice(0, 10)} />;
+  if (site.slug === "eliche-radice") return <ErPage site={site} base={base} slug="book" />;
   return (
     <>
       <PageHero eyebrow="Book a service" title="Book your boat in" text="Choose a day and time that suits you. We'll call to confirm and prepare everything before you arrive." />

@@ -6,8 +6,15 @@ import { getSite, websiteMessages } from "@/lib/data/website";
 import { COMPANIES } from "@/lib/permissions";
 import { Badge, PageHeader, secondaryButton } from "@/components/ui";
 import { GalleryEditor, Inbox, ProductsEditor, PublishToggle, ServicesEditor, SettingsForm } from "./editor";
+import { PagesEditor } from "./pages-editor";
+import { ThemeEditor } from "./theme-editor";
+
+// Pages and Design: the block-built site (Eliche Radice first; Xpert Marine keeps its fixed pages for now).
+const BUILDER = ["eliche-radice"];
 
 const TABS = [
+  ["pages", "Pages"],
+  ["design", "Design"],
   ["texts", "Texts & contact"],
   ["services", "Services"],
   ["products", "Products"],
@@ -19,7 +26,9 @@ type Tab = (typeof TABS)[number][0];
 async function Editor({ params, searchParams }: { params: Promise<{ company: string }>; searchParams: Promise<{ tab?: string }> }) {
   const [{ company }, search] = await Promise.all([params, searchParams]);
   const { slug } = await requireModule(company, "marketing");
-  const tab: Tab = TABS.some(([k]) => k === search.tab) ? (search.tab as Tab) : "texts";
+  const builder = BUILDER.includes(slug);
+  const tabs = TABS.filter(([k]) => builder || (k !== "pages" && k !== "design"));
+  const tab: Tab = tabs.some(([k]) => k === search.tab) ? (search.tab as Tab) : builder ? "pages" : "texts";
   const [site, messages] = await Promise.all([getSite(slug), websiteMessages(slug)]);
   const unread = messages.filter((m) => m.status === "NEW").length;
   const base = `/c/${slug}/marketing/website`;
@@ -48,7 +57,7 @@ async function Editor({ params, searchParams }: { params: Promise<{ company: str
       </div>
 
       <nav className="mt-6 flex gap-1 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-border)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Website sections">
-        {TABS.map(([key, label]) => (
+        {tabs.map(([key, label]) => (
           <Link
             key={key}
             href={`${base}?tab=${key}`}
@@ -64,6 +73,8 @@ async function Editor({ params, searchParams }: { params: Promise<{ company: str
       </nav>
 
       <div className="mt-6">
+        {tab === "pages" && <PagesEditor companySlug={slug} pages={site.pages} siteBase={`/site/${slug}`} saved={site.pagesSaved} />}
+        {tab === "design" && <ThemeEditor companySlug={slug} theme={site.theme} siteBase={`/site/${slug}`} />}
         {tab === "texts" && <SettingsForm companySlug={slug} raw={site.raw} site={site} />}
         {tab === "services" && <ServicesEditor companySlug={slug} services={site.services} />}
         {tab === "products" && <ProductsEditor companySlug={slug} products={site.catalogue} />}

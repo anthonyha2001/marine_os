@@ -3,14 +3,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CtaBand, PageHero, Picture } from "../blocks";
 import { siteContext } from "../site";
-import { ElicheGallery } from "../_eliche/pages";
+import { ErPage } from "../_er/render";
 
 export const metadata: Metadata = { title: "Gallery" };
 
 async function Gallery({ params }: { params: Promise<{ company: string }> }) {
   const { site, base, visible } = await siteContext(params);
   if (!visible) return null;
-  if (site.slug === "eliche-radice") return <ElicheGallery site={site} base={base} />;
+  if (site.slug === "eliche-radice") return <ErPage site={site} base={base} slug="gallery" />;
   const items = site.gallery.filter((g) => g.published);
   if (!site.showGallery || !items.length) notFound();
   return (

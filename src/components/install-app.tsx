@@ -8,17 +8,17 @@ type InstallEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{
 const DISMISS_KEY = "marineos:install-dismissed";
 const DAYS = 14;
 
-function dismissedRecently() {
+function dismissedRecently(dismissKey: string) {
   try {
-    const at = Number(localStorage.getItem(DISMISS_KEY) ?? 0);
+    const at = Number(localStorage.getItem(dismissKey) ?? 0);
     return Date.now() - at < DAYS * 86_400_000;
   } catch {
     return false;
   }
 }
-function rememberDismiss() {
+function rememberDismiss(dismissKey: string) {
   try {
-    localStorage.setItem(DISMISS_KEY, String(Date.now()));
+    localStorage.setItem(dismissKey, String(Date.now()));
   } catch {}
 }
 
@@ -27,7 +27,7 @@ function rememberDismiss() {
  * iPhone and iPad (Safari has no install button) get the two steps to add it to the home screen.
  * Hidden once installed, and for two weeks after "Not now".
  */
-export function InstallApp() {
+export function InstallApp({ title = "Install Marine OS", dismissKey = DISMISS_KEY }: { title?: string; dismissKey?: string } = {}) {
   const [event, setEvent] = useState<InstallEvent | null>(null);
   const [ios, setIos] = useState(false);
   const [open, setOpen] = useState(false);
@@ -35,7 +35,7 @@ export function InstallApp() {
   useEffect(() => {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" }).catch(() => {});
     const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
-    if (standalone || dismissedRecently()) return;
+    if (standalone || dismissedRecently(dismissKey)) return;
 
     const onPrompt = (e: Event) => {
       e.preventDefault();
@@ -59,11 +59,11 @@ export function InstallApp() {
       window.removeEventListener("appinstalled", onInstalled);
       if (timer) clearTimeout(timer);
     };
-  }, []);
+  }, [dismissKey]);
 
   if (!open) return null;
   const close = () => {
-    rememberDismiss();
+    rememberDismiss(dismissKey);
     setOpen(false);
   };
 
@@ -77,7 +77,7 @@ export function InstallApp() {
         <img src="/icons/icon-192.png" alt="" width={56} height={56} className="size-14 shrink-0 rounded-2xl border border-border" />
         <div className="min-w-0">
           <h2 id="install-title" className="font-semibold text-navy">
-            Install Marine OS
+            {title}
           </h2>
           <p className="mt-0.5 text-sm text-muted">
             {ios ? "Add it to your home screen to open it like an app, full screen." : "Open it like an app: its own window, icon on your desktop or home screen, faster to reach."}
@@ -107,7 +107,7 @@ export function InstallApp() {
               if (!event) return;
               await event.prompt();
               const { outcome } = await event.userChoice;
-              if (outcome === "dismissed") rememberDismiss();
+              if (outcome === "dismissed") rememberDismiss(dismissKey);
               setEvent(null);
               setOpen(false);
             }}

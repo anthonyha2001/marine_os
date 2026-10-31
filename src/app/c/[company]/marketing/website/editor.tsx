@@ -36,8 +36,26 @@ async function resize(file: File) {
 }
 
 /** Upload a picture and keep its id in a hidden field (name). */
-export function ImagePicker({ companySlug, name, initial, label, aspect = "aspect-video" }: { companySlug: string; name: string; initial: string | null; label: string; aspect?: string }) {
-  const [id, setId] = useState(initial);
+export function ImagePicker({
+  companySlug,
+  name,
+  initial,
+  label,
+  aspect = "aspect-video",
+  onChange,
+}: {
+  companySlug: string;
+  name: string;
+  initial: string | null;
+  label: string;
+  aspect?: string;
+  onChange?: (id: string | null) => void; // for forms that keep their own state (page blocks)
+}) {
+  const [id, setIdState] = useState(initial);
+  const setId = (next: string | null) => {
+    setIdState(next);
+    onChange?.(next);
+  };
   const [busy, setBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const { toast } = useFeedback();

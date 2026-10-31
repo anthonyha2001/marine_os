@@ -30,9 +30,9 @@ function Sent({ title, text }: { title: string; text: string }) {
 }
 
 /** Contact form; with a product it becomes a quote request. */
-export function ContactForm({ slug, product }: { slug: string; product?: { id: string; name: string } }) {
+export function ContactForm({ slug, product, message, sentTitle }: { slug: string; product?: { id: string; name: string }; message?: string; sentTitle?: string }) {
   const [state, action, pending] = useActionState<PublicFormState, FormData>(sendWebsiteMessage.bind(null, slug), {});
-  if (state.sent) return <Sent title={product ? "Quote request sent" : "Message sent"} text="Thank you. We'll get back to you shortly." />;
+  if (state.sent) return <Sent title={sentTitle ?? (product ? "Quote request sent" : "Message sent")} text="Thank you. We'll get back to you shortly." />;
   return (
     <form action={action} className="relative space-y-4">
       <Trap />
@@ -53,7 +53,7 @@ export function ContactForm({ slug, product }: { slug: string; product?: { id: s
       </label>
       <label className={label}>
         {product ? "What do you need? (quantity, boat, engine…)" : "Message *"}
-        <textarea name="message" required rows={5} maxLength={3000} defaultValue={product ? `I'd like a quote for ${product.name}.` : ""} className={field} />
+        <textarea name="message" required rows={5} maxLength={3000} defaultValue={product ? `I'd like a quote for ${product.name}.` : (message ?? "")} className={field} />
       </label>
       <p className="text-xs text-slate-500">Give us a phone number or an email so we can reply.</p>
       {state.error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{state.error}</p>}

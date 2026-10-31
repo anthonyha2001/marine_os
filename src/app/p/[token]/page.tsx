@@ -8,8 +8,8 @@ import { COMPANIES } from "@/lib/permissions";
 import { Badge, cardClass, primaryButton, secondaryButton } from "@/components/ui";
 import { Card, CompanyTag, Empty, JobTrack, RowLink } from "./_parts";
 
-async function Home({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
+async function Home({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<{ welcome?: string }> }) {
+  const [{ token }, search] = await Promise.all([params, searchParams]);
   const customer = await portalCustomer(token);
   if (!customer) return null;
   const data = await portalHome(customer.id);
@@ -33,6 +33,11 @@ async function Home({ params }: { params: Promise<{ token: string }> }) {
 
   return (
     <div className="space-y-6">
+      {search.welcome && (
+        <p role="status" className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-success">
+          Welcome! Your account is ready. <strong>Bookmark this page or install the app</strong>: this private link is your key, so keep it to yourself.
+        </p>
+      )}
       <div className="rounded-2xl bg-navy px-5 py-6 text-white sm:px-7">
         <p className="text-sm text-white/70">{greeting},</p>
         <h1 className="mt-0.5 text-2xl font-semibold tracking-tight">{customer.contactName || customer.name}</h1>
@@ -158,10 +163,10 @@ async function Home({ params }: { params: Promise<{ token: string }> }) {
   );
 }
 
-export default function PortalHome({ params }: PageProps<"/p/[token]">) {
+export default function PortalHome({ params, searchParams }: PageProps<"/p/[token]">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading…</p>}>
-      <Home params={params} />
+      <Home params={params} searchParams={searchParams as Promise<{ welcome?: string }>} />
     </Suspense>
   );
 }

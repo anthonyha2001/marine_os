@@ -5,7 +5,7 @@ import { Clock, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import { getSite } from "@/lib/data/website";
 import { isCompanySlug } from "@/lib/permissions";
 import { SiteHeader } from "./site-header";
-import { ElicheChrome } from "./_eliche/chrome";
+import { ErChrome } from "./_er/chrome";
 import { ACCENT, siteContext, whatsappLink } from "./site";
 
 export async function generateMetadata({ params }: LayoutProps<"/site/[company]">): Promise<Metadata> {
@@ -50,9 +50,9 @@ async function Shell({ params, children }: { params: Promise<{ company: string }
 
   if (site.slug === "eliche-radice") {
     return (
-      <ElicheChrome site={site} base={base} preview={preview}>
+      <ErChrome site={site} base={base} preview={preview}>
         {children}
-      </ElicheChrome>
+      </ErChrome>
     );
   }
 

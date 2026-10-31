@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { Search } from "lucide-react";
 import { CtaBand, PageHero, ProductGrid } from "../blocks";
 import { siteContext } from "../site";
-import { ElicheCatalogue } from "../_eliche/pages";
+import { ErPage } from "../_er/render";
 
 export const metadata: Metadata = { title: "Catalogue" };
 
@@ -12,7 +12,7 @@ async function Catalogue({ params, searchParams }: { params: Promise<{ company: 
   const [{ site, base, visible }, { q = "" }] = await Promise.all([siteContext(params), searchParams]);
   if (!visible) return null;
   if (!site.showCatalogue) notFound();
-  if (site.slug === "eliche-radice") return <ElicheCatalogue site={site} base={base} q={q} />;
+  if (site.slug === "eliche-radice") return <ErPage site={site} base={base} slug="shop" />;
   const needle = q.trim().toLowerCase();
   const products = site.listings.filter((p) => !needle || p.name.toLowerCase().includes(needle) || p.code.includes(needle) || (p.description ?? "").toLowerCase().includes(needle));
   return (

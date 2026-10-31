@@ -67,6 +67,7 @@ model Company {
   websiteImages    WebsiteImage[]
   websiteMessages  WebsiteMessage[]
   portalThreads    PortalThread[]
+  websitePages     WebsitePage[]
 }
 
 model User {
@@ -1437,6 +1438,7 @@ model WebsiteSettings {
   showCatalogue  Boolean  @default(true)
   showGallery    Boolean  @default(true)
   showBooking    Boolean  @default(true)
+  theme          Json? // colours, fonts, corners, motion: see lib/website-theme.ts
   updatedAt      DateTime @updatedAt
 }
 
@@ -1556,4 +1558,37 @@ model PortalMessage {
   createdAt    DateTime     @default(now())
 
   @@index([threadId, createdAt])
+}
+
+/// A page of a company website, made of blocks (Marketing → Website → Pages).
+/// slug "" is the home page; about, services, shop, gallery, contact… or any page the company adds.
+model WebsitePage {
+  id             String         @id @default(cuid())
+  companyId      String
+  company        Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  slug           String
+  title          String
+  inNav          Boolean        @default(true) // shown in the site menu
+  position       Int            @default(0)
+  published      Boolean        @default(true)
+  seoTitle       String?
+  seoDescription String?
+  blocks         WebsiteBlock[]
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([companyId, slug])
+}
+
+/// One block on a page: its type (hero, stats, services…) and everything editable about it.
+model WebsiteBlock {
+  id        String      @id @default(cuid())
+  pageId    String
+  page      WebsitePage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  type      String
+  position  Int         @default(0)
+  hidden    Boolean     @default(false)
+  data      Json
+  createdAt DateTime    @default(now())
+
+  @@index([pageId, position])
 }

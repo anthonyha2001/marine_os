@@ -4,14 +4,14 @@ import { Clock, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import { PageHero } from "../blocks";
 import { ContactForm } from "../forms";
 import { siteContext, whatsappLink } from "../site";
-import { ElicheContact } from "../_eliche/pages";
+import { ErPage } from "../_er/render";
 
 export const metadata: Metadata = { title: "Contact" };
 
 async function Contact({ params }: { params: Promise<{ company: string }> }) {
   const { site, base, visible } = await siteContext(params);
   if (!visible) return null;
-  if (site.slug === "eliche-radice") return <ElicheContact site={site} base={base} />;
+  if (site.slug === "eliche-radice") return <ErPage site={site} base={base} slug="contact" />;
   const wa = whatsappLink(site.whatsapp, `Hello ${site.name}, `);
   const rows = [
     site.phone && { icon: Phone, label: "Phone", value: site.phone, href: `tel:${site.phone}` },
