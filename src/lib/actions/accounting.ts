@@ -1,5 +1,6 @@
 "use server";
 
+import { againTarget, wantsAnother } from "@/lib/return-to";
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -16,7 +17,7 @@ import { nextNumber } from "@/lib/ledger/numbering";
 import { postSupplierPayment, removeEntries } from "@/lib/ledger/posting";
 import { round2 } from "@/lib/money";
 
-export type PaymentFormState = { error?: string; savedId?: string }; // savedId: saved in a pop-up (form sent with "stay")
+export type PaymentFormState = { error?: string; savedId?: string; again?: boolean }; // again: "Save & new" in a pop-up // savedId: saved in a pop-up (form sent with "stay")
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
@@ -101,8 +102,8 @@ export async function recordSupplierPayment(
 
   updateTag(payablesTag(companyId));
   updateTag(ledgerTag(companyId));
-  if (formData.get("stay")) return { savedId: paymentId };
-  redirect(`/c/${slug}/finance/vouchers?saved=${paymentId}`);
+  if (formData.get("stay")) return { savedId: paymentId, again: wantsAnother(formData) };
+  redirect(againTarget(slug, formData, "Payment voucher saved.") ?? `/c/${slug}/finance/vouchers?saved=${paymentId}`);
 }
 
 /** Remove a payment recorded by mistake (and its journal entry). */

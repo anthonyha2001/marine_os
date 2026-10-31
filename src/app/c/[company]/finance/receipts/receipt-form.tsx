@@ -1,5 +1,6 @@
 "use client";
 
+import { SaveNewButton } from "@/components/save-new-button";
 import { useActionState, useEffect, useState } from "react";
 import { recordReceipt, type FinanceFormState } from "@/lib/actions/finance";
 import type { MoneyAccountOption } from "@/lib/data/ledger";
@@ -30,7 +31,7 @@ export function ReceiptForm({
   customers?: { id: string; name: string }[];
   defaultInvoiceId?: string;
   defaultCustomerId?: string; // "on account" starts with this customer
-  onSaved?: (id: string) => void; // in a pop-up: stay on the page and report the new id
+  onSaved?: (id: string, again?: boolean) => void; // in a pop-up: stay on the page and report the new id (again: Save & new)
 }) {
   const [mode, setMode] = useState<"invoice" | "account">(invoices.length ? "invoice" : "account");
   const [invoiceId, setInvoiceId] = useState(invoices.find((i) => i.id === defaultInvoiceId)?.id ?? invoices[0]?.id ?? "");
@@ -39,7 +40,7 @@ export function ReceiptForm({
   const amountInput = useFocusOnShow<HTMLInputElement>();
   const [state, formAction, pending] = useActionState<FinanceFormState, FormData>(recordReceipt.bind(null, companySlug), {});
   useEffect(() => {
-    if (state.savedId) onSaved?.(state.savedId);
+    if (state.savedId) onSaved?.(state.savedId, state.again);
   }, [state, onSaved]);
   const value = Number(amount) || 0;
   const tooMuch = mode === "invoice" && !!invoice && value > invoice.balance + 0.001;
@@ -147,10 +148,13 @@ export function ReceiptForm({
       </label>
 
       <FormMessage error={state.error} />
-      <button type="submit" disabled={pending || tooMuch || value <= 0} className={`${primaryButton} w-full gap-2`}>
-        {pending ? "Saving…" : "Save receipt voucher"}
-        <Kbd className="border-white/30 bg-white/10 text-white">Ctrl S</Kbd>
-      </button>
+      <div className="flex gap-2">
+        <button type="submit" disabled={pending || tooMuch || value <= 0} className={`${primaryButton} flex-1 gap-2`}>
+          {pending ? "Saving…" : "Save receipt voucher"}
+          <Kbd className="border-white/30 bg-white/10 text-white">Ctrl S</Kbd>
+        </button>
+        <SaveNewButton disabled={pending || tooMuch || value <= 0} />
+      </div>
     </form>
   );
 }

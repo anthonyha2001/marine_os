@@ -1,5 +1,6 @@
 "use client";
 
+import { SaveNewButton } from "@/components/save-new-button";
 import { useActionState, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { saveVessel, type VesselFormState } from "@/lib/actions/vessels";
@@ -167,10 +168,13 @@ export function VesselForm({
         <textarea name="notes" rows={2} maxLength={2000} defaultValue={vessel?.notes ?? ""} className={inputClass} />
       </label>
       <FormMessage error={state.error} />
-      <button type="submit" disabled={pending} className={`${primaryButton} w-full gap-2`}>
-        {pending ? "Saving…" : vessel ? "Save vessel" : "Add vessel"}
-        <Kbd className="border-white/30 bg-white/10 text-white">Ctrl S</Kbd>
-      </button>
+      <div className="flex gap-2">
+        <button type="submit" disabled={pending} className={`${primaryButton} flex-1 gap-2`}>
+          {pending ? "Saving…" : vessel ? "Save vessel" : "Add vessel"}
+          <Kbd className="border-white/30 bg-white/10 text-white">Ctrl S</Kbd>
+        </button>
+        {!vessel && <SaveNewButton disabled={pending} />}
+      </div>
     </form>
   );
 }

@@ -6,7 +6,10 @@ import { listProductsWithStock, listSuppliers } from "@/lib/data/inventory";
 import { formatMoney, withVat } from "@/lib/money";
 import { COMPANIES } from "@/lib/permissions";
 import { Modal } from "@/components/modal";
-import { cardClass, PageHeader, ButtonLink, StockBadge, SavedNotice, SearchBar } from "@/components/ui";
+import { OpenRow } from "@/components/open-row";
+import { withParams } from "@/lib/url";
+import { ImageOff, Pencil } from "lucide-react";
+import { cardClass, PageHeader, ButtonLink, StockBadge, SavedNotice, SearchBar, primaryButton } from "@/components/ui";
 import { ProductForm } from "./product-form";
 
 async function InventoryContent({
@@ -14,10 +17,10 @@ async function InventoryContent({
   searchParams,
 }: {
   params: Promise<{ company: string }>;
-  searchParams: Promise<{ q?: string; status?: string; saved?: string; new?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; saved?: string; new?: string; view?: string }>;
 }) {
   const { company } = await params;
-  const { q = "", status = "", saved, new: creating } = await searchParams;
+  const { q = "", status = "", saved, new: creating, view } = await searchParams;
   const { slug } = await requireModule(company, "inventory");
 
   const [all, suppliers] = await Promise.all([listProductsWithStock(slug, q), creating ? listSuppliers() : []]);
@@ -28,6 +31,9 @@ async function InventoryContent({
     out: all.filter((p) => p.status === "out").length,
   };
   const base = `/c/${slug}/inventory`;
+  // This list as shown (search + filter), so the product pop-up closes back to it.
+  const listHref = withParams(base, { q: q || null, status: status || null });
+  const viewing = view ? products.find((p) => p.id === view) : undefined;
   const filterHref = (s: string) => `${base}?${new URLSearchParams({ ...(q ? { q } : {}), ...(s ? { status: s } : {}) })}`;
 
   return (
@@ -91,7 +97,7 @@ async function InventoryContent({
             </thead>
             <tbody className="divide-y divide-border">
               {products.map((p) => (
-                <tr key={p.id} className="hover:bg-background/60">
+                <OpenRow key={p.id} href={withParams(listHref, { view: p.id })} className="hover:bg-background/60">
                   <td className="px-4 py-3">
                     <Link href={`${base}/${p.id}`} className="flex items-center gap-3">
                       {p.imageUrl ? (
@@ -117,12 +123,57 @@ async function InventoryContent({
                   <td className="px-4 py-3">
                     <StockBadge status={p.status} />
                   </td>
-                </tr>
+                </OpenRow>
               ))}
             </tbody>
           </table>
         )}
       </div>
+
+      {viewing && (
+        <Modal title={viewing.name} closeHref={listHref} size="lg">
+          <div className="grid gap-5 sm:grid-cols-[16rem_1fr]">
+            <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-border bg-white">
+              {viewing.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- product photos are stored as plain URLs
+                <img src={viewing.imageUrl} alt={viewing.name} className="h-full w-full object-contain" />
+              ) : (
+                <span className="flex flex-col items-center gap-2 p-4 text-center text-xs text-muted">
+                  <ImageOff className="size-8" aria-hidden />
+                  No photo yet. Add one with Edit.
+                </span>
+              )}
+            </div>
+            <div className="space-y-4">
+              <dl className="grid grid-cols-2 gap-3 text-sm">
+                {(
+                  [
+                    ["Code", <span key="c" className="font-mono">{viewing.code}</span>],
+                    ["Barcode", <span key="b" className="font-mono">{viewing.barcodes.join(", ") || "—"}</span>],
+                    ["Price excl. VAT", formatMoney(viewing.priceHT)],
+                    ["Price incl. VAT", <span key="t" className="text-lg">{formatMoney(withVat(viewing.priceHT))}</span>],
+                    ["In stock", <span key="s" className={viewing.stock > 0 ? "" : "text-danger"}>{viewing.stock}</span>],
+                    ["Minimum", viewing.minQuantity],
+                    ["Supplier", viewing.supplierName ?? "—"],
+                    ["Status", <StockBadge key="st" status={viewing.status} />],
+                  ] as [string, React.ReactNode][]
+                ).map(([label, value]) => (
+                  <div key={label}>
+                    <dt className="text-xs uppercase tracking-wider text-muted">{label}</dt>
+                    <dd className="mt-0.5 font-semibold text-navy">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              {viewing.description && <p className="whitespace-pre-line rounded-lg bg-surface-2 p-3 text-sm text-slate-700">{viewing.description}</p>}
+              <div className="flex justify-end border-t border-border pt-4">
+                <Link href={`${base}/${viewing.id}`} className={primaryButton}>
+                  <Pencil className="size-4" aria-hidden /> Edit product
+                </Link>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
     </>
   );
 }
@@ -132,7 +183,7 @@ export default function InventoryPage({ params, searchParams }: PageProps<"/c/[c
     <Suspense fallback={<p className="text-muted">Loading inventory…</p>}>
       <InventoryContent
         params={params}
-        searchParams={searchParams as Promise<{ q?: string; status?: string; saved?: string; new?: string }>}
+        searchParams={searchParams as Promise<{ q?: string; status?: string; saved?: string; new?: string; view?: string }>}
       />
     </Suspense>
   );

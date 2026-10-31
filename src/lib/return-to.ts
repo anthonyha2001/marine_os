@@ -8,3 +8,13 @@ export function returnTarget(slug: string, formData: FormData | undefined, messa
   const to = formData?.get("returnTo");
   return typeof to === "string" && to.startsWith(`/c/${slug}/`) ? withParams(to, { done: message }) : null;
 }
+
+/** "Save & new": the same page again (so the same empty form reopens), with the "saved" message. */
+export function againTarget(slug: string, formData: FormData | undefined, message: string) {
+  if (formData?.get("intent") !== "new") return null;
+  const to = formData.get("again");
+  return typeof to === "string" && to.startsWith(`/c/${slug}/`) ? withParams(to, { done: message }) : null;
+}
+
+/** True when the form was sent with "Save & new". */
+export const wantsAnother = (formData: FormData | undefined) => formData?.get("intent") === "new";

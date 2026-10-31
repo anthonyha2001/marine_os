@@ -1,5 +1,6 @@
 "use client";
 
+import { SaveNewButton } from "@/components/save-new-button";
 import { useActionState, useEffect, useRef } from "react";
 import { saveCustomer, type CustomerFormState } from "@/lib/actions/customers";
 import { useFocusOnShow } from "@/components/use-focus-on-show";
@@ -69,9 +70,12 @@ export function CustomerForm({ companySlug, customer }: { companySlug: string; c
         <textarea name="notes" rows={2} defaultValue={customer?.notes ?? ""} className={inputClass} />
       </label>
       <FormMessage error={state.error} success={state.success} />
-      <button type="submit" disabled={pending} className={`${primaryButton} w-full`}>
-        {pending ? "Saving…" : customer ? "Save changes" : "Add customer  (Ctrl S)"}
-      </button>
+      <div className="flex gap-2">
+        <button type="submit" disabled={pending} className={`${primaryButton} flex-1`}>
+          {pending ? "Saving…" : customer ? "Save changes" : "Add customer  (Ctrl S)"}
+        </button>
+        {!customer && <SaveNewButton disabled={pending} />}
+      </div>
     </form>
   );
 }

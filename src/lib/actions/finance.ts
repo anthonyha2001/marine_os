@@ -1,6 +1,6 @@
 "use server";
 
-import { returnTarget } from "@/lib/return-to";
+import { againTarget, returnTarget, wantsAnother } from "@/lib/return-to";
 import { Prisma } from "@prisma/client";
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
@@ -21,7 +21,7 @@ import { nextNumber } from "@/lib/ledger/numbering";
 import { UnbalancedEntryError, postCreditNote, postEntry, postReceipt, postVoucher, removeEntries, reverseEntries } from "@/lib/ledger/posting";
 import { VAT_RATE, round2 } from "@/lib/money";
 
-export type FinanceFormState = { error?: string; savedId?: string }; // savedId: saved in a pop-up (form sent with "stay")
+export type FinanceFormState = { error?: string; savedId?: string; again?: boolean }; // again: "Save & new" in a pop-up // savedId: saved in a pop-up (form sent with "stay")
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date");
@@ -125,8 +125,8 @@ export async function recordReceipt(companySlug: string, _prev: FinanceFormState
   }
 
   refresh(companyId, true);
-  if (formData.get("stay")) return { savedId: receiptId };
-  redirect(`/c/${slug}/finance/vouchers?saved=${receiptId}`);
+  if (formData.get("stay")) return { savedId: receiptId, again: wantsAnother(formData) };
+  redirect(againTarget(slug, formData, "Receipt voucher saved.") ?? `/c/${slug}/finance/vouchers?saved=${receiptId}`);
 }
 
 export async function deleteReceipt(companySlug: string, receiptId: string): Promise<{ error?: string }> {
@@ -230,8 +230,8 @@ export async function createVoucher(companySlug: string, _prev: FinanceFormState
   }, TRANSACTION_OPTIONS);
 
   refresh(companyId);
-  if (formData.get("stay")) return { savedId: id };
-  redirect(`/c/${slug}/finance/vouchers?saved=${id}`);
+  if (formData.get("stay")) return { savedId: id, again: wantsAnother(formData) };
+  redirect(againTarget(slug, formData, "Voucher saved.") ?? `/c/${slug}/finance/vouchers?saved=${id}`);
 }
 
 export async function deleteVoucher(companySlug: string, voucherId: string): Promise<{ error?: string }> {

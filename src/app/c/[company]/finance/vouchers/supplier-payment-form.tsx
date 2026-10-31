@@ -1,5 +1,6 @@
 "use client";
 
+import { SaveNewButton } from "@/components/save-new-button";
 import { useActionState, useEffect, useState } from "react";
 import { recordSupplierPayment, type PaymentFormState } from "@/lib/actions/accounting";
 import type { MoneyAccountOption } from "@/lib/data/ledger";
@@ -25,11 +26,11 @@ export function SupplierPaymentForm({
   bills: OpenBillOption[];
   accounts: MoneyAccountOption[];
   defaultBillId?: string;
-  onSaved?: (id: string) => void; // in a pop-up: stay on the page and report the new id
+  onSaved?: (id: string, again?: boolean) => void; // in a pop-up: stay on the page and report the new id (again: Save & new)
 }) {
   const [state, formAction, pending] = useActionState<PaymentFormState, FormData>(recordSupplierPayment.bind(null, companySlug), {});
   useEffect(() => {
-    if (state.savedId) onSaved?.(state.savedId);
+    if (state.savedId) onSaved?.(state.savedId, state.again);
   }, [state, onSaved]);
   const start = bills.find((b) => b.id === defaultBillId);
   const [supplierId, setSupplierId] = useState(start?.supplierId ?? "");
@@ -124,10 +125,13 @@ export function SupplierPaymentForm({
       </label>
 
       <FormMessage error={state.error} />
-      <button type="submit" disabled={pending || !bill || tooMuch || value <= 0} className={`${primaryButton} w-full gap-2`}>
-        {pending ? "Saving…" : "Save payment voucher"}
-        <Kbd className="border-white/30 bg-white/10 text-white">Ctrl S</Kbd>
-      </button>
+      <div className="flex gap-2">
+        <button type="submit" disabled={pending || !bill || tooMuch || value <= 0} className={`${primaryButton} flex-1 gap-2`}>
+          {pending ? "Saving…" : "Save payment voucher"}
+          <Kbd className="border-white/30 bg-white/10 text-white">Ctrl S</Kbd>
+        </button>
+        <SaveNewButton disabled={pending || !bill || tooMuch || value <= 0} />
+      </div>
     </form>
   );
 }

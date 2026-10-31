@@ -1,5 +1,6 @@
 "use server";
 
+import { againTarget } from "@/lib/return-to";
 import { Prisma } from "@prisma/client";
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
@@ -60,6 +61,6 @@ export async function saveCustomer(
 
   updateTag(salesTags.customers);
   // A new customer opens on their own page, ready for an offer, a boat or a job card.
-  if (createdId) redirect(`/c/${slug}/customers/${createdId}`);
+  if (createdId) redirect(againTarget(slug, formData, `${parsed.data.name} added.`) ?? `/c/${slug}/customers/${createdId}`);
   return { success: "Customer updated" };
 }

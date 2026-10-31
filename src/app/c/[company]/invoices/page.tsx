@@ -15,6 +15,9 @@ import { VAT_RATE, formatMoney, round2 } from "@/lib/money";
 import { InvoiceDialog } from "@/components/document-dialogs";
 import { Modal } from "@/components/modal";
 import { OpenRow } from "@/components/open-row";
+import { RowSelection } from "@/components/row-selection";
+import { INVOICE_STATUSES } from "@/lib/offers";
+import { InvoiceBulkBar } from "./bulk-bar";
 import { COMPANIES, canAccessModule } from "@/lib/permissions";
 import { cardClass, PageHeader, ButtonLink, ProgressBar, SearchBar, secondaryButton } from "@/components/ui";
 import { CustomInvoiceForm } from "./custom-invoice-form";
@@ -177,6 +180,7 @@ async function InvoicesContent({
         <SearchBar action={base} defaultValue={q} placeholder="Search by invoice number, customer or offer" />
       </div>
 
+      <RowSelection ids={invoices.map((i) => i.id)}>
       <div className={`${cardClass} mt-4 overflow-x-auto`}>
         {invoices.length === 0 ? (
           <p className="p-10 text-center text-muted">
@@ -198,7 +202,7 @@ async function InvoicesContent({
             </thead>
             <tbody className="divide-y divide-border">
               {invoices.map((i) => (
-                <OpenRow key={i.id} href={`${base}?${q ? `q=${encodeURIComponent(q)}&` : ""}view=${i.id}`} className={`hover:bg-background/60 ${i.status === "CANCELLED" ? "opacity-60" : ""}`}>
+                <OpenRow key={i.id} selectId={i.id} href={`${base}?${q ? `q=${encodeURIComponent(q)}&` : ""}view=${i.id}`} className={`hover:bg-background/60 ${i.status === "CANCELLED" ? "opacity-60" : ""}`}>
                   <td className="px-4 py-3">
                     <Link href={`${base}/${i.id}`} className="font-mono font-medium text-brand hover:underline">
                       {i.number}
@@ -230,6 +234,20 @@ async function InvoicesContent({
           </table>
         )}
       </div>
+      <InvoiceBulkBar
+        companySlug={slug}
+        invoices={invoices.map((i) => ({
+          id: i.id,
+          number: i.number,
+          customerName: i.customerName,
+          invoiceDate: i.invoiceDate.toISOString().slice(0, 10),
+          dueDate: i.dueDate.toISOString().slice(0, 10),
+          status: INVOICE_STATUSES[i.status],
+          totalTTC: i.totalTTC,
+          balance: i.status === "CANCELLED" ? 0 : i.balance,
+        }))}
+      />
+      </RowSelection>
     </>
   );
 }

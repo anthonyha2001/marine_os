@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useFeedback } from "@/components/feedback";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, FileDown } from "lucide-react";
 import { paymentFormData, type PayKind, type PaymentFormData } from "@/lib/actions/payments";
@@ -48,6 +49,13 @@ function PayPopup({ companySlug, kind, invoiceId, billId, customerId }: { compan
   const [data, setData] = useState<PaymentFormData | null>(null);
   const [failed, setFailed] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [round, setRound] = useState(0); // a new empty form after "Save & new"
+  const { toast } = useFeedback();
+  const onSaved = (id: string, again?: boolean) => {
+    if (!again) return setSavedId(id);
+    toast.success("Saved. Enter the next one.");
+    setRound((n) => n + 1);
+  };
 
   useEffect(() => {
     let live = true;
@@ -57,7 +65,7 @@ function PayPopup({ companySlug, kind, invoiceId, billId, customerId }: { compan
     return () => {
       live = false;
     };
-  }, [companySlug, kind, customerId]);
+  }, [companySlug, kind, customerId, round]); // after "Save & new", reload balances
 
   const close = () => {
     const rest = new URLSearchParams(params.toString());
@@ -86,7 +94,7 @@ function PayPopup({ companySlug, kind, invoiceId, billId, customerId }: { compan
       ) : !data ? (
         <p className="py-10 text-center text-sm text-muted">Loading…</p>
       ) : data.kind === "SUPPLIER" && "bills" in data ? (
-        <SupplierPaymentForm companySlug={companySlug} bills={data.bills} accounts={data.accounts} defaultBillId={billId} onSaved={setSavedId} />
+        <SupplierPaymentForm companySlug={companySlug} bills={data.bills} accounts={data.accounts} defaultBillId={billId} key={round} onSaved={onSaved} />
       ) : data.kind === "CUSTOMER" && "invoices" in data ? (
         <ReceiptForm
           companySlug={companySlug}
@@ -95,10 +103,10 @@ function PayPopup({ companySlug, kind, invoiceId, billId, customerId }: { compan
           customers={data.customers}
           defaultInvoiceId={invoiceId}
           defaultCustomerId={customerId}
-          onSaved={setSavedId}
+          key={round} onSaved={onSaved}
         />
       ) : "counterAccounts" in data && (kind === "PAYMENT" || kind === "RECEIPT" || kind === "TRANSFER") ? (
-        <VoucherForm companySlug={companySlug} kind={kind} moneyAccounts={data.accounts} counterAccounts={data.counterAccounts} onSaved={setSavedId} />
+        <VoucherForm companySlug={companySlug} kind={kind} moneyAccounts={data.accounts} counterAccounts={data.counterAccounts} key={round} onSaved={onSaved} />
       ) : null}
     </Modal>
   );
