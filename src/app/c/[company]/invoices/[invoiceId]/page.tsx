@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { SendButton } from "@/components/send-button";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CreditNoteDialog } from "@/components/create-dialogs";
 import { requireModule } from "@/lib/auth";
 import { deleteReceipt } from "@/lib/actions/finance";
 import { PAYMENT_METHODS } from "@/lib/accounting";
@@ -20,10 +21,12 @@ const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "long", timeZon
 
 async function InvoiceDetail({
   params,
+  searchParams,
 }: {
   params: Promise<{ company: string; invoiceId: string }>;
+  searchParams: Promise<{ create?: string }>;
 }) {
-  const { company, invoiceId } = await params;
+  const [{ company, invoiceId }, search] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "invoices");
   const admin = isAdmin(user);
   const mayCancel = can(user, "cancelEntries");
@@ -202,14 +205,15 @@ async function InvoiceDetail({
         </section>
       )}
 
+      {search.create === "credit" && <CreditNoteDialog slug={slug} closeHref={`/c/${slug}/invoices/${invoiceId}`} invoiceId={invoiceId} />}
     </>
   );
 }
 
-export default function InvoicePage({ params }: PageProps<"/c/[company]/invoices/[invoiceId]">) {
+export default function InvoicePage({ params, searchParams }: PageProps<"/c/[company]/invoices/[invoiceId]">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading…</p>}>
-      <InvoiceDetail params={params} />
+      <InvoiceDetail params={params} searchParams={searchParams as Promise<{ create?: string }>} />
     </Suspense>
   );
 }

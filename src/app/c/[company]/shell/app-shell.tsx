@@ -7,6 +7,7 @@ import { FeedbackProvider } from "@/components/feedback";
 import { InstallApp } from "@/components/install-app";
 import { KeyboardShortcuts } from "../keyboard-shortcuts";
 import { CommandPalette } from "./command-palette";
+import { Flash } from "./flash";
 import { PayDialog } from "./pay-dialog";
 import { RowKeys } from "./row-keys";
 import { SectionTabs } from "./section-tabs";
@@ -93,6 +94,9 @@ export function AppShell({
       <CommandPalette companySlug={company.slug} base={base} groups={allGroups} />
       <KeyboardShortcuts base={base} groups={allGroups} />
       <RowKeys />
+      <Suspense>
+        <Flash />
+      </Suspense>
       {canPay && (
         <Suspense>
           <PayDialog companySlug={company.slug} />

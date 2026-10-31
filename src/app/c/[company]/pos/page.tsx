@@ -43,7 +43,7 @@ async function PosContent({ params, searchParams }: { params: Promise<{ company:
   if (!rate) {
     return (
       <>
-        <PageHeader eyebrow={`${COMPANIES[slug].name} · Retail`} title="Point of sale" action={rateButton} />
+        <PageHeader eyebrow={`${COMPANIES[slug].name} · Point of sale`} title="Point of sale" action={rateButton} />
         <div className={`${cardClass} mt-6`}>
           <EmptyState
             icon={Coins}
@@ -67,7 +67,7 @@ async function PosContent({ params, searchParams }: { params: Promise<{ company:
     return (
       <>
         <PageHeader
-          eyebrow={`${COMPANIES[slug].name} · Retail`}
+          eyebrow={`${COMPANIES[slug].name} · Point of sale`}
           title="Point of sale"
           description={`Rate ${formatRate(rate.lbpPerUsd)}, set by ${rate.setByName}.`}
           action={rateButton}
@@ -98,7 +98,7 @@ async function PosContent({ params, searchParams }: { params: Promise<{ company:
     <>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-brand">{COMPANIES[slug].name} · Retail</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-brand">{COMPANIES[slug].name} · Point of sale</p>
           <h1 className="text-2xl font-semibold tracking-tight text-navy">Point of sale</h1>
           <p className="text-sm text-muted">
             Shift {shift.number} · {user.name} · since {time.format(shift.openedAt)} · {shiftSales.length} sale{shiftSales.length === 1 ? "" : "s"}

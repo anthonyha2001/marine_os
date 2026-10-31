@@ -23,11 +23,13 @@ export function NewWarrantyForm({
   customers,
   vessels,
   prefill = {},
+  returnTo,
 }: {
   companySlug: string;
   customers: { id: string; name: string }[];
   vessels: VesselOption[];
   prefill?: WarrantyPrefill;
+  returnTo?: string; // opened in a pop-up: come back to this page after saving
 }) {
   const [state, formAction, pending] = useActionState<WarrantyFormState, FormData>(createWarranty.bind(null, companySlug), {});
   const [customerId, setCustomerId] = useState(prefill.customerId ?? "");
@@ -37,6 +39,7 @@ export function NewWarrantyForm({
 
   return (
     <form action={formAction} data-save-shortcut className="space-y-4">
+      {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
       {prefill.sourceLabel && (
         <p className="rounded-lg bg-background p-3 text-sm text-muted">
           From {prefill.sourceLabel}

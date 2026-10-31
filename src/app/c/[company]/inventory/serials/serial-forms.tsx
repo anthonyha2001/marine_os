@@ -14,17 +14,20 @@ export function RegisterSerialsForm({
   products,
   purchases,
   defaults,
+  returnTo,
 }: {
   companySlug: string;
   products: { id: string; label: string }[];
   purchases: { id: string; label: string; productIds: string[] }[];
   defaults: { productId?: string; purchaseId?: string };
+  returnTo?: string; // opened in a pop-up: come back to this page after saving
 }) {
   const [state, formAction, pending] = useActionState<SerialFormState, FormData>(registerSerials.bind(null, companySlug), {});
   const [productId, setProductId] = useState(defaults.productId ?? products[0]?.id ?? "");
   const area = useFocusOnShow<HTMLTextAreaElement>();
   return (
     <form action={formAction} data-save-shortcut className="space-y-4">
+      {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
       {products.length === 0 ? (
         <p className="rounded-lg bg-background p-3 text-sm text-muted">No product tracks serial numbers yet. Edit a product (e.g. an engine) and tick “Track serial numbers”.</p>
       ) : (

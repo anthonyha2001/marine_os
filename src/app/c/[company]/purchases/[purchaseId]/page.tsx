@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
+import { RegisterSerialsDialog } from "@/components/create-dialogs";
 import { requireModule } from "@/lib/auth";
 import { getPurchase } from "@/lib/data/inventory";
 import { formatMoney, VAT_RATE } from "@/lib/money";
@@ -13,10 +14,12 @@ const dateFormat = new Intl.DateTimeFormat("en-GB", { dateStyle: "long", timeZon
 
 async function PurchaseDetail({
   params,
+  searchParams,
 }: {
   params: Promise<{ company: string; purchaseId: string }>;
+  searchParams: Promise<{ create?: string; product?: string }>;
 }) {
-  const { company, purchaseId } = await params;
+  const [{ company, purchaseId }, search] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "purchases");
   // Only finds purchases of this company, so another company's invoice can't be opened by URL.
   const purchase = await getPurchase(slug, purchaseId);
@@ -104,14 +107,17 @@ async function PurchaseDetail({
           <div className="flex justify-between border-t border-border pt-2 text-base font-semibold text-navy"><dt>Total incl. VAT</dt><dd>{formatMoney(purchase.totalTTC)}</dd></div>
         </dl>
       </div>
+      {search.create === "serials" && (
+        <RegisterSerialsDialog slug={slug} closeHref={`/c/${slug}/purchases/${purchaseId}`} productId={search.product} purchaseId={purchaseId} />
+      )}
     </>
   );
 }
 
-export default function PurchaseDetailPage({ params }: PageProps<"/c/[company]/purchases/[purchaseId]">) {
+export default function PurchaseDetailPage({ params, searchParams }: PageProps<"/c/[company]/purchases/[purchaseId]">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading…</p>}>
-      <PurchaseDetail params={params} />
+      <PurchaseDetail params={params} searchParams={searchParams as Promise<{ create?: string; product?: string }>} />
     </Suspense>
   );
 }

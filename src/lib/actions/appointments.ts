@@ -1,5 +1,6 @@
 "use server";
 
+import { returnTarget } from "@/lib/return-to";
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -66,7 +67,7 @@ export async function createAppointment(companySlug: string, _prev: AppointmentF
     });
   }, TRANSACTION_OPTIONS);
   updateTag(appointmentsTag(companyId));
-  redirect(`/c/${slug}/appointments?date=${d.date}`);
+  redirect(returnTarget(slug, formData, "Appointment booked.") ?? `/c/${slug}/appointments?date=${d.date}`);
 }
 
 const confirmSchema = z.object({ ...slotSchema, staffNote: z.string().trim().max(1000).optional().transform((v) => v || null) });

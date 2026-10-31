@@ -1,5 +1,6 @@
 "use client";
 
+import { today } from "@/lib/dates";
 import { useActionState, useState } from "react";
 import { createJobCard, saveJobCard, type WorkshopFormState } from "@/lib/actions/workshop";
 import type { JobCardRow } from "@/lib/data/workshop";
@@ -17,6 +18,7 @@ export function JobCardForm({
   customers,
   catalogue,
   defaults,
+  returnTo,
 }: {
   companySlug: string;
   job?: JobCardRow;
@@ -24,6 +26,7 @@ export function JobCardForm({
   customers: { id: string; name: string }[];
   catalogue: CatalogueItem[];
   defaults?: { vesselId?: string; customerId?: string };
+  returnTo?: string; // opened in a pop-up: come back to this page after saving
 }) {
   const action = job ? saveJobCard.bind(null, companySlug, job.id) : createJobCard.bind(null, companySlug);
   const [state, formAction, pending] = useActionState<WorkshopFormState, FormData>(action, {});
@@ -77,6 +80,7 @@ export function JobCardForm({
       data-dirty={dirty ? "true" : undefined}
       className="space-y-6"
     >
+      {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
       <section className={`${cardClass} grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3`}>
         <label className={labelClass}>
           Vessel
@@ -127,7 +131,7 @@ export function JobCardForm({
         </label>
         <label className={labelClass}>
           Promised for
-          <input name="dueDate" type="date" defaultValue={job?.dueDate ? job.dueDate.toISOString().slice(0, 10) : ""} className={inputClass} />
+          <input name="dueDate" type="date" defaultValue={job?.dueDate ? job.dueDate.toISOString().slice(0, 10) : today()} className={inputClass} />
         </label>
         <label className={`${labelClass} sm:col-span-2 lg:col-span-3`}>
           Work requested / problem reported *

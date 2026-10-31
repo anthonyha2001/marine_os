@@ -13,7 +13,19 @@ const POSITIONS = ["Port", "Starboard", "Main", "Centre", "Generator", "Outboard
 type Engine = { key: string; id?: string; position: string; make: string; model: string; serialNumber: string; year: string; hours: string };
 const blankEngine = (position = "Port"): Engine => ({ key: crypto.randomUUID(), position, make: "", model: "", serialNumber: "", year: "", hours: "" });
 
-export function VesselForm({ companySlug, vessel, customers, defaultCustomerId }: { companySlug: string; vessel?: VesselRow; customers: { id: string; name: string }[]; defaultCustomerId?: string }) {
+export function VesselForm({
+  companySlug,
+  vessel,
+  customers,
+  defaultCustomerId,
+  returnTo,
+}: {
+  companySlug: string;
+  vessel?: VesselRow;
+  customers: { id: string; name: string }[];
+  defaultCustomerId?: string;
+  returnTo?: string; // opened in a pop-up: come back to this page after saving
+}) {
   const [state, formAction, pending] = useActionState<VesselFormState, FormData>(saveVessel.bind(null, companySlug, vessel?.id ?? null), {});
   const nameInput = useFocusOnShow<HTMLInputElement>();
   const [engines, setEngines] = useState<Engine[]>(() =>
@@ -58,6 +70,7 @@ export function VesselForm({ companySlug, vessel, customers, defaultCustomerId }
       data-save-shortcut
       className="space-y-5"
     >
+      {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
       <div className="grid gap-4 sm:grid-cols-2">
         <label className={labelClass}>
           Vessel name *

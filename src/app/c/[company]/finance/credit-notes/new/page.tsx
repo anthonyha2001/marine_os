@@ -12,7 +12,7 @@ async function NewCreditNote({ params, searchParams }: { params: Promise<{ compa
   return (
     <>
       <PageHeader
-        eyebrow={`${COMPANIES[slug].name} · Finance`}
+        eyebrow={`${COMPANIES[slug].name} · Sales`}
         title="New credit note"
         description="Reduces what the customer owes on an invoice (returns, price corrections, discounts). VAT follows the invoice."
       />

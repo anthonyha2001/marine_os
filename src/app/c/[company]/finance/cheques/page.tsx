@@ -43,7 +43,7 @@ async function ChequesContent({ params, searchParams }: { params: Promise<{ comp
   return (
     <>
       <PageHeader
-        eyebrow={`${COMPANIES[slug].name} · Finance`}
+        eyebrow={`${COMPANIES[slug].name} · Money`}
         title="Cheques"
         description="Cheques received from customers and given to suppliers, usually post-dated. They settle the invoice or bill at once; the bank moves the money on the cheque date."
         action={

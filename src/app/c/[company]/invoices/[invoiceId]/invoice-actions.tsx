@@ -82,7 +82,7 @@ export function InvoiceActions({
         Download PDF
       </a>
       {status !== "CANCELLED" && creditable > 0 && (
-        <Link href={`/c/${companySlug}/finance/credit-notes/new?invoice=${invoiceId}`} className={secondaryButton}>
+        <Link href={`/c/${companySlug}/invoices/${invoiceId}?create=credit`} scroll={false} className={secondaryButton}>
           <FileMinus className="size-4" aria-hidden /> Credit note
         </Link>
       )}

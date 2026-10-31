@@ -21,7 +21,7 @@ export function Modal({
   closeHref?: string;
   onClose?: () => void;
   children: React.ReactNode;
-  size?: "md" | "lg" | "xl";
+  size?: "md" | "lg" | "xl" | "full"; // full: the big editors (offer, purchase) opened over a page
 }) {
   const router = useRouter();
   const panel = useRef<HTMLDivElement>(null);
@@ -53,7 +53,7 @@ export function Modal({
     };
   });
 
-  const width = { md: "max-w-xl", lg: "max-w-3xl", xl: "max-w-5xl" }[size];
+  const width = { md: "max-w-xl", lg: "max-w-3xl", xl: "max-w-5xl", full: "max-w-[min(110rem,100%)]" }[size];
 
   return (
     <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-navy-deep/40 p-4 sm:p-8" onMouseDown={close}>

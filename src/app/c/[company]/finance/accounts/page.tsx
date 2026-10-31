@@ -46,7 +46,7 @@ async function AccountsContent({ params, searchParams }: { params: Promise<{ com
   return (
     <>
       <PageHeader
-        eyebrow={`${COMPANIES[slug].name} · Finance`}
+        eyebrow={`${COMPANIES[slug].name} · Accounting`}
         title="Chart of accounts"
         description="The accounts every entry is posted to, with their current balance. Add expense accounts, cash boxes and bank accounts as you need them."
         action={<ButtonLink icon={Plus} href={`${base}?new=1`}>New account</ButtonLink>}

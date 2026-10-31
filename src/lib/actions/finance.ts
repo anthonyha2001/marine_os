@@ -1,5 +1,6 @@
 "use server";
 
+import { returnTarget } from "@/lib/return-to";
 import { Prisma } from "@prisma/client";
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
@@ -317,7 +318,7 @@ export async function createCreditNote(companySlug: string, _prev: FinanceFormSt
   }, TRANSACTION_OPTIONS);
 
   refresh(companyId, true);
-  redirect(`/c/${slug}/finance/credit-notes/${id}?saved=1`);
+  redirect(returnTarget(slug, formData, "Credit note issued.") ?? `/c/${slug}/finance/credit-notes/${id}?saved=1`);
 }
 
 export async function cancelCreditNote(companySlug: string, creditNoteId: string): Promise<{ error?: string }> {

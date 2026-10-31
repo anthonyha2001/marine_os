@@ -38,7 +38,7 @@ async function SalesContent({ params, searchParams }: { params: Promise<{ compan
   return (
     <>
       <PageHeader
-        eyebrow={`${COMPANIES[slug].name} · Retail`}
+        eyebrow={`${COMPANIES[slug].name} · Point of sale`}
         title="Counter sales"
         description={`Sales report for ${period}: takings by payment method, cashier and product.`}
         action={<ButtonLink icon={ScanBarcode} href={`/c/${slug}/pos`}>Open the till</ButtonLink>}

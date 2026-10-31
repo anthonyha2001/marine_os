@@ -59,7 +59,7 @@ export async function LandedCostsSection({ slug, purchaseId }: { slug: CompanySl
               <td className="py-2">
                 <span className="font-mono text-xs text-muted">{i.product.code}</span> {i.product.name}
                 {i.product.trackSerials && (
-                  <Link href={`/c/${slug}/inventory/serials?new=1&product=${i.productId}&purchase=${purchaseId}`} className="ml-2 text-xs text-brand hover:underline">
+                  <Link href={`/c/${slug}/purchases/${purchaseId}?create=serials&product=${i.productId}`} scroll={false} className="ml-2 text-xs text-brand hover:underline">
                     Serial numbers ({purchase.serials.filter((x) => x.productId === i.productId).length}/{i.quantity})
                   </Link>
                 )}

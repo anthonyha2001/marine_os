@@ -15,7 +15,7 @@ async function PricesContent({ params }: { params: Promise<{ company: string }> 
   return (
     <>
       <PageHeader
-        eyebrow={`${COMPANIES[slug].name} · Retail`}
+        eyebrow={`${COMPANIES[slug].name} · Point of sale`}
         title="Prices & margins"
         description="The shelf price the till sells at, with the margin on each product against its average cost."
       />

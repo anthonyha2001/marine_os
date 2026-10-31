@@ -21,7 +21,7 @@ async function ShiftsContent({ params }: { params: Promise<{ company: string }> 
   return (
     <>
       <PageHeader
-        eyebrow={`${COMPANIES[slug].name} · Retail`}
+        eyebrow={`${COMPANIES[slug].name} · Point of sale`}
         title="Shifts & reports"
         description="Every till session: opening float, takings, cash counted at closing and any difference. Open one for its Z report."
       />

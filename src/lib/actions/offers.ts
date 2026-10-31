@@ -1,5 +1,6 @@
 "use server";
 
+import { returnTarget } from "@/lib/return-to";
 import { Prisma } from "@prisma/client";
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
@@ -278,7 +279,7 @@ export async function saveOffer(
   }
 
   updateTag(salesTags.offers(companyId));
-  redirect(`/c/${slug}/offers/${savedId}?saved=1`);
+  redirect(returnTarget(slug, formData, "Offer saved.") ?? `/c/${slug}/offers/${savedId}?saved=1`);
 }
 
 /** Copy an offer into a new draft dated today (for re-quoting). */

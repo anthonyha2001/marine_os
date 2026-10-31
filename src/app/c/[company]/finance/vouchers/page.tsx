@@ -68,7 +68,7 @@ async function VouchersContent({ params, searchParams }: { params: Promise<{ com
   return (
     <>
       <PageHeader
-        eyebrow={`${COMPANIES[slug].name} · Finance`}
+        eyebrow={`${COMPANIES[slug].name} · Money`}
         title="Vouchers"
         description="All money in and out: payment vouchers for suppliers and expenses, receipt vouchers for customers and other income, and transfers between cash and bank."
         action={

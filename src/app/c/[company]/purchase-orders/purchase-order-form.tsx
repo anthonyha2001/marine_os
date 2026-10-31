@@ -49,7 +49,7 @@ export function PurchaseOrderForm({
   const [header, setHeader] = useState({
     supplierId: order?.supplierId ?? "",
     orderDate: order?.orderDate ?? today(),
-    expectedDate: order?.expectedDate ?? "",
+    expectedDate: order?.expectedDate ?? today(),
     status: order?.status ?? ("DRAFT" as "DRAFT" | "SENT"),
     reference: order?.reference ?? "",
     terms: order?.terms ?? DEFAULT_PO_TERMS,

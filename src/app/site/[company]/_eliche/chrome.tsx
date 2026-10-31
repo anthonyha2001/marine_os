@@ -5,7 +5,7 @@ import type { SiteData } from "@/lib/data/website";
 import { whatsappLink } from "../site";
 import { ElicheHeader } from "./header";
 
-export const display = Playfair_Display({ subsets: ["latin"], variable: "--font-display", style: ["normal", "italic"] });
+export const display = Playfair_Display({ subsets: ["latin"], variable: "--font-display", style: ["normal"] });
 
 /** Eliche Radice website frame: warm cream, serif headings, centred logo, light footer. */
 export function ElicheChrome({ site, base, preview, children }: { site: SiteData; base: string; preview: boolean; children: React.ReactNode }) {
@@ -27,7 +27,7 @@ export function ElicheChrome({ site, base, preview, children }: { site: SiteData
 
   return (
     <div
-      className={`${display.variable} flex min-h-screen flex-col bg-[#faf6f0] text-[#2a2f3d] antialiased`}
+      className={`${display.variable} flex min-h-screen flex-col bg-[#faf6f0] [font-variant-numeric:lining-nums] text-[#2a2f3d] antialiased`}
       style={{ "--site-accent": "#a8692a", "--site-accent-soft": "#f2e7d8", "--site-dark": "#141b2d", "--site-darker": "#0c1120" } as React.CSSProperties}
     >
       {preview && (
@@ -42,8 +42,8 @@ export function ElicheChrome({ site, base, preview, children }: { site: SiteData
         <div className="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={site.logo} alt={site.name} className="mx-auto h-12 w-auto" />
-          <p className="mx-auto mt-5 max-w-lg font-[family-name:var(--font-display)] text-lg italic text-[#5b4a36]">{site.tagline}</p>
-          <nav className="mt-8 flex flex-wrap justify-center gap-x-8 gap-y-3 text-[12px] uppercase tracking-[0.25em] text-[#141b2d]" aria-label="Footer">
+          <p className="mx-auto mt-5 max-w-lg text-sm text-[#5b4a36]">{site.tagline}</p>
+          <nav className="mt-8 flex flex-wrap justify-center gap-x-8 gap-y-3 text-[12px] uppercase font-medium tracking-[0.14em] text-[#141b2d]" aria-label="Footer">
             {links.map((l) => (
               <Link key={l.href} href={l.href} className="hover:text-[#a8692a]">
                 {l.label}
@@ -52,7 +52,7 @@ export function ElicheChrome({ site, base, preview, children }: { site: SiteData
           </nav>
           <div className="mx-auto mt-10 grid max-w-3xl gap-6 text-sm text-[#5b4a36] sm:grid-cols-3">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.3em] text-[#a8692a]">Call</p>
+              <p className="uppercase font-medium text-[12px] tracking-[0.14em] text-[#a8692a]">Call</p>
               {site.phone ? (
                 <a href={`tel:${site.phone}`} className="mt-1 block hover:text-[#141b2d]">
                   {site.phone}
@@ -62,7 +62,7 @@ export function ElicheChrome({ site, base, preview, children }: { site: SiteData
               )}
             </div>
             <div>
-              <p className="text-[11px] uppercase tracking-[0.3em] text-[#a8692a]">Write</p>
+              <p className="uppercase font-medium text-[12px] tracking-[0.14em] text-[#a8692a]">Write</p>
               {site.email ? (
                 <a href={`mailto:${site.email}`} className="mt-1 block break-all hover:text-[#141b2d]">
                   {site.email}
@@ -72,12 +72,12 @@ export function ElicheChrome({ site, base, preview, children }: { site: SiteData
               )}
             </div>
             <div>
-              <p className="text-[11px] uppercase tracking-[0.3em] text-[#a8692a]">Visit</p>
+              <p className="uppercase font-medium text-[12px] tracking-[0.14em] text-[#a8692a]">Visit</p>
               <p className="mt-1 whitespace-pre-line">{site.address ?? "—"}</p>
             </div>
           </div>
           {social.length > 0 && (
-            <div className="mt-8 flex justify-center gap-6 text-[12px] uppercase tracking-[0.25em]">
+            <div className="mt-8 flex justify-center gap-6 text-[12px] uppercase font-medium tracking-[0.14em]">
               {social.map(([label, url]) => (
                 <a key={label} href={url} target="_blank" rel="noopener" className="text-[#141b2d] hover:text-[#a8692a]">
                   {label}

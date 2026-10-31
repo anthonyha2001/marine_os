@@ -13,7 +13,7 @@ const serif = "font-[family-name:var(--font-display)]";
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[11px] uppercase tracking-[0.35em] text-[#a8692a]">
+    <p className="uppercase font-medium text-[12px] tracking-[0.14em] text-[#a8692a]">
       {children}
     </p>
   );
@@ -96,7 +96,7 @@ function ShopGrid({
             />
           </div>
           {p.featured && (
-            <p className="mt-4 text-[10px] uppercase tracking-[0.3em] text-[#a8692a]">
+            <p className="mt-4 uppercase font-medium text-[12px] tracking-[0.14em] text-[#a8692a]">
               Featured
             </p>
           )}
@@ -105,10 +105,10 @@ function ShopGrid({
           >
             {p.name}
           </h3>
-          <p className="mt-1 text-xs uppercase tracking-[0.2em] text-[#8a7a66]">
+          <p className="mt-1 text-[12px] uppercase font-medium tracking-[0.14em] text-[#8a7a66]">
             Ref. {p.code}
           </p>
-          <span className="mt-3 inline-block border-b border-[#a8692a] pb-0.5 text-[12px] uppercase tracking-[0.2em] text-[#a8692a]">
+          <span className="mt-3 inline-block border-b border-[#a8692a] pb-0.5 text-[12px] uppercase font-medium tracking-[0.14em] text-[#a8692a]">
             Request a quote
           </span>
         </Link>
@@ -121,11 +121,11 @@ function Invitation({ site, base }: P) {
   return (
     <section className="bg-[#141b2d] text-center text-white">
       <div className="mx-auto max-w-3xl px-4 py-20 sm:px-6">
-        <p className="text-[11px] uppercase tracking-[0.35em] text-[#d9a66a]">
+        <p className="uppercase font-medium text-[12px] tracking-[0.14em] text-[#d9a66a]">
           {site.name}
         </p>
         <h2
-          className={`${serif} mt-4 text-3xl italic leading-snug sm:text-4xl`}
+          className={`${serif} mt-4 text-3xl leading-snug sm:text-4xl`}
         >
           Every boat deserves the right propeller.
         </h2>
@@ -133,14 +133,14 @@ function Invitation({ site, base }: P) {
           {site.showBooking && (
             <Link
               href={`${base}/book`}
-              className="bg-[#a8692a] px-8 py-3.5 text-[13px] uppercase tracking-[0.2em] text-white transition hover:bg-[#8a5520]"
+              className="bg-[#a8692a] px-8 py-3.5 uppercase font-medium text-[12px] tracking-[0.14em] text-white transition hover:bg-[#8a5520]"
             >
               Book an appointment
             </Link>
           )}
           <Link
             href={`${base}/contact`}
-            className="border border-white/40 px-8 py-3.5 text-[13px] uppercase tracking-[0.2em] text-white transition hover:bg-white/10"
+            className="border border-white/40 px-8 py-3.5 uppercase font-medium text-[12px] tracking-[0.14em] text-white transition hover:bg-white/10"
           >
             Contact us
           </Link>
@@ -176,7 +176,7 @@ export function ElicheHome({ site, base }: P) {
             {products.length > 0 && (
               <Link
                 href={`${base}/catalogue`}
-                className="bg-[#141b2d] px-8 py-3.5 text-[13px] uppercase tracking-[0.2em] text-white transition hover:bg-[#a8692a]"
+                className="bg-[#141b2d] px-8 py-3.5 uppercase font-medium text-[12px] tracking-[0.14em] text-white transition hover:bg-[#a8692a]"
               >
                 Discover the shop
               </Link>
@@ -184,7 +184,7 @@ export function ElicheHome({ site, base }: P) {
             {site.showBooking && (
               <Link
                 href={`${base}/book`}
-                className="border border-[#141b2d] px-8 py-3.5 text-[13px] uppercase tracking-[0.2em] text-[#141b2d] transition hover:border-[#a8692a] hover:text-[#a8692a]"
+                className="border border-[#141b2d] px-8 py-3.5 uppercase font-medium text-[12px] tracking-[0.14em] text-[#141b2d] transition hover:border-[#a8692a] hover:text-[#a8692a]"
               >
                 Book an appointment
               </Link>
@@ -225,7 +225,7 @@ export function ElicheHome({ site, base }: P) {
                 <p className={`${serif} text-4xl text-[#a8692a]`}>
                   {String(i + 1).padStart(2, "0")}
                 </p>
-                <p className="mt-3 text-[13px] uppercase tracking-[0.2em] text-[#141b2d]">
+                <p className="mt-3 uppercase font-medium text-[12px] tracking-[0.14em] text-[#141b2d]">
                   {h.title}
                 </p>
                 {h.body && (
@@ -253,7 +253,7 @@ export function ElicheHome({ site, base }: P) {
           <div className="mt-14 text-center">
             <Link
               href={`${base}/catalogue`}
-              className="border-b border-[#141b2d] pb-1 text-[13px] uppercase tracking-[0.2em] text-[#141b2d] hover:border-[#a8692a] hover:text-[#a8692a]"
+              className="border-b border-[#141b2d] pb-1 uppercase font-medium text-[12px] tracking-[0.14em] text-[#141b2d] hover:border-[#a8692a] hover:text-[#a8692a]"
             >
               View the whole shop
             </Link>
@@ -266,13 +266,13 @@ export function ElicheHome({ site, base }: P) {
         <div className="mx-auto max-w-4xl px-4 py-24 text-center sm:px-6">
           <Eyebrow>Our story</Eyebrow>
           <p
-            className={`${serif} mt-6 text-2xl italic leading-relaxed text-[#141b2d] sm:text-3xl`}
+            className={`${serif} mt-6 text-2xl leading-relaxed text-[#141b2d] sm:text-3xl`}
           >
             &ldquo;{site.aboutText.split(/\n\s*\n/)[0]}&rdquo;
           </p>
           <Link
             href={`${base}/about`}
-            className="mt-10 inline-block border-b border-[#a8692a] pb-1 text-[13px] uppercase tracking-[0.2em] text-[#a8692a]"
+            className="mt-10 inline-block border-b border-[#a8692a] pb-1 uppercase font-medium text-[12px] tracking-[0.14em] text-[#a8692a]"
           >
             Read our story
           </Link>
@@ -401,7 +401,7 @@ export function ElicheAbout({ site, base }: P) {
                 <p className={`${serif} text-4xl text-[#a8692a]`}>
                   {String(i + 1).padStart(2, "0")}
                 </p>
-                <p className="mt-3 text-[13px] uppercase tracking-[0.2em] text-[#141b2d]">
+                <p className="mt-3 uppercase font-medium text-[12px] tracking-[0.14em] text-[#141b2d]">
                   {h.title}
                 </p>
                 {h.body && (
@@ -532,7 +532,7 @@ export function ElicheProduct({
         <div className="lg:pt-8">
           <Link
             href={`${base}/catalogue`}
-            className="text-[12px] uppercase tracking-[0.25em] text-[#8a7a66] hover:text-[#a8692a]"
+            className="text-[12px] uppercase font-medium tracking-[0.14em] text-[#8a7a66] hover:text-[#a8692a]"
           >
             ← The shop
           </Link>
@@ -541,7 +541,7 @@ export function ElicheProduct({
           >
             {product.name}
           </h1>
-          <p className="mt-3 text-xs uppercase tracking-[0.25em] text-[#8a7a66]">
+          <p className="mt-3 text-[12px] uppercase font-medium tracking-[0.14em] text-[#8a7a66]">
             Ref. {product.code}
           </p>
           <Rule />
@@ -550,7 +550,7 @@ export function ElicheProduct({
               {product.description}
             </p>
           )}
-          <p className={`${serif} mt-8 text-xl italic text-[#141b2d]`}>
+          <p className={`${serif} mt-8 text-xl text-[#141b2d]`}>
             Price on request
           </p>
           {wa && (
@@ -558,13 +558,13 @@ export function ElicheProduct({
               href={wa}
               target="_blank"
               rel="noopener"
-              className="mt-5 inline-flex items-center gap-2 bg-[#25d366] px-6 py-3 text-[13px] uppercase tracking-[0.15em] text-white"
+              className="mt-5 inline-flex items-center gap-2 bg-[#25d366] px-6 py-3 uppercase font-medium text-[12px] tracking-[0.14em] text-white"
             >
               <MessageCircle className="size-4" aria-hidden /> Ask on WhatsApp
             </a>
           )}
           <div className="mt-10 border-t border-[#e9dccb] pt-8">
-            <p className="text-[11px] uppercase tracking-[0.3em] text-[#a8692a]">
+            <p className="uppercase font-medium text-[12px] tracking-[0.14em] text-[#a8692a]">
               Request a quote
             </p>
             <div className="mt-5">
@@ -578,7 +578,7 @@ export function ElicheProduct({
       </section>
       {others.length > 0 && (
         <section className="mx-auto max-w-6xl px-4 pb-24 sm:px-6">
-          <p className="text-center text-[11px] uppercase tracking-[0.35em] text-[#a8692a]">
+          <p className="text-center uppercase font-medium text-[12px] tracking-[0.14em] text-[#a8692a]">
             You may also like
           </p>
           <div className="mt-10">
@@ -669,7 +669,7 @@ export function ElicheContact({ site }: P) {
             .filter(([, value]) => value)
             .map(([label, value, href]) => (
               <div key={label}>
-                <p className="text-[11px] uppercase tracking-[0.3em] text-[#a8692a]">
+                <p className="uppercase font-medium text-[12px] tracking-[0.14em] text-[#a8692a]">
                   {label}
                 </p>
                 {href ? (
@@ -692,7 +692,7 @@ export function ElicheContact({ site }: P) {
             ))}
           {site.openingHours.length > 0 && (
             <div>
-              <p className="text-[11px] uppercase tracking-[0.3em] text-[#a8692a]">
+              <p className="uppercase font-medium text-[12px] tracking-[0.14em] text-[#a8692a]">
                 Opening hours
               </p>
               {site.openingHours.map((h) => (

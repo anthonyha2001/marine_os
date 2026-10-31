@@ -19,7 +19,7 @@ async function CountsContent({ params, searchParams }: { params: Promise<{ compa
   return (
     <>
       <PageHeader
-        eyebrow={`${COMPANIES[slug].name} · Inventory`}
+        eyebrow={`${COMPANIES[slug].name} · Stock`}
         title="Stock counts"
         description="Count what is really on the shelves, then post: the system stock is corrected to the counted quantities."
         action={<ButtonLink icon={Plus} href={`${base}?new=1`}>New count</ButtonLink>}

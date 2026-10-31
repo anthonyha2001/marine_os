@@ -20,7 +20,7 @@ async function ReconcileContent({ params, searchParams }: { params: Promise<{ co
   if (!account) {
     return (
       <>
-        <PageHeader eyebrow={`${COMPANIES[slug].name} · Finance`} title="Bank reconciliation" />
+        <PageHeader eyebrow={`${COMPANIES[slug].name} · Accounting`} title="Bank reconciliation" />
         <div className={`${cardClass} mt-6`}>
           <EmptyState icon={CheckCheck} title="No bank account" description="Add a bank account in the chart of accounts." />
         </div>
@@ -43,7 +43,7 @@ async function ReconcileContent({ params, searchParams }: { params: Promise<{ co
   return (
     <>
       <PageHeader
-        eyebrow={`${COMPANIES[slug].name} · Finance`}
+        eyebrow={`${COMPANIES[slug].name} · Accounting`}
         title="Bank reconciliation"
         description="Match the bank statement with the books: tick each movement that appears on the statement until both balances agree. Unticked lines are not yet through the bank (e.g. a cheque not cashed)."
       />

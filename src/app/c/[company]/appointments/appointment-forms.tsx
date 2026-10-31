@@ -51,18 +51,23 @@ export function NewAppointmentForm({
   date,
   customers,
   vessels,
+  defaultCustomerId,
+  returnTo,
 }: {
   companySlug: string;
   slots: string[];
   date: string;
   customers: { id: string; name: string }[];
   vessels: VesselOption[];
+  defaultCustomerId?: string;
+  returnTo?: string; // opened in a pop-up: come back to this page after saving
 }) {
   const [state, formAction, pending] = useActionState<AppointmentFormState, FormData>(createAppointment.bind(null, companySlug), {});
-  const [customerId, setCustomerId] = useState("");
+  const [customerId, setCustomerId] = useState(defaultCustomerId ?? "");
   const first = useFocusOnShow<HTMLSelectElement>();
   return (
     <form action={formAction} data-save-shortcut className="space-y-4">
+      {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
       <div className="grid gap-4 sm:grid-cols-2">
         <label className={labelClass}>
           Customer *

@@ -1,5 +1,6 @@
 "use server";
 
+import { returnTarget } from "@/lib/return-to";
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -76,7 +77,7 @@ export async function createWarranty(companySlug: string, _prev: WarrantyFormSta
     });
   }, TRANSACTION_OPTIONS);
   refresh(companyId);
-  redirect(`/c/${slug}/warranties?saved=1`);
+  redirect(returnTarget(slug, formData, "Warranty saved.") ?? `/c/${slug}/warranties?saved=1`);
 }
 
 export async function setWarrantyVoid(companySlug: string, warrantyId: string, voided: boolean): Promise<{ error?: string }> {

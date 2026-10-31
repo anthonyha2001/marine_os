@@ -1,5 +1,6 @@
 "use client";
 
+import { today } from "@/lib/dates";
 import { useActionState } from "react";
 import { saveEmployee, type PayrollFormState } from "@/lib/actions/payroll";
 import type { EmployeeRow } from "@/lib/data/payroll";
@@ -45,7 +46,7 @@ export function EmployeeForm({ companySlug, employee, defaultExemption = 0 }: { 
         </label>
         <label className={labelClass}>
           Start date
-          <input name="startDate" type="date" defaultValue={employee?.startDate ? employee.startDate.toISOString().slice(0, 10) : ""} className={inputClass} />
+          <input name="startDate" type="date" defaultValue={employee?.startDate ? employee.startDate.toISOString().slice(0, 10) : today()} className={inputClass} />
         </label>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">

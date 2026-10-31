@@ -1,5 +1,6 @@
 "use server";
 
+import { returnTarget } from "@/lib/return-to";
 import { Prisma } from "@prisma/client";
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
@@ -151,7 +152,7 @@ export async function createPurchase(
   updateTag(payablesTag(companyId));
   updateTag(ledgerTag(companyId));
   if (data.purchaseOrderId) updateTag(poTag(companyId));
-  redirect(`/c/${slug}/purchases/${purchaseId}`);
+  redirect(returnTarget(slug, formData, "Saved and added to stock.") ?? `/c/${slug}/purchases/${purchaseId}`);
 }
 
 export type LandedCostState = { error?: string };

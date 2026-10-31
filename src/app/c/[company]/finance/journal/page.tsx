@@ -45,7 +45,7 @@ async function JournalContent({ params, searchParams }: { params: Promise<{ comp
   return (
     <>
       <PageHeader
-        eyebrow={`${COMPANIES[slug].name} · Finance`}
+        eyebrow={`${COMPANIES[slug].name} · Accounting`}
         title="Journal"
         description="Every accounting entry, in double entry. Documents post automatically; use a manual entry for opening balances, accruals or corrections."
         action={<ButtonLink icon={Plus} href={`${base}?new=1`}>Manual entry</ButtonLink>}

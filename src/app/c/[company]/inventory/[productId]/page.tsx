@@ -17,7 +17,7 @@ async function EditProduct({ params }: { params: Promise<{ company: string; prod
   return (
     <>
       <PageHeader
-        eyebrow="Inventory"
+        eyebrow="Stock"
         title={product.name}
         description={`Product #${product.code}`}
         action={

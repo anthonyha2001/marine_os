@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FileText, Hammer, Pencil, ShieldCheck } from "lucide-react";
+import { NewJobCardDialog } from "@/components/create-dialogs";
 import { requireModule } from "@/lib/auth";
 import { dayFormat, businessToday } from "@/lib/dates";
 import { listCustomers, listInvoices, listOffers } from "@/lib/data/sales";
@@ -17,7 +18,7 @@ import { VesselForm } from "../vessel-form";
 
 type Event = { date: Date; kind: "job" | "offer" | "invoice" | "warranty"; label: string; detail: string; href: string; badge?: { tone: "blue" | "amber" | "green" | "gray" | "red"; text: string }; amount?: number };
 
-async function VesselDetail({ params, searchParams }: { params: Promise<{ company: string; vesselId: string }>; searchParams: Promise<{ edit?: string; saved?: string }> }) {
+async function VesselDetail({ params, searchParams }: { params: Promise<{ company: string; vesselId: string }>; searchParams: Promise<{ edit?: string; saved?: string; create?: string }> }) {
   const [{ company, vesselId }, search] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "customers");
   const vessel = await getVessel(vesselId);
@@ -94,7 +95,7 @@ async function VesselDetail({ params, searchParams }: { params: Promise<{ compan
         action={
           <>
             {can("workshop") && (
-              <Link href={`/c/${slug}/workshop/new?vessel=${vessel.id}`} className={primaryButton}>
+              <Link href={`${base}?create=job`} scroll={false} className={primaryButton}>
                 <Hammer className="size-4" aria-hidden /> New job card
               </Link>
             )}
@@ -179,6 +180,7 @@ async function VesselDetail({ params, searchParams }: { params: Promise<{ compan
           <VesselForm key={crypto.randomUUID()} companySlug={slug} vessel={vessel} customers={customers.map((c) => ({ id: c.id, name: c.name }))} />
         </Modal>
       )}
+      {search.create === "job" && can("workshop") && <NewJobCardDialog slug={slug} closeHref={base} vesselId={vessel.id} customerId={vessel.customer?.id} />}
     </>
   );
 }
@@ -186,7 +188,7 @@ async function VesselDetail({ params, searchParams }: { params: Promise<{ compan
 export default function VesselPage({ params, searchParams }: PageProps<"/c/[company]/vessels/[vesselId]">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading…</p>}>
-      <VesselDetail params={params} searchParams={searchParams as Promise<{ edit?: string; saved?: string }>} />
+      <VesselDetail params={params} searchParams={searchParams as Promise<{ edit?: string; saved?: string; create?: string }>} />
     </Suspense>
   );
 }

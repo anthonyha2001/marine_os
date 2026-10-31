@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { History } from "lucide-react";
 import { requireModule } from "@/lib/auth";
 import { companyIdFor } from "@/lib/data/inventory";
-import { parseDay, parseDayEnd } from "@/lib/dates";
+import { businessToday, parseDay, parseDayEnd } from "@/lib/dates";
 import { COMPANIES } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { Badge, EmptyState, PageHeader, cardClass, inputClass, secondaryButton, tdClass, thClass } from "@/components/ui";
@@ -24,8 +24,10 @@ async function AuditContent({ params, searchParams }: { params: Promise<{ compan
   const { slug } = await requireModule(company, "audit");
   const base = `/c/${slug}/audit`;
   const companyId = await companyIdFor(slug);
-  const from = parseDay(search.from);
-  const to = parseDayEnd(search.to);
+  const fromStr = search.from || `${businessToday().slice(0, 4)}-01-01`;
+  const toStr = search.to || businessToday();
+  const from = parseDay(fromStr);
+  const to = parseDayEnd(toStr);
   const q = (search.q ?? "").trim();
   // Read fresh: this is the record of what happened.
   const [rows, users] = await Promise.all([
@@ -79,11 +81,11 @@ async function AuditContent({ params, searchParams }: { params: Promise<{ compan
         </label>
         <label className="text-xs font-medium text-muted">
           From
-          <input type="date" name="from" defaultValue={search.from} className={`${inputClass} mt-1 h-9 w-40`} />
+          <input type="date" name="from" defaultValue={fromStr} className={`${inputClass} mt-1 h-9 w-40`} />
         </label>
         <label className="text-xs font-medium text-muted">
           To
-          <input type="date" name="to" defaultValue={search.to} className={`${inputClass} mt-1 h-9 w-40`} />
+          <input type="date" name="to" defaultValue={toStr} className={`${inputClass} mt-1 h-9 w-40`} />
         </label>
         <button type="submit" className={`${secondaryButton} h-9`}>
           Filter

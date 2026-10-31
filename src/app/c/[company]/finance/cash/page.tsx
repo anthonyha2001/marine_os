@@ -29,7 +29,7 @@ async function CashContent({ params, searchParams }: { params: Promise<{ company
   return (
     <>
       <PageHeader
-        eyebrow={`${COMPANIES[slug].name} · Finance`}
+        eyebrow={`${COMPANIES[slug].name} · Money`}
         title="Cash & bank"
         description="Balance of every cash box and bank account, and the cash book: every movement in and out, with a running balance."
         action={

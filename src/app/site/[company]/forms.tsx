@@ -90,7 +90,7 @@ export function BookingForm({ slug, slots, minDate }: { slug: string; slots: str
         </label>
         <label className={label}>
           Preferred date *
-          <input name="date" type="date" required min={minDate} className={field} />
+          <input name="date" type="date" required min={minDate} defaultValue={minDate} className={field} />
         </label>
         <label className={label}>
           Preferred time *

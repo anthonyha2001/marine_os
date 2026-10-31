@@ -43,7 +43,7 @@ async function SerialsContent({ params, searchParams }: { params: Promise<{ comp
   return (
     <>
       <PageHeader
-        eyebrow={`${COMPANIES[slug].name} · Inventory`}
+        eyebrow={`${COMPANIES[slug].name} · Stock`}
         title="Serial numbers"
         description="Each engine or outboard by its serial number: which purchase it came from, and who it was sold to. Search a serial when a customer calls."
         action={<ButtonLink icon={Plus} href={`${base}?new=1`}>Register serials</ButtonLink>}

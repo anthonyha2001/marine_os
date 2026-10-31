@@ -3,6 +3,7 @@ import Link from "next/link";
 import { payHref } from "@/lib/url";
 import { notFound } from "next/navigation";
 import { CalendarDays, FileText, Hammer, HandCoins, Pencil, Receipt, Sailboat, ScrollText } from "lucide-react";
+import { NewAppointmentDialog, NewJobCardDialog, NewOfferDialog, NewVesselDialog } from "@/components/create-dialogs";
 import { requireModule } from "@/lib/auth";
 import { listAppointments } from "@/lib/data/appointments";
 import { APPOINTMENT_STATUS } from "@/lib/data/portal";
@@ -81,7 +82,7 @@ function Row({ href, title, detail, right }: { href: string; title: string; deta
   );
 }
 
-type Search = { edit?: string; inv?: string; offer?: string; job?: string; invoice?: string };
+type Search = { edit?: string; inv?: string; offer?: string; job?: string; invoice?: string; create?: string };
 
 async function CustomerContent({
   params,
@@ -143,9 +144,9 @@ async function CustomerContent({
         description={[customer.contactName, customer.phone, customer.email, customer.address].filter(Boolean).join(" · ") || "No contact details yet."}
         action={
           <>
-            {may.offers && <ButtonLink icon={FileText} href={`${c}/offers/new?customer=${customer.id}`}>New offer</ButtonLink>}
+            {may.offers && <ButtonLink icon={FileText} href={`${base}?create=offer`}>New offer</ButtonLink>}
             {may.workshop && (
-              <Link href={`${c}/workshop/new?customer=${customer.id}`} className={secondaryButton}>
+              <Link href={`${base}?create=job`} className={secondaryButton}>
                 <Hammer className="size-4" aria-hidden /> Job card
               </Link>
             )}
@@ -207,7 +208,7 @@ async function CustomerContent({
         )}
 
         {may.offers && (
-          <Panel title="Offers" icon={FileText} count={myOffers.length} newHref={`${c}/offers/new?customer=${customer.id}`} newLabel="New offer">
+          <Panel title="Offers" icon={FileText} count={myOffers.length} newHref={`${base}?create=offer`} newLabel="New offer">
             {top(myOffers).map((o) => (
               <Row
                 key={o.id}
@@ -225,7 +226,7 @@ async function CustomerContent({
           </Panel>
         )}
 
-        <Panel title="Boats" icon={Sailboat} count={boats.length} newHref={`${c}/vessels?new=1&customer=${customer.id}`} newLabel="Add boat">
+        <Panel title="Boats" icon={Sailboat} count={boats.length} newHref={`${base}?create=boat`} newLabel="Add boat">
           {boats.map((v) => (
             <Row
               key={v.id}
@@ -238,7 +239,7 @@ async function CustomerContent({
         </Panel>
 
         {may.workshop && (
-          <Panel title="Job cards" icon={Hammer} count={myJobs.length} newHref={`${c}/workshop/new?customer=${customer.id}`} newLabel="New job card">
+          <Panel title="Job cards" icon={Hammer} count={myJobs.length} newHref={`${base}?create=job`} newLabel="New job card">
             {top(myJobs).map((j) => (
               <Row
                 key={j.id}
@@ -252,7 +253,7 @@ async function CustomerContent({
         )}
 
         {may.workshop && (
-          <Panel title="Appointments" icon={CalendarDays} count={myAppointments.length} newHref={`${c}/appointments?new=1`} newLabel="Book">
+          <Panel title="Appointments" icon={CalendarDays} count={myAppointments.length} newHref={`${base}?create=booking`} newLabel="Book">
             {top([...myAppointments].reverse()).map((a) => (
               <Row
                 key={a.id}
@@ -285,6 +286,10 @@ async function CustomerContent({
       {search.job && may.workshop && (
         <JobCardDialog slug={slug} id={search.job} closeHref={base} selfHref={`${base}?job=${search.job}`} canInvoice={may.invoices} invoicing={search.invoice === "1"} />
       )}
+      {search.create === "offer" && may.offers && <NewOfferDialog slug={slug} closeHref={base} customerId={customer.id} />}
+      {search.create === "job" && may.workshop && <NewJobCardDialog slug={slug} closeHref={base} customerId={customer.id} />}
+      {search.create === "boat" && <NewVesselDialog slug={slug} closeHref={base} customerId={customer.id} />}
+      {search.create === "booking" && may.workshop && <NewAppointmentDialog slug={slug} closeHref={base} customerId={customer.id} />}
       {search.edit && (
         <Modal title={`Edit ${customer.name}`} closeHref={base} size="md">
           <div className={`${cardClass} p-5`}>

@@ -15,7 +15,7 @@ async function SettingsContent({ params, searchParams }: { params: Promise<{ com
   return (
     <>
       <PageHeader
-        eyebrow={`${COMPANIES[slug].name} · Retail`}
+        eyebrow={`${COMPANIES[slug].name} · Point of sale`}
         title="POS settings"
         description="What cashiers can do at the till. Managers and admins aren't limited by the cashier rules."
       />

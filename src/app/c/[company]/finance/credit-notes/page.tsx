@@ -23,7 +23,7 @@ async function CreditNotesContent({ params, searchParams }: { params: Promise<{ 
   return (
     <>
       <PageHeader
-        eyebrow={`${COMPANIES[slug].name} · Finance`}
+        eyebrow={`${COMPANIES[slug].name} · Sales`}
         title="Credit notes"
         description="Credits issued to customers against invoices. Each one reverses the sale and VAT and lowers the invoice balance."
         action={<ButtonLink icon={Plus} href={`${base}/new`}>New credit note</ButtonLink>}

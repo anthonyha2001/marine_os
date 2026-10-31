@@ -26,7 +26,7 @@ async function TransfersContent({ params, searchParams }: { params: Promise<{ co
   return (
     <>
       <PageHeader
-        eyebrow={`${COMPANIES[slug].name} · Inventory`}
+        eyebrow={`${COMPANIES[slug].name} · Stock`}
         title="Transfers"
         description={`Goods moved between ${COMPANIES[slug].name} and ${COMPANIES[other].name}. Stock and accounts are updated on both sides; the balance between the two companies is in account 458.`}
         action={<ButtonLink icon={Send} href={`${base}?new=1`}>Send to {COMPANIES[other].name}</ButtonLink>}

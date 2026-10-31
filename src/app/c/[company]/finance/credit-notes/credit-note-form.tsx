@@ -22,7 +22,17 @@ type Line = { key: string; title: string; quantity: string; unitPrice: string };
 const blank = (): Line => ({ key: crypto.randomUUID(), title: "", quantity: "1", unitPrice: "" });
 
 /** Credit note against an invoice: pick lines from it (or type them) and give the reason. */
-export function CreditNoteForm({ companySlug, invoices, initialInvoiceId }: { companySlug: string; invoices: CreditableInvoice[]; initialInvoiceId?: string }) {
+export function CreditNoteForm({
+  companySlug,
+  invoices,
+  initialInvoiceId,
+  returnTo,
+}: {
+  companySlug: string;
+  invoices: CreditableInvoice[];
+  initialInvoiceId?: string;
+  returnTo?: string; // opened in a pop-up: come back to this page after saving
+}) {
   const [invoiceId, setInvoiceId] = useState(initialInvoiceId && invoices.some((i) => i.id === initialInvoiceId) ? initialInvoiceId : (invoices[0]?.id ?? ""));
   const [lines, setLines] = useState<Line[]>(() => [blank()]);
   const [state, formAction, pending] = useActionState<FinanceFormState, FormData>(createCreditNote.bind(null, companySlug), {});
@@ -53,6 +63,7 @@ export function CreditNoteForm({ companySlug, invoices, initialInvoiceId }: { co
       data-save-shortcut
       className="space-y-6"
     >
+      {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
       <section className={`${cardClass} grid gap-4 p-5 sm:grid-cols-3`}>
         <label className={`${labelClass} sm:col-span-2`}>
           Invoice *

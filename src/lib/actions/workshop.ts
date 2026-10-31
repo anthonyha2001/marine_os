@@ -1,5 +1,6 @@
 "use server";
 
+import { returnTarget } from "@/lib/return-to";
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -124,7 +125,7 @@ export async function createJobCard(companySlug: string, _prev: WorkshopFormStat
     return job.id;
   }, TRANSACTION_OPTIONS);
   refresh(companyId);
-  redirect(`/c/${slug}/workshop/${id}?saved=1`);
+  redirect(returnTarget(slug, formData, "Job card saved.") ?? `/c/${slug}/workshop/${id}?saved=1`);
 }
 
 function lineData(l: z.infer<typeof lineSchema>, position: number) {
@@ -141,12 +142,6 @@ function lineData(l: z.infer<typeof lineSchema>, position: number) {
 }
 
 /** Start the work for an accepted offer: its lines are copied as "covered by the offer". */
-/** Where to go after a quick action started from a pop-up: a page of this company only. */
-function returnPath(slug: string, formData?: FormData) {
-  const to = formData?.get("returnTo");
-  return typeof to === "string" && to.startsWith(`/c/${slug}/`) ? to : null;
-}
-
 export async function createJobCardFromOffer(companySlug: string, offerId: string, formData?: FormData) {
   const { user, slug, companyId } = await ctx(companySlug);
   const offer = await prisma.offer.findFirst({
@@ -190,7 +185,7 @@ export async function createJobCardFromOffer(companySlug: string, offerId: strin
     return job.id;
   }, TRANSACTION_OPTIONS);
   refresh(companyId);
-  redirect(returnPath(slug, formData) ?? `/c/${slug}/workshop/${id}?saved=1`);
+  redirect(returnTarget(slug, formData, "Job card started.") ?? `/c/${slug}/workshop/${id}?saved=1`);
 }
 
 /** Save the job card. Lines already invoiced are kept as they are. */
@@ -300,7 +295,7 @@ export async function invoiceJobCard(companySlug: string, jobId: string, _prev: 
     }, TRANSACTION_OPTIONS),
   );
   refresh(companyId, { invoices: true });
-  redirect(returnPath(slug, formData) ?? `/c/${slug}/invoices/${invoice.id}`);
+  redirect(returnTarget(slug, formData, "Invoice created.") ?? `/c/${slug}/invoices/${invoice.id}`);
 }
 
 export async function deleteJobCard(companySlug: string, jobId: string): Promise<{ error?: string }> {

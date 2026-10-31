@@ -37,7 +37,7 @@ async function ReceiptsContent({ params, searchParams }: { params: Promise<{ com
   return (
     <>
       <PageHeader
-        eyebrow={`${COMPANIES[slug].name} · Finance`}
+        eyebrow={`${COMPANIES[slug].name} · Money`}
         title="Customer receipts"
         description="Money received from customers, against invoices or on account. New customer payments are entered under Vouchers, as receipt vouchers (RV)."
         action={canAccessModule(user, slug, "accounting") && <ButtonLink icon={HandCoins} href={payHref(`/c/${slug}/finance/receipts`, "CUSTOMER")}>Customer payment</ButtonLink>}

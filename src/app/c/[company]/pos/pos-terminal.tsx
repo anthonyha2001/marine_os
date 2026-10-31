@@ -2,12 +2,13 @@
 
 import { useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import Link from "next/link";
-import { CheckCircle2, FileText, Minus, Plus, Printer, ScanBarcode, Trash2, UserRound } from "lucide-react";
+import { CheckCircle2, FileText, ImageOff, Minus, Plus, Printer, ScanBarcode, Trash2, UserRound } from "lucide-react";
 import { completeSale, type CompleteSaleResult } from "@/lib/actions/pos";
 import type { PosProduct } from "@/lib/data/pos";
 import { formatMoney, round2, withVat } from "@/lib/money";
 import { ceilLbp, formatLbp, saleTotals, settle, type ChangeCurrency, type PosRules } from "@/lib/pos";
 import { useFeedback } from "@/components/feedback";
+import { Modal } from "@/components/modal";
 import { useFocusOnShow } from "@/components/use-focus-on-show";
 import { FormMessage, Kbd, cardClass, inputClass, labelClass, primaryButton, secondaryButton, secondaryButtonSm } from "@/components/ui";
 
@@ -34,6 +35,12 @@ const subscribeAutoPrint = (l: () => void) => {
   autoPrintListeners.add(l);
   return () => autoPrintListeners.delete(l);
 };
+
+/** "3*oil filter" or "3* 6291041500213": a quantity, a star, then the product. */
+function splitQuantity(text: string) {
+  const m = /^\s*(\d{1,4})\s*\*\s*(.*)$/.exec(text);
+  return m && Number(m[1]) > 0 ? { qty: Number(m[1]), term: m[2] } : { qty: 1, term: text };
+}
 
 const num = (v: string) => (v.trim() === "" ? 0 : Number(v.replace(/,/g, "")) || 0);
 
@@ -68,6 +75,7 @@ export function PosTerminal({
   const [cart, setCart] = useState<CartItem[]>([]);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [discount, setDiscount] = useState("");
   const [paidUsd, setPaidUsd] = useState("");
   const [paidLbp, setPaidLbp] = useState("");
@@ -86,7 +94,9 @@ export function PosTerminal({
   const usdRef = useRef<HTMLInputElement>(null);
 
   const base = `/c/${companySlug}/pos`;
-  const q = query.trim().toLowerCase();
+  const { qty: typedQty, term } = splitQuantity(query);
+  const hasQty = term !== query;
+  const q = term.trim().toLowerCase();
   const results = useMemo(() => {
     if (!q) return [];
     return products
@@ -103,11 +113,11 @@ export function PosTerminal({
   const needsCustomer = rules.customerRequiredAbove > 0 && totals.totalTTC > rules.customerRequiredAbove && !customerId && !customerName.trim();
   const canComplete = cart.length > 0 && pay.ok && !discountTooHigh && !overStock && !needsCustomer && !pending && !done;
 
-  const add = (p: PosProduct) => {
+  const add = (p: PosProduct, qty = typedQty) => {
     setCart((items) => {
       const existing = items.find((i) => i.productId === p.id);
-      if (existing) return items.map((i) => (i.productId === p.id ? { ...i, quantity: i.quantity + 1 } : i));
-      return [...items, { productId: p.id, code: p.code, name: p.name, priceHT: p.priceHT, quantity: 1, stock: p.stock }];
+      if (existing) return items.map((i) => (i.productId === p.id ? { ...i, quantity: i.quantity + qty } : i));
+      return [...items, { productId: p.id, code: p.code, name: p.name, priceHT: p.priceHT, quantity: qty, stock: p.stock }];
     });
     setQuery("");
     setHighlight(0);
@@ -122,9 +132,10 @@ export function PosTerminal({
       setHighlight((h) => Math.max(h - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const raw = query.trim();
+      const raw = term.trim();
       if (!raw) {
-        if (cart.length) usdRef.current?.focus();
+        if (hasQty) toast.error(`Now type or scan the product to add ${typedQty}.`);
+        else if (cart.length) usdRef.current?.focus();
         return;
       }
       // A scanner types the barcode then Enter: exact barcode or code first.
@@ -219,10 +230,15 @@ export function PosTerminal({
             onKeyDown={onScanKey}
             disabled={!!done}
             aria-label="Scan a barcode or search a product"
-            placeholder="Scan a barcode, or type a name or code…"
+            placeholder="Scan a barcode, or type a name or code…  (3* first for 3 pieces)"
             autoComplete="off"
             className="h-14 w-full rounded-xl border border-border bg-surface pl-12 pr-4 text-lg shadow-sm outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/10"
           />
+          {hasQty && (
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-lg bg-navy px-2.5 py-1 text-sm font-semibold text-white" aria-live="polite">
+              × {typedQty}
+            </span>
+          )}
           {results.length > 0 && (
             <ul role="listbox" aria-label="Matching products" className={`${cardClass} absolute inset-x-0 top-full z-20 mt-1 overflow-hidden py-1 shadow-lg`}>
               {results.map((p, i) => (
@@ -234,6 +250,7 @@ export function PosTerminal({
                     className={`flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm ${i === highlight ? "bg-brand-soft" : "hover:bg-surface-2"}`}
                   >
                     <span className="min-w-0">
+                      {hasQty && <span className="mr-1.5 font-semibold text-brand">{typedQty} ×</span>}
                       <span className="font-mono text-xs text-muted">{p.code}</span> <span className="font-medium text-navy">{p.name}</span>
                       <span className={`ml-2 text-xs ${p.stock > 0 ? "text-muted" : "text-danger"}`}>{p.stock} in stock</span>
                     </span>
@@ -252,7 +269,7 @@ export function PosTerminal({
                 <ScanBarcode className="size-6" aria-hidden />
               </span>
               <p className="mt-4 font-semibold text-navy">Scan the first product</p>
-              <p className="mt-1 text-sm text-muted">Scanning the same item again adds one more.</p>
+              <p className="mt-1 text-sm text-muted">Scanning the same item again adds one more. Type 3* before it for 3.</p>
             </div>
           ) : (
             <table className="w-full text-sm">
@@ -267,9 +284,20 @@ export function PosTerminal({
               </thead>
               <tbody className="divide-y divide-border">
                 {cart.map((c) => (
-                  <tr key={c.productId}>
+                  <tr
+                    key={c.productId}
+                    onDoubleClick={(e) => {
+                      if ((e.target as HTMLElement).closest("button, input")) return;
+                      window.getSelection()?.removeAllRanges();
+                      setDetailId(c.productId);
+                    }}
+                    title="Double-click to see the item and its photo"
+                    className="cursor-pointer hover:bg-surface-2/60"
+                  >
                     <td className="px-4 py-2.5">
-                      <span className="font-medium text-navy">{c.name}</span>
+                      <button type="button" onClick={() => setDetailId(c.productId)} className="text-left font-medium text-navy hover:text-brand">
+                        {c.name}
+                      </button>
                       <span className="block text-xs text-muted">
                         <span className="font-mono">{c.code}</span>
                         {c.quantity > c.stock && <span className="ml-2 font-medium text-amber-700">Only {Math.max(c.stock, 0)} in stock</span>}
@@ -501,6 +529,76 @@ export function PosTerminal({
           </label>
         </div>
       </aside>
+
+      {detailId && (
+        <ItemDetails
+          product={products.find((p) => p.id === detailId)}
+          inCart={cart.find((c) => c.productId === detailId)?.quantity ?? 0}
+          onQty={done ? undefined : (n) => setQty(detailId, n)}
+          onClose={() => {
+            setDetailId(null);
+            setTimeout(() => scanRef.current?.focus(), 0);
+          }}
+        />
+      )}
     </form>
+  );
+}
+
+/** What the cashier checks before handing the item over: the photo, the code, the price. */
+function ItemDetails({ product, inCart, onQty, onClose }: { product?: PosProduct; inCart: number; onQty?: (n: number) => void; onClose: () => void }) {
+  if (!product) return null;
+  return (
+    <Modal title={product.name} onClose={onClose} size="lg">
+      <div className="grid gap-5 sm:grid-cols-[16rem_1fr]">
+        <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-border bg-white">
+          {product.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- product photos are stored as plain URLs
+            <img src={product.imageUrl} alt={product.name} className="h-full w-full object-contain" />
+          ) : (
+            <span className="flex flex-col items-center gap-2 p-4 text-center text-xs text-muted">
+              <ImageOff className="size-8" aria-hidden />
+              No photo yet. Add one in Stock → the product.
+            </span>
+          )}
+        </div>
+        <div className="space-y-4">
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-muted">Code</dt>
+              <dd className="font-mono font-semibold text-navy">{product.code}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-muted">Price (incl. VAT)</dt>
+              <dd className="tabular text-lg font-semibold text-navy">{formatMoney(withVat(product.priceHT))}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-muted">In stock</dt>
+              <dd className={`font-semibold ${product.stock > 0 ? "text-navy" : "text-danger"}`}>{product.stock}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-muted">Barcode</dt>
+              <dd className="font-mono text-navy">{product.barcodes.join(", ") || "—"}</dd>
+            </div>
+          </dl>
+          {product.description && <p className="whitespace-pre-line rounded-lg bg-surface-2 p-3 text-sm text-slate-700">{product.description}</p>}
+          {onQty && (
+            <div className="flex items-center gap-3 border-t border-border pt-4">
+              <span className="text-sm text-muted">In this sale</span>
+              <button type="button" onClick={() => onQty(inCart - 1)} aria-label="One less" className="inline-flex size-9 items-center justify-center rounded-md border border-border hover:bg-surface-2">
+                <Minus className="size-4" aria-hidden />
+              </button>
+              <span className="tabular w-8 text-center text-lg font-semibold text-navy">{inCart}</span>
+              <button type="button" onClick={() => onQty(inCart + 1)} aria-label="One more" className="inline-flex size-9 items-center justify-center rounded-md border border-border hover:bg-surface-2">
+                <Plus className="size-4" aria-hidden />
+              </button>
+              <button type="button" onClick={onClose} className={`${primaryButton} ml-auto`} autoFocus>
+                OK
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </Modal>
   );
 }

@@ -44,7 +44,7 @@ async function BinContent({ params, searchParams }: { params: Promise<{ company:
   return (
     <>
       <PageHeader
-        eyebrow={`${COMPANIES[slug].name} · Administration`}
+        eyebrow={`${COMPANIES[slug].name} · Settings`}
         title="Recycle bin"
         description="Everything deleted in the system lands here, with its lines and accounting entries. Restore puts it back exactly as it was."
       />

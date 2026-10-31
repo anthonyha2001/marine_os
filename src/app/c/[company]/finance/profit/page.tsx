@@ -41,7 +41,7 @@ async function ProfitContent({ params, searchParams }: { params: Promise<{ compa
   return (
     <>
       <PageHeader
-        eyebrow={`${COMPANIES[slug].name} · Finance`}
+        eyebrow={`${COMPANIES[slug].name} · Accounting`}
         title="Profit"
         description="Revenue excl. VAT against real cost: parts at average cost (purchase price after discount + freight, customs…), workshop labour at the hourly cost you set."
       />

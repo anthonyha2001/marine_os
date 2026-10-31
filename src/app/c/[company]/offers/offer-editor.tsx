@@ -131,6 +131,7 @@ export function OfferEditor({
   vessels = [],
   clauses = [],
   defaultCustomerId,
+  returnTo,
 }: {
   vessels?: { id: string; customerId: string | null; label: string }[];
   clauses?: { id: string; title: string; text: string }[];
@@ -142,6 +143,7 @@ export function OfferEditor({
   defaultTerms: string;
   offer?: OfferEditorValue;
   defaultCustomerId?: string; // new offer started from a customer page
+  returnTo?: string; // opened in a pop-up: come back to this page after saving
 }) {
   // Saved lines get keys 1..n; lines added later continue from n + 1.
   const nextKey = useRef((offer?.lines.length ?? 0) + 1);
@@ -453,6 +455,7 @@ export function OfferEditor({
   const [state, formAction, pending] = useActionState<OfferFormState, FormData>(async (prev) => {
     const fd = new FormData();
     fd.set("payload", JSON.stringify(buildPayload()));
+    if (returnTo) fd.set("returnTo", returnTo);
     return saveOffer(companySlug, offer?.id ?? null, prev, fd);
   }, {});
 
@@ -1109,7 +1112,7 @@ export function OfferEditor({
           </span>
         }
       >
-        <Link href={`/c/${companySlug}/offers`} className={secondaryButton}>
+        <Link href={returnTo ?? `/c/${companySlug}/offers`} scroll={!returnTo} className={secondaryButton}>
           Cancel
         </Link>
         <button type="button" onClick={preview} disabled={previewing} className={secondaryButton}>

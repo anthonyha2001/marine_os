@@ -28,19 +28,21 @@ export function PurchaseForm({
   suppliers,
   catalogue,
   fromOrder,
+  returnTo,
 }: {
   companySlug: string;
   companyName: string;
   suppliers: { id: string; name: string }[];
   catalogue: CatalogueItem[];
   fromOrder?: PurchaseFromOrder;
+  returnTo?: string; // opened in a pop-up: come back to this page after saving
 }) {
   const [header, setHeader] = useState({
     supplierId: fromOrder?.supplierId ?? "",
     invoiceNumber: "",
     reference: fromOrder?.number ?? "",
     purchaseDate: today(),
-    dueDate: "",
+    dueDate: today(),
     discount: fromOrder?.discount ? String(fromOrder.discount) : "",
     notes: "",
   });
@@ -73,6 +75,7 @@ export function PurchaseForm({
     };
     const formData = new FormData();
     formData.set("payload", JSON.stringify(payload));
+    if (returnTo) formData.set("returnTo", returnTo);
     return createPurchase(companySlug, prev, formData);
   }, {});
 
@@ -201,7 +204,8 @@ export function PurchaseForm({
           }
         >
           <Link
-            href={fromOrder ? `/c/${companySlug}/purchase-orders/${fromOrder.purchaseOrderId}` : `/c/${companySlug}/purchases`}
+            href={returnTo ?? (fromOrder ? `/c/${companySlug}/purchase-orders/${fromOrder.purchaseOrderId}` : `/c/${companySlug}/purchases`)}
+            scroll={!returnTo}
             className={secondaryButton}
           >
             Cancel

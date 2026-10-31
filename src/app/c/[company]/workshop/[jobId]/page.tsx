@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FileText, ReceiptText, ShieldPlus } from "lucide-react";
+import { NewWarrantyDialog } from "@/components/create-dialogs";
 import { requireModule } from "@/lib/auth";
 import { dayFormat } from "@/lib/dates";
 import { getCatalogue } from "@/lib/data/inventory";
@@ -20,7 +21,7 @@ import { InvoiceJobForm, JobActions } from "./job-actions";
 
 const KIND = { PART: "Part", LABOR: "Labour", SERVICE: "Service" } as const;
 
-async function JobDetail({ params, searchParams }: { params: Promise<{ company: string; jobId: string }>; searchParams: Promise<{ saved?: string; invoice?: string }> }) {
+async function JobDetail({ params, searchParams }: { params: Promise<{ company: string; jobId: string }>; searchParams: Promise<{ saved?: string; invoice?: string; create?: string }> }) {
   const [{ company, jobId }, search] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "workshop");
   const job = await getJobCard(slug, jobId);
@@ -52,7 +53,7 @@ async function JobDetail({ params, searchParams }: { params: Promise<{ company: 
                 <ReceiptText className="size-4" aria-hidden /> Create invoice
               </Link>
             )}
-            <Link href={`/c/${slug}/warranties?new=1&job=${job.id}`} className={secondaryButton}>
+            <Link href={`${base}?create=warranty`} scroll={false} className={secondaryButton}>
               <ShieldPlus className="size-4" aria-hidden /> Add warranty
             </Link>
             <JobActions companySlug={slug} jobId={job.id} number={job.number} status={job.status} hasInvoices={job.invoices.length > 0} />
@@ -165,6 +166,7 @@ async function JobDetail({ params, searchParams }: { params: Promise<{ company: 
           <InvoiceJobForm key={crypto.randomUUID()} companySlug={slug} jobId={job.id} amount={`${formatMoney(job.toInvoiceHT)} excl. VAT · ${formatMoney(billTTC)} to pay`} />
         </Modal>
       )}
+      {search.create === "warranty" && <NewWarrantyDialog slug={slug} closeHref={base} jobId={job.id} />}
     </>
   );
 }
@@ -172,7 +174,7 @@ async function JobDetail({ params, searchParams }: { params: Promise<{ company: 
 export default function JobCardPage({ params, searchParams }: PageProps<"/c/[company]/workshop/[jobId]">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading…</p>}>
-      <JobDetail params={params} searchParams={searchParams as Promise<{ saved?: string; invoice?: string }>} />
+      <JobDetail params={params} searchParams={searchParams as Promise<{ saved?: string; invoice?: string; create?: string }>} />
     </Suspense>
   );
 }

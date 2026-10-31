@@ -92,7 +92,7 @@ export const NAV: NavGroup[] = [
     items: [
       { label: "Customers", path: "customers", module: "customers", icon: "customers" },
       { label: "Vessels", path: "vessels", module: "customers", icon: "vessels" },
-      { label: "Statements", path: "finance/statements", module: "accounting", icon: "statements" },
+      { label: "Customer statements", tab: "Statements", path: "finance/statements", module: "accounting", icon: "statements" },
       { label: "New customer", path: "customers?new=1", module: "customers", hidden: true, create: true },
       { label: "New vessel", path: "vessels?new=1", module: "customers", hidden: true, create: true },
     ],
@@ -126,6 +126,7 @@ export const NAV: NavGroup[] = [
       { label: "Purchase orders", path: "purchase-orders", module: "purchases", icon: "purchaseOrders" },
       { label: "Purchases", path: "purchases", module: "purchases", icon: "purchases" },
       { label: "Suppliers", path: "suppliers", module: "suppliers", icon: "suppliers" },
+      { label: "Supplier statements", tab: "Statements", path: "suppliers/statements", module: "accounting", icon: "statements" },
       { label: "New purchase order", path: "purchase-orders/new", module: "purchases", hidden: true, create: true },
       { label: "New purchase", path: "purchases/new", module: "purchases", hidden: true, create: true },
     ],

@@ -149,7 +149,7 @@ export async function getSale(slug: CompanySlug, id: string) {
 export async function posCatalogue(slug: CompanySlug) {
   return (await listProductsWithStock(slug))
     .filter((p) => p.active)
-    .map((p) => ({ id: p.id, code: p.code, name: p.name, priceHT: p.posPriceHT ?? p.priceHT, barcodes: p.barcodes, stock: p.stock, imageUrl: p.imageUrl }));
+    .map((p) => ({ id: p.id, code: p.code, name: p.name, priceHT: p.posPriceHT ?? p.priceHT, barcodes: p.barcodes, stock: p.stock, imageUrl: p.imageUrl, description: p.description }));
 }
 export type PosProduct = Awaited<ReturnType<typeof posCatalogue>>[number];
 

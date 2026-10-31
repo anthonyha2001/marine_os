@@ -1,5 +1,6 @@
 "use server";
 
+import { returnTarget } from "@/lib/return-to";
 import { Prisma } from "@prisma/client";
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
@@ -51,7 +52,7 @@ export async function registerSerials(companySlug: string, _prev: SerialFormStat
     throw e;
   }
   updateTag(serialsTag(companyId));
-  redirect(`/c/${slug}/inventory/serials?saved=${serials.length}`);
+  redirect(returnTarget(slug, formData, `${serials.length} serial number${serials.length === 1 ? "" : "s"} registered.`) ?? `/c/${slug}/inventory/serials?saved=${serials.length}`);
 }
 
 /** Who the unit went to: customer (and boat), date and the document it was sold on. */

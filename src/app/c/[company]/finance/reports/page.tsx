@@ -335,7 +335,7 @@ async function ReportsContent({ params, searchParams }: { params: Promise<{ comp
   return (
     <>
       <PageHeader
-        eyebrow={`${COMPANIES[slug].name} · Finance`}
+        eyebrow={`${COMPANIES[slug].name} · Accounting`}
         title="Financial reports"
         description="Computed live from the general ledger: every invoice, purchase, payment, voucher and journal entry. Amounts in USD."
       />

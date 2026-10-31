@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ReceiveGoodsDialog } from "@/components/create-dialogs";
 import { requireModule } from "@/lib/auth";
 import { listSuppliers, productCatalogue } from "@/lib/data/inventory";
 import { PO_STATUSES, getPurchaseOrder } from "@/lib/data/purchase-orders";
@@ -21,9 +22,9 @@ async function PurchaseOrderPage({
   searchParams,
 }: {
   params: Promise<{ company: string; orderId: string }>;
-  searchParams: Promise<{ saved?: string }>;
+  searchParams: Promise<{ saved?: string; create?: string }>;
 }) {
-  const [{ company, orderId }, { saved }] = await Promise.all([params, searchParams]);
+  const [{ company, orderId }, { saved, create }] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "purchases");
   const order = await getPurchaseOrder(slug, orderId);
   if (!order) notFound();
@@ -41,7 +42,7 @@ async function PurchaseOrderPage({
         action={
           <div className="flex flex-wrap gap-2">
             {editable && (
-              <ButtonLink href={`/c/${slug}/purchases/new?po=${order.id}`}>Receive goods</ButtonLink>
+              <ButtonLink href={`/c/${slug}/purchase-orders/${order.id}?create=receive`}>Receive goods</ButtonLink>
             )}
             <a href={pdfUrl} target="_blank" rel="noopener" className={`${editable ? secondaryButton : primaryButton} gap-2`}>
               Open PDF <Kbd>Ctrl P</Kbd>
@@ -143,6 +144,7 @@ async function PurchaseOrderPage({
           </div>
         </>
       )}
+      {create === "receive" && <ReceiveGoodsDialog slug={slug} closeHref={`/c/${slug}/purchase-orders/${order.id}`} orderId={order.id} />}
     </>
   );
 }
@@ -150,7 +152,7 @@ async function PurchaseOrderPage({
 export default function PurchaseOrderDetailPage({ params, searchParams }: PageProps<"/c/[company]/purchase-orders/[orderId]">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading…</p>}>
-      <PurchaseOrderPage params={params} searchParams={searchParams as Promise<{ saved?: string }>} />
+      <PurchaseOrderPage params={params} searchParams={searchParams as Promise<{ saved?: string; create?: string }>} />
     </Suspense>
   );
 }

@@ -1,5 +1,6 @@
 "use server";
 
+import { returnTarget } from "@/lib/return-to";
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -78,7 +79,7 @@ export async function saveVessel(companySlug: string, vesselId: string | null, _
   }, TRANSACTION_OPTIONS);
 
   updateTag(vesselsTag);
-  redirect(`/c/${slug}/vessels/${id}?saved=1`);
+  redirect(returnTarget(slug, formData, "Boat saved.") ?? `/c/${slug}/vessels/${id}?saved=1`);
 }
 
 export async function setVesselActive(companySlug: string, vesselId: string, active: boolean): Promise<{ error?: string }> {
