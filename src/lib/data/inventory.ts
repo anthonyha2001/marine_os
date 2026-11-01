@@ -10,6 +10,7 @@ import { DATA_TAG } from "@/lib/cache-tag";
 export const tags = {
   products: "products",
   suppliers: "suppliers",
+  supplierDocuments: "supplier-documents",
   stock: (companyId: string) => `stock:${companyId}`,
   purchases: (companyId: string) => `purchases:${companyId}`,
 };
@@ -137,6 +138,17 @@ export async function listSuppliers() {
   cacheTag(DATA_TAG, tags.suppliers);
   cacheLife("hours");
   return prisma.supplier.findMany({ orderBy: { name: "asc" } });
+}
+
+/** The files kept on each supplier (without their contents), newest first. */
+export async function listSupplierDocuments() {
+  "use cache";
+  cacheTag(DATA_TAG, tags.supplierDocuments);
+  cacheLife("hours");
+  return prisma.supplierDocument.findMany({
+    select: { id: true, supplierId: true, name: true, contentType: true, size: true, uploadedBy: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+  });
 }
 
 async function getPurchases(companyId: string) {

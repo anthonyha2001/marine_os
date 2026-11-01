@@ -251,6 +251,22 @@ model Supplier {
   purchases      Purchase[]
   purchaseOrders PurchaseOrder[]
   journalLines   JournalLine[]
+  documents      SupplierDocument[]
+}
+
+// Files kept on a supplier: contracts, price lists, certificates, photos. Stored in the database.
+model SupplierDocument {
+  id          String   @id @default(cuid())
+  supplierId  String
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  name        String
+  contentType String
+  size        Int
+  data        Bytes
+  uploadedBy  String?
+  createdAt   DateTime @default(now())
+
+  @@index([supplierId])
 }
 
 // Catalogue item: a stocked product or a service (labour, repair…).
