@@ -189,7 +189,7 @@ export function OfferEditor({
     applyVat: offer?.applyVat ?? true,
   });
   const [lines, setLines] = useState<Line[]>(() => offer?.lines.map((l, i) => toLine(l, i + 1)) ?? []);
-  const [saveCustomer, setSaveCustomer] = useState(true);
+  const [notFound, setNotFound] = useState<string | null>(null);
   // Payment schedule: plan + editable rows (descriptions, % for "Percentages", due days).
   const [plan, setPlan] = useState<PaymentPlan>(offer?.paymentPlan ?? "FULL");
   const [installments, setInstallments] = useState(
@@ -271,20 +271,6 @@ export function OfferEditor({
       discountPercent: "",
     });
 
-  const customLine = (title = "") =>
-    addLine({
-      kind: "ITEM",
-      productId: null,
-      code: null,
-      title,
-      description: "",
-      showDescription: false,
-      quantity: "1",
-      unit: "pc",
-      unitPrice: "",
-      discountPercent: "",
-    });
-
   const sectionLine = (title = "") =>
     addLine({
       kind: "SECTION",
@@ -317,7 +303,7 @@ export function OfferEditor({
     const exact = catalogue.find((c) => c.code === q || c.barcodes.includes(q));
     const pick = exact ?? suggestions[highlight];
     if (pick) fromCatalogue(pick);
-    else customLine(q);
+    else setNotFound(q);
   }
 
   function move(index: number, delta: number) {
@@ -424,7 +410,6 @@ export function OfferEditor({
   const buildPayload = () => ({
       ...header,
       customerId: header.customerId || undefined,
-      saveCustomer,
       discountValue: Number(header.discountValue) || 0,
       paymentPlan: plan,
       installments: Math.min(Math.max(Math.floor(Number(installments) || 1), 1), MAX_INSTALLMENTS),
@@ -564,11 +549,8 @@ export function OfferEditor({
                 ))}
             </select>
           </label>
-          {!header.customerId && (
-            <label className="flex items-center gap-2 text-sm text-muted">
-              <input type="checkbox" checked={saveCustomer} onChange={(e) => setSaveCustomer(e.target.checked)} />
-              Save this customer for next time
-            </label>
+          {!header.customerId && header.customerName.trim().length > 1 && (
+            <p className="text-sm text-muted">New customer: it is saved with the offer.</p>
           )}
         </div>
 
@@ -666,6 +648,7 @@ export function OfferEditor({
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
+              setNotFound(null);
               setHighlight(0);
               setPickerOpen(true);
             }}
@@ -689,16 +672,18 @@ export function OfferEditor({
           >
             Browse products
           </button>
-          <button type="button" onClick={() => customLine()} className={secondaryButton}>
-            + Custom line
-          </button>
           <button type="button" onClick={() => sectionLine()} className={secondaryButton}>
             + Section
           </button>
           <p className="w-full text-xs text-muted">
-            <Kbd>Enter</Kbd> adds the selected item, or a custom line with what you typed if nothing matches.{" "}
+            <Kbd>Enter</Kbd> adds the selected product or service. Only catalogue items can be offered.{" "}
             <Kbd>Shift Enter</Kbd> adds it as a section heading.
           </p>
+          {notFound && (
+            <p role="alert" className="w-full text-sm text-danger">
+              &ldquo;{notFound}&rdquo; is not in the catalogue. Pick an item from the list, or add it under Stock → Products / Services first.
+            </p>
+          )}
           {pickerOpen && !search.trim() && catalogue.length === 0 && (
             <p className="absolute left-4 right-4 top-[3.75rem] z-10 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-muted shadow-lg">
               No products or services yet. Add them under Stock or Services.

@@ -21,6 +21,8 @@ import { nextInvoiceNumber, withNumberRetry } from "@/lib/invoice-numbers";
 import { createInvoiceWithLines, linesTotals } from "@/lib/invoicing";
 import { workshopTag } from "@/lib/data/workshop";
 import { withParams } from "@/lib/url";
+import { NOT_IN_CATALOGUE, customerNamed, existingProductIds } from "@/lib/customer-record";
+
 
 const longDate = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
@@ -267,6 +269,7 @@ const standaloneSchema = z.object({
   lines: z
     .array(
       z.object({
+        productId: z.string().nullish(),
         title: z.string().trim().min(1, "Every line needs a description").max(300),
         description: z.string().trim().max(1000).optional(),
         quantity: z.number().positive("Quantities must be more than 0"),
@@ -288,9 +291,13 @@ export async function createStandaloneInvoice(companySlug: string, _prev: Custom
   const parsed = standaloneSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const data = parsed.data;
-  const saved = data.customerId ? await prisma.customer.findUnique({ where: { id: data.customerId } }) : null;
-  if (data.customerId && !saved) return { error: "That customer no longer exists." };
-  if (!saved && (data.customerName ?? "").length < 2) return { error: "Choose a customer or type the customer's name." };
+  const picked = data.customerId ? await prisma.customer.findUnique({ where: { id: data.customerId } }) : null;
+  if (data.customerId && !picked) return { error: "That customer no longer exists." };
+  if (!picked && (data.customerName ?? "").length < 2) return { error: "Choose a customer or type the customer's name." };
+  const known = await existingProductIds(data.lines.map((l) => l.productId));
+  const unknown = data.lines.find((l) => !l.productId || !known.has(l.productId));
+  if (unknown) return { error: NOT_IN_CATALOGUE(unknown.title) };
+  const saved = picked ?? (await customerNamed(data.customerName!, { address: data.customerAddress, taxNumber: data.customerTaxNumber }));
   const total = data.lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
   if (total <= 0) return { error: "The invoice total must be more than 0." };
 
@@ -346,6 +353,8 @@ const editedInvoiceSchema = z.object({
     .array(
       z.object({
         jobLineId: z.string().optional(),
+        productId: z.string().nullish(),
+        fixed: z.boolean().optional(),
         title: z.string().trim().min(1, "Every line needs a description").max(300),
         description: z.string().trim().max(1000).optional(),
         quantity: z.number().positive("Quantities must be more than 0"),
@@ -373,6 +382,11 @@ export async function issueEditedInvoice(companySlug: string, _prev: CustomInvoi
   const data = parsed.data;
   const lines = data.lines.map((l) => ({ ...l, description: l.description || null }));
   if (linesTotals(lines, data.applyVat).totalTTC <= 0) return { error: "The invoice total must be more than 0." };
+  // Lines added in the pop-up must come from the catalogue; the job card's / offer's own lines are kept as they are.
+  const added = lines.filter((l) => !l.jobLineId && !l.fixed);
+  const known = await existingProductIds(added.map((l) => l.productId));
+  const unknown = added.find((l) => !l.productId || !known.has(l.productId));
+  if (unknown) return { error: NOT_IN_CATALOGUE(unknown.title) };
   const companyId = await companyIdFor(slug);
   const today = todayUtc();
   const dueDate = new Date(today.getTime() + data.dueDays * 86400000);

@@ -48,7 +48,7 @@ export function StandaloneInvoiceForm({
             dueDays: Number(f("dueDays")) || 0,
             lines: lines
               .filter((l) => l.title.trim() || Number(l.unitPrice))
-              .map((l) => ({ title: l.title, quantity: Number(l.quantity) || 0, unitPrice: Number(l.unitPrice) || 0 })),
+              .map((l) => ({ productId: l.productId, title: l.title, quantity: Number(l.quantity) || 0, unitPrice: Number(l.unitPrice) || 0 })),
           }),
         );
         return formAction(fd);

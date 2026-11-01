@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
+import { LiveSearch } from "@/components/live-search";
 
 // ── Shared look: inputs, buttons, cards, headers, badges, tables ──
 
@@ -184,40 +185,9 @@ export function EmptyState({
   );
 }
 
-/**
- * Search box for list pages: submits ?q= on Enter (keeps other filters via `keep`).
- * "/" focuses it (data-shortcut-search).
- */
-export function SearchBar({
-  action,
-  defaultValue,
-  placeholder,
-  keep = {},
-}: {
-  action: string;
-  defaultValue?: string;
-  placeholder: string;
-  keep?: Record<string, string | undefined>;
-}) {
-  return (
-    <form action={action} className="relative w-full max-w-md" role="search">
-      {Object.entries(keep).map(([k, v]) => (v ? <input key={k} type="hidden" name={k} value={v} /> : null))}
-      <svg className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-        <circle cx="11" cy="11" r="7" />
-        <path d="m20 20-3.5-3.5" strokeLinecap="round" />
-      </svg>
-      <input
-        name="q"
-        type="search"
-        data-shortcut-search
-        defaultValue={defaultValue}
-        placeholder={placeholder}
-        aria-label={placeholder}
-        className="block h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-10 text-sm shadow-[0_1px_0_rgba(15,23,42,0.03)] outline-none transition placeholder:text-slate-400 focus:border-brand focus:ring-4 focus:ring-brand/10"
-      />
-      <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-border bg-surface-2 px-1.5 font-mono text-[10px] text-muted">/</kbd>
-    </form>
-  );
+/** Search box for list pages: filters while you type (?q=). "/" focuses it (data-shortcut-search). */
+export function SearchBar(props: { action: string; defaultValue?: string; placeholder: string; keep?: Record<string, string | undefined> }) {
+  return <LiveSearch {...props} />;
 }
 
 /**

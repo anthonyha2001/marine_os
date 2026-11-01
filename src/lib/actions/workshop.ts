@@ -20,6 +20,8 @@ import { averageCosts } from "@/lib/costing";
 import { TRANSACTION_OPTIONS } from "@/lib/item-codes";
 import { nextNumber } from "@/lib/ledger/numbering";
 import { round2 } from "@/lib/money";
+import { NOT_IN_CATALOGUE, customerNamed, existingProductIds } from "@/lib/customer-record";
+
 
 export type WorkshopFormState = { error?: string };
 
@@ -80,15 +82,24 @@ function parsePayload(formData: FormData) {
   }
 }
 
-/** Owner of the job: the vessel's owner, a saved customer, or a typed name. */
+/** Every line must be a catalogue product or service: the error to show, or null. */
+async function checkCatalogue(lines: { productId?: string | null; title: string }[]) {
+  const known = await existingProductIds(lines.map((l) => l.productId));
+  const unknown = lines.find((l) => !l.productId || !known.has(l.productId));
+  return unknown ? NOT_IN_CATALOGUE(unknown.title) : null;
+}
+
+/** Owner of the job: the vessel's owner, a saved customer, or a typed name (saved as a new customer). */
 async function resolveCustomer(data: z.infer<typeof jobSchema>) {
   const vessel = data.vesselId ? await prisma.vessel.findUnique({ where: { id: data.vesselId }, select: { id: true, customer: { select: { id: true, name: true } } } }) : null;
   if (data.vesselId && !vessel) return { error: "That vessel no longer exists." };
   const customerId = data.customerId || vessel?.customer?.id || null;
   const customer = customerId ? await prisma.customer.findUnique({ where: { id: customerId }, select: { id: true, name: true } }) : null;
-  const name = customer?.name ?? data.customerName?.trim();
-  if (!name || name.length < 2) return { error: "Choose the vessel or customer (or type the customer's name)." };
-  return { customer: { id: customer?.id ?? null, name }, vesselId: vessel?.id ?? null };
+  if (customer) return { customer, vesselId: vessel?.id ?? null };
+  const typed = data.customerName?.trim();
+  if (!typed || typed.length < 2) return { error: "Choose the vessel or customer (or type the customer's name)." };
+  const created = await customerNamed(typed);
+  return { customer: { id: created.id, name: created.name }, vesselId: vessel?.id ?? null };
 }
 
 export async function createJobCard(companySlug: string, _prev: WorkshopFormState, formData: FormData): Promise<WorkshopFormState> {
@@ -98,6 +109,8 @@ export async function createJobCard(companySlug: string, _prev: WorkshopFormStat
   const parsed = jobSchema.safeParse(payload.raw);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const data = parsed.data;
+  const notListed = await checkCatalogue(data.lines);
+  if (notListed) return { error: notListed };
   const who = await resolveCustomer(data);
   if ("error" in who) return { error: who.error };
 
@@ -202,6 +215,8 @@ export async function saveJobCard(companySlug: string, jobId: string, _prev: Wor
   const who = await resolveCustomer(data);
   if ("error" in who) return { error: who.error };
   const invoiced = new Set(job.lines.filter((l) => l.invoiceId).map((l) => l.id));
+  const notListed = await checkCatalogue(data.lines.filter((l) => !l.id || !invoiced.has(l.id)));
+  if (notListed) return { error: notListed };
 
   await prisma.$transaction(async (tx) => {
     await tx.jobCard.update({

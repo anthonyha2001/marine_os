@@ -9,6 +9,7 @@
     "lint": "eslint",
     "db:setup": "prisma migrate deploy && prisma db seed",
     "db:studio": "prisma studio",
+    "db:demo": "tsx --conditions=react-server prisma/seed-demo.ts",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "prod": "next build && next start"

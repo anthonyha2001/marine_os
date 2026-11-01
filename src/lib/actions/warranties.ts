@@ -11,6 +11,8 @@ import { vesselsTag } from "@/lib/data/vessels";
 import { workshopTag } from "@/lib/data/workshop";
 import { TRANSACTION_OPTIONS } from "@/lib/item-codes";
 import { nextNumber } from "@/lib/ledger/numbering";
+import { customerNamed } from "@/lib/customer-record";
+
 
 export type WarrantyFormState = { error?: string };
 
@@ -50,6 +52,7 @@ export async function createWarranty(companySlug: string, _prev: WarrantyFormSta
   const customer = d.customerId ? await prisma.customer.findUnique({ where: { id: d.customerId }, select: { id: true, name: true } }) : null;
   const name = customer?.name ?? d.customerName?.trim();
   if (!name || name.length < 2) return { error: "Choose the customer or type their name." };
+  const linked = customer ?? (await customerNamed(name));
   const start = new Date(`${d.startDate}T00:00:00Z`);
   const end = new Date(start);
   end.setUTCMonth(end.getUTCMonth() + d.months);
@@ -60,8 +63,8 @@ export async function createWarranty(companySlug: string, _prev: WarrantyFormSta
       data: {
         companyId,
         number: await nextNumber(tx, companyId, "WR", start.getUTCFullYear()),
-        customerId: customer?.id ?? null,
-        customerName: name,
+        customerId: linked.id,
+        customerName: linked.name,
         vesselId: d.vesselId,
         productId: d.productId,
         item: d.item,

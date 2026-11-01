@@ -6,14 +6,17 @@ import { issueEditedInvoice, type CustomInvoiceState } from "@/lib/actions/invoi
 import { VAT_RATE, formatMoney, round2 } from "@/lib/money";
 import { FormMessage, Kbd, inputClass, labelClass, primaryButton, secondaryButtonSm } from "@/components/ui";
 
-export type EditableInvoiceLine = { jobLineId?: string; title: string; description?: string | null; quantity: number; unitPrice: number; discountPercent: number };
-export type InvoiceProduct = { code: string; name: string; priceHT: number };
+export type EditableInvoiceLine = { jobLineId?: string; productId?: string | null; title: string; description?: string | null; quantity: number; unitPrice: number; discountPercent: number };
+export type InvoiceProduct = { id: string; code: string; name: string; priceHT: number };
 
-type Row = { key: string; jobLineId?: string; title: string; description: string; quantity: string; unitPrice: string; discountPercent: string };
+// fixed: a line of the job card / offer itself; added lines must be picked from the catalogue.
+type Row = { key: string; jobLineId?: string; productId: string | null; fixed: boolean; title: string; description: string; quantity: string; unitPrice: string; discountPercent: string };
 
-const toRow = (l: EditableInvoiceLine): Row => ({
+const toRow = (l: EditableInvoiceLine, fixed = true): Row => ({
   key: crypto.randomUUID(),
   jobLineId: l.jobLineId,
+  productId: l.productId ?? null,
+  fixed,
   title: l.title,
   description: l.description ?? "",
   quantity: String(l.quantity),
@@ -46,7 +49,7 @@ export function InvoiceEditor({
   intro?: React.ReactNode;
 }) {
   const [state, formAction, pending] = useActionState<CustomInvoiceState, FormData>(issueEditedInvoice.bind(null, companySlug), {});
-  const [rows, setRows] = useState<Row[]>(() => (lines.length ? lines.map(toRow) : [toRow({ title: "", quantity: 1, unitPrice: 0, discountPercent: 0 })]));
+  const [rows, setRows] = useState<Row[]>(() => (lines.length ? lines.map((l) => toRow(l)) : [toRow({ title: "", quantity: 1, unitPrice: 0, discountPercent: 0 }, false)]));
   const [applyVat, setApplyVat] = useState(vatDefault);
   const [dueDays, setDueDays] = useState("0");
   const [notes, setNotes] = useState("");
@@ -65,6 +68,8 @@ export function InvoiceEditor({
     returnTo,
     lines: filled.map((r) => ({
       jobLineId: r.jobLineId,
+      productId: r.productId,
+      fixed: r.fixed,
       title: r.title,
       description: r.description || undefined,
       quantity: n(r.quantity),
@@ -99,13 +104,17 @@ export function InvoiceEditor({
                     list={products.length ? "invoice-products" : undefined}
                     onChange={(e) => {
                       const title = e.target.value;
-                      const p = !r.jobLineId && products.find((x) => x.name === title || `${x.code} · ${x.name}` === title);
-                      set(r.key, p ? { title: p.name, unitPrice: String(p.priceHT) } : { title });
+                      if (r.fixed) return set(r.key, { title });
+                      const v = title.trim().toLowerCase();
+                      const p = products.find((x) => x.name.toLowerCase() === v || x.code.toLowerCase() === v || `${x.code} · ${x.name}`.toLowerCase() === v);
+                      set(r.key, p ? { title: p.name, productId: p.id, unitPrice: String(p.priceHT) } : { title, productId: null });
                     }}
-                    placeholder="What is billed"
+                    placeholder={r.fixed ? "What is billed" : "Type a code or name and pick it"}
                     aria-label="Description"
-                    className={cell}
+                    aria-invalid={!r.fixed && !!r.title.trim() && !r.productId}
+                    className={`${cell} ${!r.fixed && r.title.trim() && !r.productId ? "border-danger ring-2 ring-danger/15" : ""}`}
                   />
+                  {!r.fixed && r.title.trim() && !r.productId && <p className="mt-0.5 text-xs text-danger">Not in the catalogue: pick it from the list.</p>}
                   <input value={r.description} onChange={(e) => set(r.key, { description: e.target.value })} placeholder="Details (optional)" aria-label="Details" className={`${cell} mt-1 text-xs text-muted`} />
                 </td>
                 <td className="px-2 py-1.5">
@@ -137,8 +146,8 @@ export function InvoiceEditor({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={() => setRows((rs) => [...rs, toRow({ title: "", quantity: 1, unitPrice: 0, discountPercent: 0 })])} className={secondaryButtonSm}>
-          <Plus className="size-3.5" aria-hidden /> Add line
+        <button type="button" onClick={() => setRows((rs) => [...rs, toRow({ title: "", quantity: 1, unitPrice: 0, discountPercent: 0 }, false)])} className={secondaryButtonSm}>
+          <Plus className="size-3.5" aria-hidden /> Add item from the catalogue
         </button>
         <span className="ml-auto flex items-center gap-2 whitespace-nowrap text-sm text-muted">
           Discount on every line
@@ -186,7 +195,7 @@ export function InvoiceEditor({
       </div>
 
       <FormMessage error={state.error} />
-      <button type="submit" disabled={pending || !filled.length} className={`${primaryButton} w-full gap-2`}>
+      <button type="submit" disabled={pending || !filled.length || filled.some((r) => !r.fixed && !r.productId)} className={`${primaryButton} w-full gap-2`}>
         {pending ? "Creating…" : "Create invoice"}
         <Kbd className="border-white/30 bg-white/10 text-white">Ctrl S</Kbd>
       </button>

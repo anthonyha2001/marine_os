@@ -196,10 +196,10 @@ export function OfferJobsDialog({
 
 /** Issue the job card's invoice in a pop-up: its billable lines, editable, plus anything added. */
 export async function JobInvoiceDialog({ slug, job, closeHref }: { slug: CompanySlug; job: JobCardRow; closeHref: string }) {
-  const products = (await getCatalogue()).filter((p) => p.active).map((p) => ({ code: p.code, name: p.name, priceHT: p.priceHT }));
+  const products = (await getCatalogue()).filter((p) => p.active).map((p) => ({ id: p.id, code: p.code, name: p.name, priceHT: p.priceHT }));
   const lines = job.lines
     .filter((l) => l.billable && !l.invoice)
-    .map((l) => ({ jobLineId: l.id, title: l.title, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, discountPercent: 0 }));
+    .map((l) => ({ jobLineId: l.id, productId: l.productId, title: l.title, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, discountPercent: 0 }));
   return (
     <Modal title={`Invoice ${job.number}`} closeHref={closeHref} size="xl">
       <InvoiceEditor

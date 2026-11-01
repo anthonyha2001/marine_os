@@ -297,14 +297,14 @@ export async function OfferDialog({
  * discounts. Partly invoiced: one line for the balance. Everything can be changed or added to.
  */
 export async function OfferInvoiceDialog({ slug, offer, closeHref }: { slug: CompanySlug; offer: OfferDetail; closeHref: string }) {
-  const products = (await getCatalogue()).filter((p) => p.active).map((p) => ({ code: p.code, name: p.name, priceHT: p.priceHT }));
+  const products = (await getCatalogue()).filter((p) => p.active).map((p) => ({ id: p.id, code: p.code, name: p.name, priceHT: p.priceHT }));
   const remainingTTC = round2(offer.totalTTC - offer.invoicedTTC);
   const lines =
     offer.invoicedTTC === 0
       ? [
           ...offer.lines
             .filter((l) => l.kind === "ITEM")
-            .map((l) => ({ title: l.title, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, discountPercent: l.discountPercent })),
+            .map((l) => ({ productId: l.productId, title: l.title, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, discountPercent: l.discountPercent })),
           ...(offer.discountTotal > 0 ? [{ title: "Overall discount", description: `As per offer ${offer.number}`, quantity: 1, unitPrice: -offer.discountTotal, discountPercent: 0 }] : []),
         ]
       : remainingTTC > 0

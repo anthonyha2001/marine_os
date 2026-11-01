@@ -23,6 +23,8 @@ import {
   termsForPlan,
 } from "@/lib/offers";
 import type { CompanySlug } from "@/lib/permissions";
+import { NOT_IN_CATALOGUE, customerNamed } from "@/lib/customer-record";
+
 
 export type OfferFormState = { error?: string };
 
@@ -166,26 +168,18 @@ function lineRows(data: OfferInput, catalogueIds: Set<string>) {
   });
 }
 
-/** Link to a saved customer, creating one from the typed details if asked. */
+/** Link to a saved customer, creating one from the typed details when it's new. */
 async function resolveCustomer(data: OfferInput) {
   if (data.customerId) {
     const exists = await prisma.customer.findUnique({ where: { id: data.customerId }, select: { id: true } });
     if (exists) return exists.id;
   }
-  if (!data.saveCustomer) return null;
-  const customer = await prisma.customer.upsert({
-    where: { name: data.customerName },
-    update: {},
-    create: {
-      name: data.customerName,
-      contactName: data.customerAttention,
-      address: data.customerAddress,
-      email: data.customerEmail,
-      phone: data.customerPhone,
-    },
-    select: { id: true },
+  const customer = await customerNamed(data.customerName, {
+    contactName: data.customerAttention,
+    address: data.customerAddress,
+    email: data.customerEmail,
+    phone: data.customerPhone,
   });
-  updateTag(salesTags.customers);
   return customer.id;
 }
 
@@ -238,6 +232,8 @@ export async function saveOffer(
     return { error: "This offer has invoices, so it is locked. Cancel its invoices, or duplicate it to make a new version." };
   }
   const catalogueIds = new Set(catalogue.map((p) => p.id));
+  const unknown = data.lines.find((l) => l.kind === "ITEM" && (!l.productId || !catalogueIds.has(l.productId)));
+  if (unknown) return { error: NOT_IN_CATALOGUE(unknown.title) };
 
   let savedId: string;
   if (existing) {

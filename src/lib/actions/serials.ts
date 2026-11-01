@@ -11,6 +11,8 @@ import { requireModule } from "@/lib/auth";
 import { companyIdFor } from "@/lib/data/inventory";
 import { serialsTag } from "@/lib/data/serials";
 import { vesselsTag } from "@/lib/data/vessels";
+import { customerNamed } from "@/lib/customer-record";
+
 
 export type SerialFormState = { error?: string };
 
@@ -67,9 +69,10 @@ export async function markSerialSold(companySlug: string, serialId: string, _pre
   const customer = customerId ? await prisma.customer.findUnique({ where: { id: customerId }, select: { id: true, name: true } }) : null;
   const name = customer?.name ?? typedName;
   if (name.length < 2) return { error: "Choose the customer or type their name." };
+  const linked = customer ?? (await customerNamed(name));
   const updated = await prisma.productSerial.updateMany({
     where: { id: serialId, companyId },
-    data: { status: "SOLD", customerId: customer?.id ?? null, customerName: name, vesselId, soldRef, soldAt: new Date(`${soldAtRaw}T00:00:00Z`) },
+    data: { status: "SOLD", customerId: linked.id, customerName: linked.name, vesselId, soldRef, soldAt: new Date(`${soldAtRaw}T00:00:00Z`) },
   });
   if (!updated.count) return { error: "This serial number no longer exists." };
   updateTag(serialsTag(companyId));

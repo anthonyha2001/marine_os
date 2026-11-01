@@ -15,6 +15,8 @@ import { nextNumber } from "@/lib/ledger/numbering";
 import { postPosRefund, postPosSale, postShiftDifference } from "@/lib/ledger/posting";
 import { VAT_RATE, round2 } from "@/lib/money";
 import { canManagePos, canSetRate, hasPos, htForShelfPrice, isRefundMethod, lbpUsdValue, refundTTC, roundLbp, rulesFor, saleTotals, settle, shelfPrice } from "@/lib/pos";
+import { customerNamed } from "@/lib/customer-record";
+
 
 export type PosFormState = { error?: string; saved?: boolean };
 
@@ -170,7 +172,7 @@ export async function completeSale(companySlug: string, payload: unknown): Promi
   if ((data.paidUsd > 0 && !rules.allowUsd) || (data.paidLbp > 0 && !rules.allowLbp) || (data.paidCard > 0 && !rules.allowCard))
     return { error: "This payment method is turned off in the POS settings." };
 
-  const [shift, rate, products, customer] = await Promise.all([
+  const [shift, rate, products, picked] = await Promise.all([
     prisma.posShift.findFirst({ where: { companyId, cashierId: user.id, status: "OPEN" }, select: { id: true } }),
     latestRate(companyId),
     prisma.product.findMany({ where: { id: { in: data.lines.map((l) => l.productId) }, type: "PRODUCT" }, select: { id: true, code: true, name: true, priceHT: true, posPriceHT: true } }),
@@ -196,13 +198,15 @@ export async function completeSale(companySlug: string, payload: unknown): Promi
     if (short) return { error: `Only ${Math.max(0, onHand.get(short.productId) ?? 0)} of ${short.name} in stock. A manager can sell beyond the stock.` };
   }
   const totals = saleTotals(lines, data.discountPct);
-  if (rules.customerRequiredAbove > 0 && totals.totalTTC > rules.customerRequiredAbove && !customer && !data.customerName?.trim())
+  if (rules.customerRequiredAbove > 0 && totals.totalTTC > rules.customerRequiredAbove && !picked && !data.customerName?.trim())
     return { error: `Enter the customer's name for sales above ${rules.customerRequiredAbove} USD.` };
   const pay = settle({ totalTTC: totals.totalTTC, rate, paidUsd: data.paidUsd, paidLbp: data.paidLbp, paidCard: data.paidCard, changeCurrency: data.changeCurrency, cardOverpay: rules.cardOverpay });
   if (pay.cardTooHigh) return { error: "The card amount can't be more than the total." };
   if (!pay.ok) return { error: "The payment doesn't cover the total yet." };
 
-  const name = customer?.name ?? (data.customerName || "Walk-in customer");
+  // A typed name becomes a saved customer; no name stays a walk-in sale.
+  const customer = picked ?? (data.customerName?.trim() ? await customerNamed(data.customerName, { taxNumber: data.customerTaxNumber }) : null);
+  const name = customer?.name ?? "Walk-in customer";
   const date = todayDate();
   const sale = await prisma.$transaction(async (tx) => {
     const number = await nextNumber(tx, companyId, "POS", date.getUTCFullYear(), 5);

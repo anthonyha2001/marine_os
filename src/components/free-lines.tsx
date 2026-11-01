@@ -22,8 +22,8 @@ export const newLine = (kind: LineKind = "PART"): FreeLine => ({ key: crypto.ran
 export const lineAmount = (l: FreeLine) => round2((Number(l.quantity) || 0) * (Number(l.unitPrice) || 0));
 
 /**
- * Editable lines: type a description, or pick a catalogue product / service (code or name)
- * to fill it in with its price. `withKind` shows Part / Labour / Service; `withBillable`
+ * Editable lines: every line is a catalogue product / service (type its code or name and pick
+ * it), which fills in its price. Anything else is flagged and refused when saving. `withKind` shows Part / Labour / Service; `withBillable`
  * shows the "bill" tick (job cards made from an offer).
  */
 export function FreeLinesEditor({
@@ -43,7 +43,8 @@ export function FreeLinesEditor({
 }) {
   const set = (key: string, patch: Partial<FreeLine>) => onChange(lines.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const pick = (key: string, value: string) => {
-    const item = catalogue.find((c) => `${c.code} · ${c.name}` === value);
+    const v = value.trim().toLowerCase();
+    const item = catalogue.find((c) => `${c.code} · ${c.name}`.toLowerCase() === v || c.code.toLowerCase() === v || c.name.toLowerCase() === v);
     if (item) set(key, { title: item.name, productId: item.id, unitPrice: String(item.priceHT), kind: item.type === "SERVICE" ? "SERVICE" : "PART" });
     else set(key, { title: value, productId: null });
   };
@@ -83,10 +84,12 @@ export function FreeLinesEditor({
                     value={l.title}
                     list={listId}
                     onChange={(e) => pick(l.key, e.target.value)}
-                    placeholder="Type, or pick a product / service"
+                    placeholder="Type a code or name and pick it"
                     aria-label={`Line ${i + 1} description`}
-                    className={`${inputClass} h-9`}
+                    aria-invalid={!l.locked && !!l.title.trim() && !l.productId}
+                    className={`${inputClass} h-9 ${!l.locked && l.title.trim() && !l.productId ? "border-danger ring-2 ring-danger/15" : ""}`}
                   />
+                  {!l.locked && l.title.trim() && !l.productId && <p className="mt-0.5 text-xs text-danger">Not in the catalogue: pick it from the list.</p>}
                 </td>
                 <td className="py-1 pr-2">
                   <input disabled={l.locked} type="number" min="0" step="any" value={l.quantity} onChange={(e) => set(l.key, { quantity: e.target.value })} aria-label={`Line ${i + 1} quantity`} className={`${inputClass} h-9 text-right`} />
@@ -121,11 +124,6 @@ export function FreeLinesEditor({
         <button type="button" onClick={() => onChange([...lines, newLine("PART")])} className={secondaryButtonSm}>
           <Plus className="size-3.5" aria-hidden /> Add line
         </button>
-        {withKind && (
-          <button type="button" onClick={() => onChange([...lines, { ...newLine("LABOR"), title: "Labour", unitPrice: "" }])} className={secondaryButtonSm}>
-            <Plus className="size-3.5" aria-hidden /> Add labour
-          </button>
-        )}
       </div>
     </div>
   );

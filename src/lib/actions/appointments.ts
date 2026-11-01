@@ -13,6 +13,8 @@ import { workshopTag } from "@/lib/data/workshop";
 import { businessToday } from "@/lib/dates";
 import { TRANSACTION_OPTIONS } from "@/lib/item-codes";
 import { nextNumber } from "@/lib/ledger/numbering";
+import { customerNamed } from "@/lib/customer-record";
+
 
 export type AppointmentFormState = { error?: string };
 
@@ -45,14 +47,15 @@ export async function createAppointment(companySlug: string, _prev: AppointmentF
   const customer = d.customerId ? await prisma.customer.findUnique({ where: { id: d.customerId }, select: { id: true, name: true, phone: true } }) : null;
   const name = customer?.name ?? d.customerName?.trim();
   if (!name || name.length < 2) return { error: "Choose the customer or type their name." };
+  const linked = customer ?? (await customerNamed(name, { phone: d.phone }));
   const date = new Date(`${d.date}T00:00:00Z`);
   await prisma.$transaction(async (tx) => {
     await tx.appointment.create({
       data: {
         companyId,
         number: await nextNumber(tx, companyId, "AP", date.getUTCFullYear()),
-        customerId: customer?.id ?? null,
-        customerName: name,
+        customerId: linked.id,
+        customerName: linked.name,
         phone: d.phone ?? customer?.phone ?? null,
         vesselId: d.vesselId,
         reason: d.reason,
