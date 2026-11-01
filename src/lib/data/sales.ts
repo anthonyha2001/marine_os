@@ -276,6 +276,7 @@ async function loadInvoice(companyId: string, id: string) {
       description: l.description,
       quantity: Number(l.quantity),
       unitPrice: Number(l.unitPrice),
+      discountPercent: Number(l.discountPercent),
       lineTotal: Number(l.lineTotal),
     })),
   };

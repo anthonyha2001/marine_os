@@ -3,10 +3,12 @@ import { ExternalLink, FileText, Hammer, ReceiptText } from "lucide-react";
 import { createJobCardFromOffer } from "@/lib/actions/workshop";
 import { dayFormat } from "@/lib/dates";
 import { JOB_STATUS, JOB_TONE, getJobCard, type JobCardRow } from "@/lib/data/workshop";
-import { VAT_RATE, formatMoney, round2 } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import type { CompanySlug } from "@/lib/permissions";
 import { withParams } from "@/lib/url";
-import { InvoiceJobForm, JobActions, JobQuickActions } from "@/app/c/[company]/workshop/[jobId]/job-actions";
+import { JobActions, JobQuickActions } from "@/app/c/[company]/workshop/[jobId]/job-actions";
+import { getCatalogue } from "@/lib/data/inventory";
+import { InvoiceEditor } from "@/components/invoice-editor";
 import { Modal } from "@/components/modal";
 import { Badge, cardClass, primaryButton, secondaryButton, secondaryButtonSm } from "@/components/ui";
 
@@ -73,21 +75,9 @@ export async function JobCardDialog({
   const job = await getJobCard(slug, id);
   if (!job) return null;
   const page = `/c/${slug}/workshop/${job.id}`;
-  const billTTC = round2(job.toInvoiceHT * (job.applyVat ? 1 + VAT_RATE : 1));
   const mayInvoice = canInvoice && job.status !== "CANCELLED" && job.toInvoiceHT > 0;
 
-  if (invoicing && mayInvoice)
-    return (
-      <Modal title={`Invoice ${job.number}`} closeHref={withParams(selfHref, { invoice: null })} size="md">
-        <InvoiceJobForm
-          key={crypto.randomUUID()}
-          companySlug={slug}
-          jobId={job.id}
-          amount={`${formatMoney(job.toInvoiceHT)} excl. VAT · ${formatMoney(billTTC)} to pay`}
-          returnTo={withParams(selfHref, { invoice: null })}
-        />
-      </Modal>
-    );
+  if (invoicing && mayInvoice) return <JobInvoiceDialog slug={slug} job={job} closeHref={withParams(selfHref, { invoice: null })} />;
 
   return (
     <Modal title={`Job card ${job.number}`} closeHref={closeHref} size="lg">
@@ -200,6 +190,33 @@ export function OfferJobsDialog({
           )}
         </div>
       </div>
+    </Modal>
+  );
+}
+
+/** Issue the job card's invoice in a pop-up: its billable lines, editable, plus anything added. */
+export async function JobInvoiceDialog({ slug, job, closeHref }: { slug: CompanySlug; job: JobCardRow; closeHref: string }) {
+  const products = (await getCatalogue()).filter((p) => p.active).map((p) => ({ code: p.code, name: p.name, priceHT: p.priceHT }));
+  const lines = job.lines
+    .filter((l) => l.billable && !l.invoice)
+    .map((l) => ({ jobLineId: l.id, title: l.title, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, discountPercent: 0 }));
+  return (
+    <Modal title={`Invoice ${job.number}`} closeHref={closeHref} size="xl">
+      <InvoiceEditor
+        key={crypto.randomUUID()}
+        companySlug={slug}
+        source={{ kind: "job", id: job.id }}
+        lines={lines}
+        applyVat={job.applyVat}
+        returnTo={closeHref}
+        products={products}
+        intro={
+          <>
+            Billable lines of {job.number} for <span className="font-medium text-navy">{job.customerName}</span>. Change prices and discounts, remove lines or add
+            others. Lines you remove stay on the job card to invoice later.
+          </>
+        }
+      />
     </Modal>
   );
 }

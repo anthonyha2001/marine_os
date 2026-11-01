@@ -282,7 +282,7 @@ async function CustomerContent({
       </div>
 
       {search.inv && may.invoices && <InvoiceDialog slug={slug} id={search.inv} closeHref={base} canReceive={may.accounting} canOpen />}
-      {search.offer && may.offers && <OfferDialog slug={slug} id={search.offer} closeHref={base} canInvoice={may.invoices} />}
+      {search.offer && may.offers && <OfferDialog slug={slug} id={search.offer} closeHref={base} selfHref={`${base}?offer=${search.offer}`} invoicing={search.invoice === "1"} canInvoice={may.invoices} />}
       {search.job && may.workshop && (
         <JobCardDialog slug={slug} id={search.job} closeHref={base} selfHref={`${base}?job=${search.job}`} canInvoice={may.invoices} invoicing={search.invoice === "1"} />
       )}

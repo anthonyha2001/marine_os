@@ -16,6 +16,7 @@ import { DeleteButton } from "@/components/delete-button";
 import { Modal } from "@/components/modal";
 import { round2 } from "@/lib/money";
 import { CustomInvoiceForm } from "../../invoices/custom-invoice-form";
+import { OfferInvoiceDialog } from "@/components/document-dialogs";
 import { PageHeader, secondaryButton } from "@/components/ui";
 import { OfferEditor } from "../offer-editor";
 import { offerEditorData } from "../editor-data";
@@ -109,6 +110,7 @@ async function OfferPage({
           <div id="invoicing" className="scroll-mt-4">
             <InvoicingPanel companySlug={slug} offer={offer} />
           </div>
+          {invoice === "lines" && offer.status !== "REJECTED" && <OfferInvoiceDialog slug={slug} offer={offer} closeHref={`/c/${slug}/offers/${offer.id}`} />}
           {invoice === "custom" && (
             <Modal title={`Custom invoice for ${offer.number}`} closeHref={`/c/${slug}/offers/${offer.id}`} size="md">
               <CustomInvoiceForm

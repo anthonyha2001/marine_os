@@ -110,7 +110,10 @@ async function InvoiceDetail({
                   {l.description && <p className="text-xs text-muted">{l.description}</p>}
                 </td>
                 <td className="px-4 py-3 text-right">{l.quantity}</td>
-                <td className="px-4 py-3 text-right">{formatMoney(l.unitPrice)}</td>
+                <td className="px-4 py-3 text-right">
+                  {formatMoney(l.unitPrice)}
+                  {l.discountPercent > 0 && <span className="block text-xs text-muted">-{l.discountPercent}% discount</span>}
+                </td>
                 <td className="px-4 py-3 text-right font-medium">{formatMoney(l.lineTotal)}</td>
               </tr>
             ))}

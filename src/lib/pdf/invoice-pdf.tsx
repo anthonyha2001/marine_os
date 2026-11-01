@@ -118,7 +118,10 @@ export function InvoicePdf({ slug, invoice, company, bilingual = false }: { slug
                 {line.description && <Text style={s.itemDesc}>{line.description}</Text>}
               </View>
               <Text style={s.cQty}>{line.quantity}</Text>
-              <Text style={s.cPrice}>{money.format(line.unitPrice)}</Text>
+              <View style={s.cPrice}>
+                <Text>{money.format(line.unitPrice)}</Text>
+                {line.discountPercent > 0 && <Text style={{ fontSize: 7, color: MUTED }}>-{line.discountPercent}% discount</Text>}
+              </View>
               <Text style={[s.cAmt, { fontFamily: "Helvetica-Bold" }]}>{money.format(line.lineTotal)}</Text>
             </View>
           ))}

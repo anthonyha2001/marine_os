@@ -13,6 +13,7 @@ import { cardClass, PageHeader, ButtonLink, SearchBar, secondaryButton } from "@
 import { deleteOffer } from "@/lib/actions/offers";
 import { DeleteButton } from "@/components/delete-button";
 import { OfferDialog } from "@/components/document-dialogs";
+import { withParams } from "@/lib/url";
 import { OpenRow } from "@/components/open-row";
 import { StatusSelect } from "./status-select";
 
@@ -23,9 +24,9 @@ async function OffersContent({
   searchParams,
 }: {
   params: Promise<{ company: string }>;
-  searchParams: Promise<{ q?: string; clauses?: string; view?: string }>;
+  searchParams: Promise<{ q?: string; clauses?: string; view?: string; invoice?: string }>;
 }) {
-  const [{ company }, { q = "", clauses, view }] = await Promise.all([params, searchParams]);
+  const [{ company }, { q = "", clauses, view, invoice }] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "offers");
   const mayDelete = (status: string) => isAdmin(user) || (status === "DRAFT" && can(user, "deleteDrafts"));
   const needle = q.trim().toLowerCase();
@@ -111,7 +112,16 @@ async function OffersContent({
         )}
       </div>
 
-      {view && <OfferDialog slug={slug} id={view} closeHref={q ? `${base}?q=${encodeURIComponent(q)}` : base} canInvoice={canAccessModule(user, slug, "invoices")} />}
+      {view && (
+        <OfferDialog
+          slug={slug}
+          id={view}
+          closeHref={q ? `${base}?q=${encodeURIComponent(q)}` : base}
+          selfHref={withParams(base, { q: q || null, view })}
+          invoicing={invoice === "1"}
+          canInvoice={canAccessModule(user, slug, "invoices")}
+        />
+      )}
 
       {clauses && (
         <Modal title="Standard clauses" closeHref={base} size="lg">

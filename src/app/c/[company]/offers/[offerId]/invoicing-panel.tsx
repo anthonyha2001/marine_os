@@ -60,9 +60,14 @@ export function InvoicingPanel({ companySlug, offer }: { companySlug: string; of
           <ProgressBar value={offer.totalTTC > 0 ? offer.invoicedTTC / offer.totalTTC : 0} label="Invoiced" className="mt-2 max-w-sm" />
         </div>
         <div className="flex flex-wrap gap-2">
+          {offer.status !== "REJECTED" && (
+            <Link href={`/c/${companySlug}/offers/${offer.id}?invoice=lines`} scroll={false} className={primaryButton}>
+              Issue invoice (edit lines)
+            </Link>
+          )}
           {remaining > 0 && (
             <Link href={`/c/${companySlug}/offers/${offer.id}?invoice=custom`} scroll={false} className={secondaryButton}>
-              + Custom invoice
+              + Custom amount
             </Link>
           )}
           {open.length > 1 && (

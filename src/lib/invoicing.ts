@@ -6,9 +6,9 @@ import type { Tx } from "@/lib/prisma";
 import { currentLbpRate } from "@/lib/lbp-rate";
 import type { CompanySlug } from "@/lib/permissions";
 
-export type InvoiceLineInput = { title: string; description?: string | null; quantity: number; unitPrice: number };
+export type InvoiceLineInput = { title: string; description?: string | null; quantity: number; unitPrice: number; discountPercent?: number };
 
-/** Totals for free invoice lines: line amounts excl. VAT, then 11% VAT if applied. */
+/** Totals for free invoice lines: line amounts excl. VAT after each line's discount, then 11% VAT if applied. */
 export function linesTotals(lines: InvoiceLineInput[], applyVat: boolean) {
   const rows = lines.map((l, position) => ({
     position,
@@ -16,7 +16,8 @@ export function linesTotals(lines: InvoiceLineInput[], applyVat: boolean) {
     description: l.description ?? null,
     quantity: l.quantity,
     unitPrice: round2(l.unitPrice),
-    lineTotal: round2(l.quantity * l.unitPrice),
+    discountPercent: Math.min(Math.max(l.discountPercent ?? 0, 0), 100),
+    lineTotal: round2(l.quantity * l.unitPrice * (1 - Math.min(Math.max(l.discountPercent ?? 0, 0), 100) / 100)),
   }));
   const totalHT = round2(rows.reduce((s, r) => s + r.lineTotal, 0));
   const vatAmount = applyVat ? round2(totalHT * VAT_RATE) : 0;
@@ -43,6 +44,7 @@ export async function createInvoiceWithLines(
     lines: InvoiceLineInput[];
     vesselId?: string | null;
     jobCardId?: string | null;
+    offerId?: string | null;
   },
 ) {
   const t = linesTotals(input.lines, input.applyVat);
@@ -70,6 +72,7 @@ export async function createInvoiceWithLines(
       totalTTC: t.totalTTC,
       vesselId: input.vesselId ?? null,
       jobCardId: input.jobCardId ?? null,
+      offerId: input.offerId ?? null,
       createdById: input.createdById,
       lines: { create: t.rows },
     },

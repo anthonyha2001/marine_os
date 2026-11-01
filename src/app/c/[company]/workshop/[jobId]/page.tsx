@@ -12,12 +12,12 @@ import { jobProfit } from "@/lib/data/profit";
 import { getCompanyProfile, listCustomers } from "@/lib/data/sales";
 import { vesselOptions } from "@/lib/data/vessels";
 import { JOB_STATUS, JOB_TONE, getJobCard } from "@/lib/data/workshop";
-import { VAT_RATE, formatMoney, round2 } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import { COMPANIES, canAccessModule } from "@/lib/permissions";
-import { Modal } from "@/components/modal";
 import { Badge, PageHeader, cardClass, primaryButton, secondaryButton, tdClass, thClass } from "@/components/ui";
 import { JobCardForm } from "../job-card-form";
-import { InvoiceJobForm, JobActions } from "./job-actions";
+import { JobActions } from "./job-actions";
+import { JobInvoiceDialog } from "@/components/job-dialogs";
 
 const KIND = { PART: "Part", LABOR: "Labour", SERVICE: "Service" } as const;
 
@@ -29,7 +29,6 @@ async function JobDetail({ params, searchParams }: { params: Promise<{ company: 
   const base = `/c/${slug}/workshop/${job.id}`;
   const editable = job.status === "OPEN" || job.status === "IN_PROGRESS";
   const canInvoice = canAccessModule(user, slug, "invoices");
-  const billTTC = round2(job.toInvoiceHT * (job.applyVat ? 1 + VAT_RATE : 1));
   const [vessels, customers, catalogue] = editable ? await Promise.all([vesselOptions(), listCustomers(), getCatalogue()]) : [[], [], []];
   // Profit is for managers and accountants, not the workshop.
   const showProfit = canAccessModule(user, slug, "accounting");
@@ -162,9 +161,7 @@ async function JobDetail({ params, searchParams }: { params: Promise<{ company: 
       </div>
 
       {search.invoice && canInvoice && job.toInvoiceHT > 0 && (
-        <Modal title={`Invoice ${job.number}`} closeHref={base} size="md">
-          <InvoiceJobForm key={crypto.randomUUID()} companySlug={slug} jobId={job.id} amount={`${formatMoney(job.toInvoiceHT)} excl. VAT · ${formatMoney(billTTC)} to pay`} />
-        </Modal>
+        <JobInvoiceDialog slug={slug} job={job} closeHref={base} />
       )}
       {search.create === "warranty" && <NewWarrantyDialog slug={slug} closeHref={base} jobId={job.id} />}
     </>

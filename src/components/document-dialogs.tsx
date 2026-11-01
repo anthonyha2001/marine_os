@@ -1,17 +1,19 @@
 import Link from "next/link";
-import { payHref } from "@/lib/url";
+import { payHref, withParams } from "@/lib/url";
 import { ExternalLink, FileDown, HandCoins, ReceiptText, Truck } from "lucide-react";
 import { billStatus } from "@/lib/accounting";
 import { listPurchasePayments } from "@/lib/data/accounting";
 import { getPurchase } from "@/lib/data/inventory";
 import { invoiceSettlements } from "@/lib/data/ledger";
-import { getInvoice, getOffer } from "@/lib/data/sales";
+import { getInvoice, getOffer, type OfferDetail } from "@/lib/data/sales";
+import { getCatalogue } from "@/lib/data/inventory";
 import { dayFormat, dueInWords, isOverdue } from "@/lib/dates";
-import { formatMoney, round2 } from "@/lib/money";
+import { VAT_RATE, formatMoney, round2 } from "@/lib/money";
 import type { CompanySlug } from "@/lib/permissions";
 import { BillStatusBadge } from "@/app/c/[company]/accounting/bill-status";
 import { InvoiceStatusBadge } from "@/app/c/[company]/invoices/status-badge";
 import { Modal } from "@/components/modal";
+import { InvoiceEditor } from "@/components/invoice-editor";
 import { cardClass, primaryButton, secondaryButton } from "@/components/ui";
 
 // What's inside a purchase, invoice or offer, in a pop-up opened by double-clicking its row.
@@ -162,7 +164,10 @@ export async function InvoiceDialog({ slug, id, closeHref, canReceive, canOpen }
                     {l.description && <span className="block text-xs text-muted">{l.description}</span>}
                   </td>
                   <td className={num}>{l.quantity}</td>
-                  <td className={num}>{formatMoney(l.unitPrice)}</td>
+                  <td className={num}>
+                    {formatMoney(l.unitPrice)}
+                    {l.discountPercent > 0 && <span className="block text-xs text-muted">-{l.discountPercent}%</span>}
+                  </td>
                   <td className={num}>{formatMoney(l.lineTotal)}</td>
                 </tr>
               ))}
@@ -198,10 +203,26 @@ export async function InvoiceDialog({ slug, id, closeHref, canReceive, canOpen }
   );
 }
 
-export async function OfferDialog({ slug, id, closeHref, canInvoice }: { slug: CompanySlug; id: string; closeHref: string; canInvoice: boolean }) {
+export async function OfferDialog({
+  slug,
+  id,
+  closeHref,
+  canInvoice,
+  selfHref,
+  invoicing,
+}: {
+  slug: CompanySlug;
+  id: string;
+  closeHref: string;
+  canInvoice: boolean;
+  /** The URL that shows this pop-up: "Issue invoice" then opens the invoice pop-up on top of it. */
+  selfHref?: string;
+  invoicing?: boolean;
+}) {
   const offer = await getOffer(slug, id);
   if (!offer) return null;
   const remaining = round2(offer.totalTTC - offer.invoicedTTC);
+  if (invoicing && selfHref && canInvoice && offer.status !== "REJECTED") return <OfferInvoiceDialog slug={slug} offer={offer} closeHref={selfHref} />;
   return (
     <Modal title={`Offer ${offer.number}`} closeHref={closeHref} size="lg">
       <div className="space-y-4">
@@ -261,12 +282,52 @@ export async function OfferDialog({ slug, id, closeHref, canInvoice }: { slug: C
             <ExternalLink className="size-4" aria-hidden /> Open offer
           </Link>
           {canInvoice && offer.status !== "REJECTED" && remaining > 0 && (
-            <Link href={`/c/${slug}/offers/${offer.id}#invoicing`} className={primaryButton}>
+            <Link href={selfHref ? withParams(selfHref, { invoice: "1" }) : `/c/${slug}/offers/${offer.id}?invoice=lines`} scroll={false} className={primaryButton}>
               <ReceiptText className="size-4" aria-hidden /> Issue invoice
             </Link>
           )}
         </div>
       </div>
+    </Modal>
+  );
+}
+
+/**
+ * Issue an invoice from an offer in a pop-up. Nothing invoiced yet: the offer's lines with their
+ * discounts. Partly invoiced: one line for the balance. Everything can be changed or added to.
+ */
+export async function OfferInvoiceDialog({ slug, offer, closeHref }: { slug: CompanySlug; offer: OfferDetail; closeHref: string }) {
+  const products = (await getCatalogue()).filter((p) => p.active).map((p) => ({ code: p.code, name: p.name, priceHT: p.priceHT }));
+  const remainingTTC = round2(offer.totalTTC - offer.invoicedTTC);
+  const lines =
+    offer.invoicedTTC === 0
+      ? [
+          ...offer.lines
+            .filter((l) => l.kind === "ITEM")
+            .map((l) => ({ title: l.title, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, discountPercent: l.discountPercent })),
+          ...(offer.discountTotal > 0 ? [{ title: "Overall discount", description: `As per offer ${offer.number}`, quantity: 1, unitPrice: -offer.discountTotal, discountPercent: 0 }] : []),
+        ]
+      : remainingTTC > 0
+        ? [{ title: `Balance of offer ${offer.number}`, description: offer.subject, quantity: 1, unitPrice: round2(offer.applyVat ? remainingTTC / (1 + VAT_RATE) : remainingTTC), discountPercent: 0 }]
+        : [];
+  return (
+    <Modal title={`Invoice from offer ${offer.number}`} closeHref={closeHref} size="xl">
+      <InvoiceEditor
+        key={crypto.randomUUID()}
+        companySlug={slug}
+        source={{ kind: "offer", id: offer.id }}
+        lines={lines}
+        applyVat={offer.applyVat}
+        returnTo={closeHref}
+        products={products}
+        intro={
+          <>
+            For <span className="font-medium text-navy">{offer.customerName}</span>.{" "}
+            {offer.invoicedTTC === 0 ? "The offer's lines are filled in" : `${formatMoney(offer.invoicedTTC)} is already invoiced, so the balance is filled in`}: change prices and
+            discounts, remove lines or add anything else. The offer is marked as accepted.
+          </>
+        }
+      />
     </Modal>
   );
 }

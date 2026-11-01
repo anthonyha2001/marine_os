@@ -463,15 +463,16 @@ model Invoice {
 }
 
 model InvoiceLine {
-  id          String  @id @default(cuid())
-  invoiceId   String
-  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  position    Int
-  title       String
-  description String?
-  quantity    Decimal @db.Decimal(12, 2)
-  unitPrice   Decimal @db.Decimal(12, 2) // excl. VAT
-  lineTotal   Decimal @db.Decimal(12, 2) // excl. VAT
+  id              String  @id @default(cuid())
+  invoiceId       String
+  invoice         Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  position        Int
+  title           String
+  description     String?
+  quantity        Decimal @db.Decimal(12, 2)
+  unitPrice       Decimal @db.Decimal(12, 2) // excl. VAT
+  discountPercent Decimal @default(0) @db.Decimal(5, 2)
+  lineTotal       Decimal @db.Decimal(12, 2) // excl. VAT, after the discount
 
   @@index([invoiceId])
 }

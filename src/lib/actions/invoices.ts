@@ -18,7 +18,9 @@ import { payablesTag } from "@/lib/data/accounting";
 import { ledgerTag } from "@/lib/data/ledger";
 import { businessToday } from "@/lib/dates";
 import { nextInvoiceNumber, withNumberRetry } from "@/lib/invoice-numbers";
-import { createInvoiceWithLines } from "@/lib/invoicing";
+import { createInvoiceWithLines, linesTotals } from "@/lib/invoicing";
+import { workshopTag } from "@/lib/data/workshop";
+import { withParams } from "@/lib/url";
 
 const longDate = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
@@ -332,4 +334,109 @@ export async function saveLbpRate(companySlug: string, _prev: CustomInvoiceState
   updateTag(posTag(companyId));
   updateTag(salesTags.invoices(companyId));
   redirect(`/c/${slug}/invoices?rateSaved=1`);
+}
+
+const editedInvoiceSchema = z.object({
+  source: z.discriminatedUnion("kind", [z.object({ kind: z.literal("job"), id: z.string().min(1) }), z.object({ kind: z.literal("offer"), id: z.string().min(1) })]),
+  applyVat: z.boolean(),
+  dueDays: z.number().int().min(0).max(365),
+  notes: z.string().trim().max(2000).optional(),
+  returnTo: z.string().max(500).optional(),
+  lines: z
+    .array(
+      z.object({
+        jobLineId: z.string().optional(),
+        title: z.string().trim().min(1, "Every line needs a description").max(300),
+        description: z.string().trim().max(1000).optional(),
+        quantity: z.number().positive("Quantities must be more than 0"),
+        unitPrice: z.number(),
+        discountPercent: z.number().min(0, "Discounts can't be negative").max(100, "A discount can't be more than 100%"),
+      }),
+    )
+    .min(1, "Add at least one line"),
+});
+
+/**
+ * Issue an invoice from a job card or an offer after reviewing it in the pop-up: lines can be
+ * changed, discounted, removed or added. Job card lines kept on the invoice are marked invoiced.
+ */
+export async function issueEditedInvoice(companySlug: string, _prev: CustomInvoiceState, formData: FormData): Promise<CustomInvoiceState> {
+  const { user, slug } = await requireModule(companySlug, "invoices");
+  let raw: unknown;
+  try {
+    raw = JSON.parse(String(formData.get("payload") ?? ""));
+  } catch {
+    return { error: "The form couldn't be read. Please try again." };
+  }
+  const parsed = editedInvoiceSchema.safeParse(raw);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const data = parsed.data;
+  const lines = data.lines.map((l) => ({ ...l, description: l.description || null }));
+  if (linesTotals(lines, data.applyVat).totalTTC <= 0) return { error: "The invoice total must be more than 0." };
+  const companyId = await companyIdFor(slug);
+  const today = todayUtc();
+  const dueDate = new Date(today.getTime() + data.dueDays * 86400000);
+  const base = { slug, companyId, createdById: user.id, invoiceDate: today, dueDate, applyVat: data.applyVat, notes: data.notes || null, lines };
+
+  let invoice: { id: string; number: string };
+  if (data.source.kind === "job") {
+    const job = await prisma.jobCard.findFirst({
+      where: { id: data.source.id, companyId },
+      include: { lines: { where: { billable: true, invoiceId: null }, select: { id: true } }, customer: true, vessel: { select: { name: true } } },
+    });
+    if (!job) return { error: "This job card no longer exists." };
+    if (job.status === "CANCELLED") return { error: "This job card is cancelled." };
+    const open = new Set(job.lines.map((l) => l.id));
+    const kept = lines.map((l) => l.jobLineId).filter((id): id is string => !!id);
+    if (kept.some((id) => !open.has(id))) return { error: "Some lines were invoiced meanwhile. Close and open the pop-up again." };
+    invoice = await withNumberRetry(() =>
+      prisma.$transaction(async (tx) => {
+        const created = await createInvoiceWithLines(tx, {
+          ...base,
+          customer: job.customer
+            ? { id: job.customer.id, name: job.customer.name, address: job.customer.address, email: job.customer.email, phone: job.customer.phone, taxNumber: job.customer.taxNumber, attention: job.customer.contactName }
+            : { id: null, name: job.customerName },
+          subject: `Job card ${job.number}${job.vessel ? ` · ${job.vessel.name}` : ""}`,
+          reference: job.offerId ? "Additional work" : null,
+          vesselId: job.vesselId,
+          jobCardId: job.id,
+        });
+        if (kept.length) await tx.jobCardLine.updateMany({ where: { id: { in: kept } }, data: { invoiceId: created.id } });
+        return created;
+      }, TRANSACTION_OPTIONS),
+    );
+    updateTag(workshopTag(companyId));
+  } else {
+    const loaded = await loadOfferForInvoicing(companyId, data.source.id);
+    if (!loaded) return { error: "That offer no longer exists." };
+    const { offer } = loaded;
+    if (offer.status === "REJECTED") return { error: `Offer ${offer.number} was declined.` };
+    invoice = await withNumberRetry(() =>
+      prisma.$transaction(async (tx) => {
+        const created = await createInvoiceWithLines(tx, {
+          ...base,
+          customer: {
+            id: offer.customerId,
+            name: offer.customerName,
+            attention: offer.customerAttention,
+            address: offer.customerAddress,
+            email: offer.customerEmail,
+            phone: offer.customerPhone,
+            taxNumber: offer.customer?.taxNumber ?? null,
+          },
+          subject: offer.subject,
+          reference: offer.reference ?? `Offer ${offer.number}`,
+          offerId: offer.id,
+        });
+        if (offer.status !== "ACCEPTED") await tx.offer.update({ where: { id: offer.id }, data: { status: "ACCEPTED" } });
+        return created;
+      }, TRANSACTION_OPTIONS),
+    );
+    updateTag(salesTags.offers(companyId));
+  }
+  updateTag(salesTags.invoices(companyId));
+  updateTag(ledgerTag(companyId));
+  const message = `Invoice ${invoice.number} created.`;
+  const to = data.returnTo && data.returnTo.startsWith(`/c/${slug}/`) ? withParams(data.returnTo, { done: message }) : `/c/${slug}/invoices/${invoice.id}`;
+  redirect(to);
 }
