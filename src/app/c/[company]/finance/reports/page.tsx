@@ -3,10 +3,10 @@ import Link from "next/link";
 import { CheckCircle2, TriangleAlert } from "lucide-react";
 import { requireModule } from "@/lib/auth";
 import { dayFormat } from "@/lib/dates";
-import { getLedger, type Ledger } from "@/lib/data/ledger";
+import { getAccountLedger, getAccountTotals, getAccounts, getVatDocuments } from "@/lib/data/ledger";
 import { getRate } from "@/lib/data/pos";
 import { VatLbp } from "./vat-lbp";
-import { accountLedger, balanceSheet, profitAndLoss, trialBalance, vatReport, type AccountTotal, type Period } from "@/lib/ledger/reports";
+import { balanceSheet, profitAndLoss, trialBalance, vatReport, type AccountTotal, type Period } from "@/lib/ledger/reports";
 import { formatMoney } from "@/lib/money";
 import { COMPANIES, type CompanySlug } from "@/lib/permissions";
 import { PageHeader, cardClass, inputClass, tdClass, thClass } from "@/components/ui";
@@ -78,8 +78,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function ProfitLoss({ ledger, period, glHref }: { ledger: Ledger; period: Period; glHref: (id: string) => string }) {
-  const pl = profitAndLoss(ledger, period);
+function ProfitLoss({ totals, glHref }: { totals: AccountTotal[]; glHref: (id: string) => string }) {
+  const pl = profitAndLoss(totals);
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <Section title="Income">
@@ -101,8 +101,9 @@ function ProfitLoss({ ledger, period, glHref }: { ledger: Ledger; period: Period
   );
 }
 
-function BalanceSheet({ ledger, asOf, glHref }: { ledger: Ledger; asOf: Date; glHref: (id: string) => string }) {
-  const bs = balanceSheet(ledger, asOf);
+/** totals: everything up to the balance sheet date. */
+function BalanceSheet({ totals, glHref }: { totals: AccountTotal[]; glHref: (id: string) => string }) {
+  const bs = balanceSheet(totals);
   return (
     <div className="space-y-4">
       <Balanced ok={bs.balanced} what="Assets = liabilities + equity:" />
@@ -134,8 +135,8 @@ function BalanceSheet({ ledger, asOf, glHref }: { ledger: Ledger; asOf: Date; gl
   );
 }
 
-function Trial({ ledger, period, glHref }: { ledger: Ledger; period: Period; glHref: (id: string) => string }) {
-  const tb = trialBalance(ledger, period);
+function Trial({ totals, glHref }: { totals: AccountTotal[]; glHref: (id: string) => string }) {
+  const tb = trialBalance(totals);
   return (
     <div className="space-y-4">
       <Balanced ok={tb.balanced} what="Debits = credits:" />
@@ -188,8 +189,8 @@ function Trial({ ledger, period, glHref }: { ledger: Ledger; period: Period; glH
   );
 }
 
-function Vat({ ledger, period }: { ledger: Ledger; period: Period }) {
-  const v = vatReport(ledger, period);
+function Vat({ totals }: { totals: AccountTotal[] }) {
+  const v = vatReport(totals);
   const rows: [string, number, string][] = [
     ["Sales excl. VAT", v.sales, "Net of credit notes"],
     ["VAT collected (output)", v.collected, "Account 4427"],
@@ -224,10 +225,10 @@ function Vat({ ledger, period }: { ledger: Ledger; period: Period }) {
   );
 }
 
-function GeneralLedger({ ledger, period, accountId, slug, base, fromStr, toStr }: { ledger: Ledger; period: Period; accountId?: string; slug: CompanySlug; base: string; fromStr: string; toStr: string }) {
-  const accounts = ledger.accounts;
+async function GeneralLedger({ period, accountId, slug, base, fromStr, toStr }: { period: Period; accountId?: string; slug: CompanySlug; base: string; fromStr: string; toStr: string }) {
+  const accounts = await getAccounts(slug);
   const selected = accounts.find((a) => a.id === accountId) ?? accounts.find((a) => a.kind === "CASH") ?? accounts[0];
-  const gl = selected ? accountLedger(ledger, selected.id, period) : null;
+  const gl = selected ? await getAccountLedger(slug, selected.id, period) : null;
   return (
     <div className="space-y-4">
       <form action={base} className="flex flex-wrap items-end gap-3">
@@ -329,7 +330,9 @@ async function ReportsContent({ params, searchParams }: { params: Promise<{ comp
   const base = `/c/${slug}/finance/reports`;
   const report: ReportKey = REPORTS.some((r) => r.key === search.r) ? (search.r as ReportKey) : "pl";
   const { fromStr, toStr, period } = periodFrom(search);
-  const ledger = await getLedger(slug);
+  const asOf = period.to ?? new Date();
+  // Only the open report's figures are read: totals over the period, or up to the balance sheet date.
+  const totals = report === "gl" ? [] : await getAccountTotals(slug, report === "bs" ? { to: asOf } : period);
   const glHref = (id: string) => `${base}?r=gl&account=${id}&from=${fromStr}&to=${toStr}`;
 
   return (
@@ -344,17 +347,17 @@ async function ReportsContent({ params, searchParams }: { params: Promise<{ comp
       </div>
       <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
         <PeriodFilter action={base} from={fromStr} to={toStr} keep={{ r: report, account: search.account }} />
-        {report === "bs" && <p className="text-sm text-muted">Balance sheet at {dayFormat.format(period.to ?? new Date())}</p>}
+        {report === "bs" && <p className="text-sm text-muted">Balance sheet at {dayFormat.format(asOf)}</p>}
       </div>
       <div className="mt-6">
-        {report === "pl" && <ProfitLoss ledger={ledger} period={period} glHref={glHref} />}
-        {report === "bs" && <BalanceSheet ledger={ledger} asOf={period.to ?? new Date()} glHref={glHref} />}
-        {report === "trial" && <Trial ledger={ledger} period={period} glHref={glHref} />}
-        {report === "vat" && <Vat ledger={ledger} period={period} />}
+        {report === "pl" && <ProfitLoss totals={totals} glHref={glHref} />}
+        {report === "bs" && <BalanceSheet totals={totals} glHref={glHref} />}
+        {report === "trial" && <Trial totals={totals} glHref={glHref} />}
+        {report === "vat" && <Vat totals={totals} />}
         {report === "vatlbp" && (
-          <VatLbp ledger={ledger} period={period} rate={search.rate ? Number(search.rate) || null : ((await getRate(slug))?.lbpPerUsd ?? null)} base={base} fromStr={fromStr} toStr={toStr} />
+          <VatLbp totals={totals} docs={await getVatDocuments(slug, period)} rate={search.rate ? Number(search.rate) || null : ((await getRate(slug))?.lbpPerUsd ?? null)} base={base} fromStr={fromStr} toStr={toStr} />
         )}
-        {report === "gl" && <GeneralLedger ledger={ledger} period={period} accountId={search.account} slug={slug} base={base} fromStr={fromStr} toStr={toStr} />}
+        {report === "gl" && <GeneralLedger period={period} accountId={search.account} slug={slug} base={base} fromStr={fromStr} toStr={toStr} />}
       </div>
     </>
   );

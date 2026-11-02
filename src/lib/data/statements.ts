@@ -1,17 +1,17 @@
 import "server-only";
-import { getLedger } from "@/lib/data/ledger";
+import { getPartnerBalances, getStatement } from "@/lib/data/ledger";
 import { listSuppliers } from "@/lib/data/inventory";
 import { listCustomers } from "@/lib/data/sales";
-import { partnerBalances, statement, type Partner, type Period } from "@/lib/ledger/reports";
+import type { Partner, Period } from "@/lib/ledger/reports";
 import type { CompanySlug } from "@/lib/permissions";
 
 export type PartnerType = "CUSTOMER" | "SUPPLIER";
 
 /** Everything the statements page and its PDF need: partner list with balances, and the statement. */
 export async function loadStatements(slug: CompanySlug, type: PartnerType, key: string | undefined, period: Period) {
-  const [ledger, customers, suppliers] = await Promise.all([getLedger(slug), listCustomers(), listSuppliers()]);
+  const [customers, suppliers] = await Promise.all([listCustomers(), listSuppliers()]);
   const supplierNames = new Map(suppliers.map((s) => [s.id, s.name]));
-  const balances = partnerBalances(ledger, type, supplierNames);
+  const balances = await getPartnerBalances(slug, type, supplierNames);
 
   // Everyone who can be picked: saved records plus customers that only exist on invoices.
   const options =
@@ -35,5 +35,5 @@ export async function loadStatements(slug: CompanySlug, type: PartnerType, key: 
       if (c) partner = { type: "CUSTOMER", id: c.id, name: c.name };
     }
   }
-  return { balances, options, partner, result: partner ? statement(ledger, partner, period) : null };
+  return { balances, options, partner, result: partner ? await getStatement(slug, partner, period) : null };
 }

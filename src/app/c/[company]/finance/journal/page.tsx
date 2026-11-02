@@ -3,7 +3,9 @@ import Link from "next/link";
 import { BookOpen, Plus } from "lucide-react";
 import { requireModule } from "@/lib/auth";
 import { businessToday, dayFormat } from "@/lib/dates";
-import { getLedger, getLockDate } from "@/lib/data/ledger";
+import { JOURNAL_PAGE_SIZE, getAccounts, getLockDate, listJournal } from "@/lib/data/ledger";
+import { withParams } from "@/lib/url";
+import { Pager, pageFrom } from "@/components/pager";
 import { formatMoney, round2 } from "@/lib/money";
 import { COMPANIES, can, canCloseBooks } from "@/lib/permissions";
 import { LockDateForm } from "./lock-date-form";
@@ -14,33 +16,26 @@ import { JournalForm } from "./journal-form";
 import { CancelButton } from "@/components/cancel-button";
 import { reverseJournalEntry } from "@/lib/actions/cancel";
 
-type Search = PeriodParams & { q?: string; new?: string; saved?: string; source?: string };
+type Search = PeriodParams & { q?: string; new?: string; saved?: string; source?: string; page?: string };
 
 async function JournalContent({ params, searchParams }: { params: Promise<{ company: string }>; searchParams: Promise<Search> }) {
   const [{ company }, search] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "accounting");
   const base = `/c/${slug}/finance/journal`;
-  const [ledger, lockDate] = await Promise.all([getLedger(slug), getLockDate(slug)]);
+  const { fromStr, toStr } = periodFrom(search);
+  const page = pageFrom(search.page);
+  const [journal, chart, lockDate] = await Promise.all([
+    listJournal(slug, { from: fromStr, to: toStr, source: search.source || undefined, q: search.q || undefined, page }),
+    getAccounts(slug),
+    getLockDate(slug),
+  ]);
   const mayReverse = can(user, "cancelEntries");
   // The lock date must be before today (see saveLockDate).
   const yesterday = new Date(Date.parse(`${businessToday()}T00:00:00Z`) - 86400000).toISOString().slice(0, 10);
-  const reversed = new Set(ledger.entries.map((e) => e.reversalOf).filter(Boolean));
-  const { fromStr, toStr, period } = periodFrom(search);
-  const accounts = new Map(ledger.accounts.map((a) => [a.id, a]));
-  const needle = (search.q ?? "").trim().toLowerCase();
-  const entries = ledger.entries
-    .filter((e) => (!period.from || e.date >= period.from) && (!period.to || e.date <= period.to))
-    .filter((e) => !search.source || e.sourceType === search.source)
-    .filter(
-      (e) =>
-        !needle ||
-        e.number.toLowerCase().includes(needle) ||
-        e.memo.toLowerCase().includes(needle) ||
-        e.lines.some((l) => (accounts.get(l.accountId)?.code ?? "").startsWith(needle) || (l.description ?? "").toLowerCase().includes(needle)),
-    )
-    .slice()
-    .reverse();
-  const shown = entries.slice(0, 200);
+  const reversed = new Set(journal.reversedIds);
+  const accounts = new Map(chart.map((a) => [a.id, a]));
+  const shown = journal.entries;
+  const here = withParams(base, { q: search.q, from: fromStr, to: toStr, source: search.source });
 
   return (
     <>
@@ -143,15 +138,15 @@ async function JournalContent({ params, searchParams }: { params: Promise<{ comp
             );
           })
         )}
-        {entries.length > shown.length && <p className="text-center text-sm text-muted">Showing the latest 200 of {entries.length} entries. Narrow the period to see more.</p>}
       </div>
+      <Pager href={here} page={page} pageSize={JOURNAL_PAGE_SIZE} total={journal.total} />
 
       {search.new && (
         <Modal title="Manual journal entry" closeHref={base} size="xl">
           <JournalForm
             key={crypto.randomUUID()}
             companySlug={slug}
-            accounts={ledger.accounts.filter((a) => a.active).map((a) => ({ id: a.id, code: a.code, name: a.name }))}
+            accounts={chart.filter((a) => a.active).map((a) => ({ id: a.id, code: a.code, name: a.name }))}
           />
         </Modal>
       )}

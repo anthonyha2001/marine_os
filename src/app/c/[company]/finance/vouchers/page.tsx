@@ -6,9 +6,9 @@ import { PAYMENT_METHODS, billStatus } from "@/lib/accounting";
 import { businessToday, dayFormat, dueInWords, isOverdue } from "@/lib/dates";
 import { listBills } from "@/lib/data/accounting";
 import { listCustomers } from "@/lib/data/sales";
-import { getLedger, invoicesWithBalance, listMoneyAccounts, listVouchers } from "@/lib/data/ledger";
+import { getAccounts, invoicesWithBalance, listMoneyAccounts, listVouchers } from "@/lib/data/ledger";
 import { formatMoney, round2 } from "@/lib/money";
-import { COMPANIES, can, canAccessModule } from "@/lib/permissions";
+import { COMPANIES, can, canAccessModule, type CompanySlug } from "@/lib/permissions";
 import { InvoiceDialog, PurchaseDialog } from "@/components/document-dialogs";
 import { Modal } from "@/components/modal";
 import { OpenRow } from "@/components/open-row";
@@ -270,15 +270,15 @@ async function VouchersContent({ params, searchParams }: { params: Promise<{ com
   );
 }
 
-async function NewVoucher({ slug, kind }: { slug: Parameters<typeof getLedger>[0]; kind: VoucherKind }) {
-  const [ledger, moneyAccounts] = await Promise.all([getLedger(slug), listMoneyAccounts(slug)]);
-  const counterAccounts = ledger.accounts
+async function NewVoucher({ slug, kind }: { slug: CompanySlug; kind: VoucherKind }) {
+  const [accounts, moneyAccounts] = await Promise.all([getAccounts(slug), listMoneyAccounts(slug)]);
+  const counterAccounts = accounts
     .filter((a) => a.active && !["CASH", "BANK", "RECEIVABLE", "PAYABLE"].includes(a.kind))
     .map((a) => ({ id: a.id, code: a.code, name: a.name, type: a.type }));
   return <VoucherForm key={crypto.randomUUID()} companySlug={slug} kind={kind} moneyAccounts={moneyAccounts} counterAccounts={counterAccounts} />;
 }
 
-async function NewSupplierPayment({ slug, billId }: { slug: Parameters<typeof getLedger>[0]; billId?: string }) {
+async function NewSupplierPayment({ slug, billId }: { slug: CompanySlug; billId?: string }) {
   const [bills, accounts] = await Promise.all([listBills(slug), listMoneyAccounts(slug)]);
   const open = bills
     .filter((b) => b.balance > 0)
@@ -286,7 +286,7 @@ async function NewSupplierPayment({ slug, billId }: { slug: Parameters<typeof ge
   return <SupplierPaymentForm key={crypto.randomUUID()} companySlug={slug} bills={open} accounts={accounts} defaultBillId={billId} />;
 }
 
-async function NewCustomerPayment({ slug, invoiceId }: { slug: Parameters<typeof getLedger>[0]; invoiceId?: string }) {
+async function NewCustomerPayment({ slug, invoiceId }: { slug: CompanySlug; invoiceId?: string }) {
   const [open, accounts, customers] = await Promise.all([invoicesWithBalance(slug), listMoneyAccounts(slug), listCustomers()]);
   return (
     <ReceiptForm

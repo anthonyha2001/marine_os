@@ -2,7 +2,7 @@
 
 import { requireModule } from "@/lib/auth";
 import { listBills } from "@/lib/data/accounting";
-import { getLedger, invoicesWithBalance, listMoneyAccounts } from "@/lib/data/ledger";
+import { getAccounts, invoicesWithBalance, listMoneyAccounts } from "@/lib/data/ledger";
 import { listCustomers } from "@/lib/data/sales";
 
 export type PayKind = "CUSTOMER" | "SUPPLIER" | "PAYMENT" | "RECEIPT" | "TRANSFER";
@@ -39,11 +39,11 @@ export async function paymentFormData(companySlug: string, kind: PayKind, custom
     };
   }
 
-  const ledger = await getLedger(slug);
+  const ledgerAccounts = await getAccounts(slug);
   return {
     kind,
     accounts,
-    counterAccounts: ledger.accounts
+    counterAccounts: ledgerAccounts
       .filter((a) => a.active && !["CASH", "BANK", "RECEIVABLE", "PAYABLE"].includes(a.kind))
       .map((a) => ({ id: a.id, code: a.code, name: a.name, type: a.type })),
   };

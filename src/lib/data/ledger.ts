@@ -1,14 +1,18 @@
 import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { currentLbpRate } from "@/lib/lbp-rate";
 import { companyIdFor } from "@/lib/data/inventory";
 import { listInvoices } from "@/lib/data/sales";
 import type { CompanySlug } from "@/lib/permissions";
 import { DATA_TAG } from "@/lib/cache-tag";
+import { round2 } from "@/lib/money";
+import { moves, sumByAccount, sumByMonth, sumByPartner, vatDocuments, type MoveFilter } from "@/lib/ledger/queries";
+import { accountTotalsFrom, debitNatured, withRunningBalance, type AccountTotal, type Partner, type PartnerBalance, type Period } from "@/lib/ledger/reports";
 
 // The general ledger and financial documents, cached per company. Every posting action calls
-// updateTag(ledgerTag(companyId)); reports are computed in memory from this data.
+// updateTag(ledgerTag(companyId)). Balances, statements and reports are summed in SQL.
 export const ledgerTag = (companyId: string) => `ledger:${companyId}`;
 
 export type LedgerAccountRow = {
@@ -43,54 +47,189 @@ export type LedgerEntryRow = {
   lines: LedgerLineRow[];
 };
 
-export type Ledger = { accounts: LedgerAccountRow[]; entries: LedgerEntryRow[] };
+export type JournalFilters = { from: string; to: string; source?: string; q?: string; page: number };
 
-async function loadLedger(companyId: string): Promise<Ledger> {
+export const JOURNAL_PAGE_SIZE = 50;
+
+// ── Reads summed in SQL (src/lib/ledger/queries.ts), cached per company ──
+
+/** YYYY-MM-DD of a period bound (dates are stored as plain days). */
+const dayOf = (d?: Date) => (d ? d.toISOString().slice(0, 10) : null);
+
+async function loadAccounts(companyId: string): Promise<LedgerAccountRow[]> {
   "use cache";
   cacheTag(DATA_TAG, ledgerTag(companyId));
   cacheLife("hours");
-  const [accounts, entries] = await Promise.all([
-    prisma.ledgerAccount.findMany({ where: { companyId }, orderBy: { code: "asc" } }),
+  const accounts = await prisma.ledgerAccount.findMany({ where: { companyId }, orderBy: { code: "asc" } });
+  return accounts.map((a) => ({
+    id: a.id,
+    code: a.code,
+    name: a.name,
+    type: a.type as LedgerAccountRow["type"],
+    kind: a.kind,
+    isSystem: a.isSystem,
+    active: a.active,
+  }));
+}
+
+/** The chart of accounts (active and inactive), by code. */
+export async function getAccounts(slug: CompanySlug) {
+  return loadAccounts(await companyIdFor(slug));
+}
+
+async function loadAccountSums(companyId: string, from: string | null, to: string | null) {
+  "use cache";
+  cacheTag(DATA_TAG, ledgerTag(companyId));
+  cacheLife("hours");
+  return sumByAccount(prisma, companyId, from, to);
+}
+
+/** Debit, credit and balance of every account over a period (or everything up to `to`). */
+export async function getAccountTotals(slug: CompanySlug, period: Period = {}): Promise<AccountTotal[]> {
+  const companyId = await companyIdFor(slug);
+  const [accounts, sums] = await Promise.all([loadAccounts(companyId), loadAccountSums(companyId, dayOf(period.from), dayOf(period.to))]);
+  return accountTotalsFrom(accounts, sums);
+}
+
+async function loadMonthlySums(companyId: string, from: string, to: string) {
+  "use cache";
+  cacheTag(DATA_TAG, ledgerTag(companyId));
+  cacheLife("hours");
+  return sumByMonth(prisma, companyId, from, to);
+}
+
+/** Account totals per month ("YYYY-MM") between two dates, in one query. */
+export async function getMonthlyTotals(slug: CompanySlug, from: Date, to: Date): Promise<Map<string, AccountTotal[]>> {
+  const companyId = await companyIdFor(slug);
+  const [accounts, rows] = await Promise.all([loadAccounts(companyId), loadMonthlySums(companyId, dayOf(from)!, dayOf(to)!)]);
+  const byMonth = new Map<string, typeof rows>();
+  for (const r of rows) byMonth.set(r.month, [...(byMonth.get(r.month) ?? []), r]);
+  return new Map([...byMonth].map(([month, sums]) => [month, accountTotalsFrom(accounts, sums)]));
+}
+
+async function loadMoves(companyId: string, filter: MoveFilter, from: string | null, to: string | null) {
+  "use cache";
+  cacheTag(DATA_TAG, ledgerTag(companyId));
+  cacheLife("hours");
+  return moves(prisma, companyId, filter, from, to);
+}
+
+/** General ledger of one account over a period, with running balance in its natural direction. */
+export async function getAccountLedger(slug: CompanySlug, accountId: string, period: Period) {
+  const companyId = await companyIdFor(slug);
+  const account = (await loadAccounts(companyId)).find((a) => a.id === accountId);
+  if (!account) return null;
+  const { opening, rows } = await loadMoves(companyId, { kind: "account", accountId }, dayOf(period.from), dayOf(period.to));
+  return { account, ...withRunningBalance(opening, rows, debitNatured(account.type) ? 1 : -1) };
+}
+
+/**
+ * Statement of account. Customers: what they owe us (debit − credit on Customers 411).
+ * Suppliers: what we owe them (credit − debit on Suppliers 401).
+ */
+export async function getStatement(slug: CompanySlug, partner: Partner, period: Period) {
+  const companyId = await companyIdFor(slug);
+  const filter: MoveFilter = partner.type === "CUSTOMER" ? { kind: "customer", id: partner.id, name: partner.name } : { kind: "supplier", id: partner.id };
+  const { opening, rows } = await loadMoves(companyId, filter, dayOf(period.from), dayOf(period.to));
+  return withRunningBalance(opening, rows, partner.type === "CUSTOMER" ? 1 : -1);
+}
+
+async function loadPartnerSums(companyId: string, type: "CUSTOMER" | "SUPPLIER") {
+  "use cache";
+  cacheTag(DATA_TAG, ledgerTag(companyId));
+  cacheLife("hours");
+  return sumByPartner(prisma, companyId, type);
+}
+
+/**
+ * Balance per customer (Customers 411, debit − credit) or per supplier (Suppliers 401,
+ * credit − debit). Customers without a saved record are grouped by name.
+ */
+export async function getPartnerBalances(slug: CompanySlug, type: "CUSTOMER" | "SUPPLIER", supplierNames: Map<string, string> = new Map()): Promise<PartnerBalance[]> {
+  const rows = await loadPartnerSums(await companyIdFor(slug), type);
+  return rows
+    .map((r) => {
+      const debit = round2(r.debit);
+      const credit = round2(r.credit);
+      const name = type === "CUSTOMER" ? (r.name ?? "Unknown customer") : (supplierNames.get(r.key) ?? "Unknown supplier");
+      return { key: r.key, id: r.id, name, debit, credit, balance: round2(type === "CUSTOMER" ? debit - credit : credit - debit) };
+    })
+    .sort((a, b) => b.balance - a.balance || a.name.localeCompare(b.name));
+}
+
+async function loadVatDocuments(companyId: string, from: string | null, to: string | null) {
+  "use cache";
+  cacheTag(DATA_TAG, ledgerTag(companyId));
+  cacheLife("hours");
+  return vatDocuments(prisma, companyId, from, to);
+}
+
+/** Entries of a period that carry VAT, with their amount excl. VAT (for the VAT return in LBP). */
+export async function getVatDocuments(slug: CompanySlug, period: Period) {
+  return loadVatDocuments(await companyIdFor(slug), dayOf(period.from), dayOf(period.to));
+}
+
+async function loadJournalPage(companyId: string, f: JournalFilters) {
+  "use cache";
+  cacheTag(DATA_TAG, ledgerTag(companyId));
+  cacheLife("hours");
+  const q = f.q?.trim();
+  const where: Prisma.JournalEntryWhereInput = {
+    companyId,
+    date: { gte: new Date(`${f.from}T00:00:00Z`), lte: new Date(`${f.to}T00:00:00Z`) },
+    ...(f.source ? { sourceType: f.source } : {}),
+    ...(q
+      ? {
+          OR: [
+            { number: { contains: q, mode: "insensitive" } },
+            { memo: { contains: q, mode: "insensitive" } },
+            { lines: { some: { description: { contains: q, mode: "insensitive" } } } },
+            { lines: { some: { account: { code: { startsWith: q } } } } },
+          ],
+        }
+      : {}),
+  };
+  const [total, entries] = await Promise.all([
+    prisma.journalEntry.count({ where }),
     prisma.journalEntry.findMany({
-      where: { companyId },
+      where,
       include: { lines: true, createdBy: { select: { name: true } } },
-      orderBy: [{ date: "asc" }, { number: "asc" }],
+      orderBy: [{ date: "desc" }, { number: "desc" }],
+      skip: (f.page - 1) * JOURNAL_PAGE_SIZE,
+      take: JOURNAL_PAGE_SIZE,
     }),
   ]);
+  const reversed = await prisma.journalEntry.findMany({ where: { reversalOf: { in: entries.map((e) => e.id) } }, select: { reversalOf: true } });
   return {
-    accounts: accounts.map((a) => ({
-      id: a.id,
-      code: a.code,
-      name: a.name,
-      type: a.type as LedgerAccountRow["type"],
-      kind: a.kind,
-      isSystem: a.isSystem,
-      active: a.active,
-    })),
-    entries: entries.map((e) => ({
-      id: e.id,
-      number: e.number,
-      date: e.date,
-      memo: e.memo,
-      sourceType: e.sourceType,
-      sourceId: e.sourceId,
-      reversalOf: e.reversalOf,
-      createdByName: e.createdBy.name,
-      lines: e.lines.map((l) => ({
-        accountId: l.accountId,
-        debit: Number(l.debit),
-        credit: Number(l.credit),
-        description: l.description,
-        customerId: l.customerId,
-        customerName: l.customerName,
-        supplierId: l.supplierId,
-      })),
-    })),
+    total,
+    reversedIds: reversed.map((r) => r.reversalOf!),
+    entries: entries.map(
+      (e): LedgerEntryRow => ({
+        id: e.id,
+        number: e.number,
+        date: e.date,
+        memo: e.memo,
+        sourceType: e.sourceType,
+        sourceId: e.sourceId,
+        reversalOf: e.reversalOf,
+        createdByName: e.createdBy.name,
+        lines: e.lines.map((l) => ({
+          accountId: l.accountId,
+          debit: Number(l.debit),
+          credit: Number(l.credit),
+          description: l.description,
+          customerId: l.customerId,
+          customerName: l.customerName,
+          supplierId: l.supplierId,
+        })),
+      }),
+    ),
   };
 }
 
-export async function getLedger(slug: CompanySlug) {
-  return loadLedger(await companyIdFor(slug));
+/** One page of the journal (newest first), filtered by period, type and search, in SQL. */
+export async function listJournal(slug: CompanySlug, filters: JournalFilters) {
+  return loadJournalPage(await companyIdFor(slug), filters);
 }
 
 async function loadReceipts(companyId: string) {
@@ -294,7 +433,7 @@ export type MoneyAccountOption = { id: string; code: string; name: string; kind:
 
 /** Active cash boxes and bank accounts, for "paid from / paid into" selects. */
 export async function listMoneyAccounts(slug: CompanySlug): Promise<MoneyAccountOption[]> {
-  const { accounts } = await getLedger(slug);
+  const accounts = await getAccounts(slug);
   return accounts
     .filter((a) => a.active && (a.kind === "CASH" || a.kind === "BANK"))
     .map((a) => ({ id: a.id, code: a.code, name: a.name, kind: a.kind as "CASH" | "BANK" }));

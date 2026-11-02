@@ -3,8 +3,7 @@ import Link from "next/link";
 import { Lock, Pencil, Plus } from "lucide-react";
 import { requireModule } from "@/lib/auth";
 import { deleteLedgerAccount } from "@/lib/actions/finance";
-import { getLedger } from "@/lib/data/ledger";
-import { accountTotals } from "@/lib/ledger/reports";
+import { getAccountTotals } from "@/lib/data/ledger";
 import { COMPANIES, isAdmin } from "@/lib/permissions";
 import { DeleteButton } from "@/components/delete-button";
 import { Modal } from "@/components/modal";
@@ -38,10 +37,10 @@ async function AccountsContent({ params, searchParams }: { params: Promise<{ com
   const [{ company }, search] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "accounting");
   const base = `/c/${slug}/finance/accounts`;
-  const ledger = await getLedger(slug);
-  const totals = accountTotals(ledger).filter((a) => a.active || search.inactive);
-  const editing = search.edit ? ledger.accounts.find((a) => a.id === search.edit) : undefined;
-  const inactiveCount = ledger.accounts.filter((a) => !a.active).length;
+  const all = await getAccountTotals(slug);
+  const totals = all.filter((a) => a.active || search.inactive);
+  const editing = search.edit ? all.find((a) => a.id === search.edit) : undefined;
+  const inactiveCount = all.filter((a) => !a.active).length;
 
   return (
     <>

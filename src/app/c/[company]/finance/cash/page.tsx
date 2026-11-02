@@ -4,8 +4,8 @@ import { payHref } from "@/lib/url";
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Wallet } from "lucide-react";
 import { requireModule } from "@/lib/auth";
 import { dayFormat } from "@/lib/dates";
-import { getLedger } from "@/lib/data/ledger";
-import { accountLedger, moneyBalances } from "@/lib/ledger/reports";
+import { getAccountLedger, getAccountTotals } from "@/lib/data/ledger";
+import { moneyBalances } from "@/lib/ledger/reports";
 import { formatMoney, round2 } from "@/lib/money";
 import { COMPANIES } from "@/lib/permissions";
 import { EmptyState, PageHeader, cardClass, primaryButton, secondaryButton, tdClass, thClass } from "@/components/ui";
@@ -17,12 +17,11 @@ async function CashContent({ params, searchParams }: { params: Promise<{ company
   const [{ company }, search] = await Promise.all([params, searchParams]);
   const { slug } = await requireModule(company, "accounting");
   const base = `/c/${slug}/finance/cash`;
-  const ledger = await getLedger(slug);
-  const accounts = moneyBalances(ledger).filter((a) => a.active || a.balance !== 0);
+  const accounts = moneyBalances(await getAccountTotals(slug)).filter((a) => a.active || a.balance !== 0);
   const total = round2(accounts.reduce((s, a) => s + a.balance, 0));
   const selected = accounts.find((a) => a.id === search.account) ?? accounts[0];
   const { fromStr, toStr, period } = periodFrom(search);
-  const book = selected ? accountLedger(ledger, selected.id, period) : null;
+  const book = selected ? await getAccountLedger(slug, selected.id, period) : null;
   const fin = `/c/${slug}/finance`;
   const here = `${fin}/cash`;
 

@@ -4,13 +4,13 @@ import { listBills } from "@/lib/data/accounting";
 import { listAppointments } from "@/lib/data/appointments";
 import { isOpenCheque, listCheques } from "@/lib/data/cheques";
 import { companyIdFor, listProductsWithStock } from "@/lib/data/inventory";
-import { getLedger, invoicesWithBalance } from "@/lib/data/ledger";
+import { getAccountTotals, getMonthlyTotals, invoicesWithBalance } from "@/lib/data/ledger";
 import { listSales } from "@/lib/data/pos";
 import { profitReport } from "@/lib/data/profit";
 import { listOffers } from "@/lib/data/sales";
 import { listJobCards } from "@/lib/data/workshop";
 import { businessToday } from "@/lib/dates";
-import { accountTotals, moneyBalances, profitAndLoss } from "@/lib/ledger/reports";
+import { moneyBalances, profitAndLoss, type AccountTotal } from "@/lib/ledger/reports";
 import { round2 } from "@/lib/money";
 import { hasPos } from "@/lib/pos";
 import type { CompanySlug } from "@/lib/permissions";
@@ -25,13 +25,13 @@ export async function ownerSummary(slug: CompanySlug) {
   const month = Number(today.slice(5, 7)) - 1;
   const monthStart = new Date(Date.UTC(year, month, 1));
   const lastMonthStart = new Date(Date.UTC(year, month - 1, 1));
-  const lastMonthEnd = new Date(monthStart.getTime() - 1);
   const yearStart = new Date(Date.UTC(year, 0, 1));
   const weekEnd = new Date(new Date(`${today}T00:00:00Z`).getTime() + 7 * 86400000).toISOString().slice(0, 10);
 
   const companyId = await companyIdFor(slug);
-  const [ledger, invoices, bills, cheques, products, costs, jobs, appointments, offers, sales, profit] = await Promise.all([
-    getLedger(slug),
+  const seriesStart = new Date(Date.UTC(year, month - 11, 1));
+  const [[monthly, yearTotals, allTotals], invoices, bills, cheques, products, costs, jobs, appointments, offers, sales, profit] = await Promise.all([
+    Promise.all([getMonthlyTotals(slug, seriesStart, now), getAccountTotals(slug, { from: yearStart, to: now }), getAccountTotals(slug)]),
     invoicesWithBalance(slug),
     listBills(slug),
     listCheques(slug),
@@ -45,17 +45,15 @@ export async function ownerSummary(slug: CompanySlug) {
   ]);
 
   // Sales = what the sales account (701) earned, net of credit notes and refunds (excl. VAT).
-  const salesIn = (from: Date, to: Date) =>
-    round2(accountTotals(ledger, { from, to }).filter((a) => a.kind === "SALES").reduce((s, a) => s + a.balance, 0));
-  const expensesIn = (from: Date, to: Date) =>
-    round2(accountTotals(ledger, { from, to }).filter((a) => a.type === "EXPENSE").reduce((s, a) => s + a.balance, 0));
+  const monthOf = (d: Date) => monthly.get(d.toISOString().slice(0, 7)) ?? ([] as AccountTotal[]);
+  const salesIn = (start: Date) => round2(monthOf(start).filter((a) => a.kind === "SALES").reduce((s, a) => s + a.balance, 0));
+  const expensesIn = (start: Date) => round2(monthOf(start).filter((a) => a.type === "EXPENSE").reduce((s, a) => s + a.balance, 0));
   const series = Array.from({ length: 12 }, (_, i) => {
     const start = new Date(Date.UTC(year, month - 11 + i, 1));
-    const end = new Date(Date.UTC(year, month - 10 + i, 1) - 1);
-    return { label: monthLabel.format(start), invoiced: salesIn(start, end), purchases: expensesIn(start, end) };
+    return { label: monthLabel.format(start), invoiced: salesIn(start), purchases: expensesIn(start) };
   });
-  const pl = profitAndLoss(ledger, { from: yearStart, to: now });
-  const money = moneyBalances(ledger).filter((a) => a.active || a.balance !== 0);
+  const pl = profitAndLoss(yearTotals);
+  const money = moneyBalances(allTotals).filter((a) => a.active || a.balance !== 0);
   const open = invoices.filter((i) => i.balance > 0);
   const overdue = open.filter((i) => i.dueDate.toISOString().slice(0, 10) < today);
   const openBills = bills.filter((b) => b.balance > 0);
@@ -68,8 +66,8 @@ export async function ownerSummary(slug: CompanySlug) {
 
   return {
     slug,
-    salesThisMonth: salesIn(monthStart, now),
-    salesLastMonth: salesIn(lastMonthStart, lastMonthEnd),
+    salesThisMonth: salesIn(monthStart),
+    salesLastMonth: salesIn(lastMonthStart),
     salesYear: round2(pl.totalIncome),
     profitYear: pl.net,
     grossProfitYear: round2(profit.jobs.total.profit + profit.sales.total.profit + profit.offers.total.profit),

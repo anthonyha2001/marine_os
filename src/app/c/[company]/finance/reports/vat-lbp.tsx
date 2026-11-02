@@ -1,7 +1,7 @@
-import type { Ledger } from "@/lib/data/ledger";
+import type { getVatDocuments } from "@/lib/data/ledger";
 import { dayFormat } from "@/lib/dates";
-import { vatReport, type Period } from "@/lib/ledger/reports";
-import { formatMoney, round2 } from "@/lib/money";
+import { vatReport, type AccountTotal } from "@/lib/ledger/reports";
+import { formatMoney } from "@/lib/money";
 import { formatLbp } from "@/lib/pos";
 import { cardClass, inputClass, secondaryButton, tdClass, thClass } from "@/components/ui";
 
@@ -11,25 +11,8 @@ const lbp = (usd: number, rate: number) => Math.round(usd * rate);
  * VAT return in Lebanese pounds: the period's VAT figures converted at the rate the user
  * enters (the official rate for the declaration), with every document behind them.
  */
-export function VatLbp({ ledger, period, rate, base, fromStr, toStr }: { ledger: Ledger; period: Period; rate: number | null; base: string; fromStr: string; toStr: string }) {
-  const v = vatReport(ledger, period);
-  const kinds = new Map(ledger.accounts.map((a) => [a.id, a.kind]));
-  const docs = ledger.entries
-    .filter((e) => (!period.from || e.date >= period.from) && (!period.to || e.date <= period.to))
-    .map((e) => {
-      let ht = 0;
-      let vatOut = 0;
-      let vatIn = 0;
-      for (const l of e.lines) {
-        const k = kinds.get(l.accountId);
-        if (k === "VAT_OUT") vatOut += l.credit - l.debit;
-        else if (k === "VAT_IN") vatIn += l.debit - l.credit;
-        else if (k === "SALES") ht += l.credit - l.debit;
-        else if (k === "PURCHASES" || k === "EXPENSE") ht += l.debit - l.credit;
-      }
-      return { id: e.id, date: e.date, number: e.number, memo: e.memo, ht: round2(ht), vatOut: round2(vatOut), vatIn: round2(vatIn) };
-    })
-    .filter((d) => d.vatOut !== 0 || d.vatIn !== 0);
+export function VatLbp({ totals, docs, rate, base, fromStr, toStr }: { totals: AccountTotal[]; docs: Awaited<ReturnType<typeof getVatDocuments>>; rate: number | null; base: string; fromStr: string; toStr: string }) {
+  const v = vatReport(totals);
 
   return (
     <div className="space-y-6">

@@ -5,7 +5,7 @@ import { requireModule } from "@/lib/auth";
 import { billStatus } from "@/lib/accounting";
 import { listBills } from "@/lib/data/accounting";
 import { listPurchaseOrders } from "@/lib/data/purchase-orders";
-import { getLedger, invoicesWithBalance } from "@/lib/data/ledger";
+import { getAccountTotals, invoicesWithBalance } from "@/lib/data/ledger";
 import { moneyBalances } from "@/lib/ledger/reports";
 import { formatMoney, round2 } from "@/lib/money";
 import { COMPANIES, canAccessModule } from "@/lib/permissions";
@@ -45,13 +45,13 @@ async function AccountingContent({
   const [{ company }, { bills: billsView = "open" }] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "accounting");
   const showReceivables = canAccessModule(user, slug, "invoices");
-  const [bills, orders, invoices, ledger] = await Promise.all([
+  const [bills, orders, invoices, totals] = await Promise.all([
     listBills(slug),
     listPurchaseOrders(slug),
     showReceivables ? invoicesWithBalance(slug) : [],
-    getLedger(slug),
+    getAccountTotals(slug),
   ]);
-  const money = moneyBalances(ledger).filter((a) => a.active || a.balance !== 0);
+  const money = moneyBalances(totals).filter((a) => a.active || a.balance !== 0);
   const fin = `/c/${slug}/finance`;
   const here = `/c/${slug}/accounting`;
   const base = `/c/${slug}/accounting`;
