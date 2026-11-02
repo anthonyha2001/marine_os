@@ -300,6 +300,7 @@ model Product {
   purchaseOrderLines PurchaseOrderLine[]
   posSaleLines       PosSaleLine[]
   jobCardLines       JobCardLine[]
+  invoiceLines       InvoiceLine[]
   warranties         Warranty[]
   stockCountLines    StockCountLine[]
   transferLines      StockTransferLine[]
@@ -373,7 +374,7 @@ model StockMovement {
   productId    String
   product      Product        @relation(fields: [productId], references: [id])
   quantity     Int // positive = in, negative = out
-  type         String // "PURCHASE" | "POS_SALE" | "POS_RETURN"
+  type         String // PURCHASE | POS_SALE | POS_RETURN | JOB_CARD | COUNT | TRANSFER_OUT | TRANSFER_IN | INVOICE | INVOICE_CANCEL
   purchaseId   String?
   purchase     Purchase?      @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   posSaleId    String?
@@ -386,9 +387,12 @@ model StockMovement {
   stockCount   StockCount?    @relation(fields: [stockCountId], references: [id], onDelete: Cascade)
   transferId   String?
   transfer     StockTransfer? @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  invoiceId    String?
+  invoice      Invoice?       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   createdAt    DateTime       @default(now())
 
   @@index([companyId, productId])
+  @@index([invoiceId])
 }
 
 // One row of an offer payment schedule. Amounts include VAT (what the customer pays).
@@ -453,26 +457,30 @@ model Invoice {
   jobCardId String?
   jobCard   JobCard? @relation("JobCardInvoices", fields: [jobCardId], references: [id], onDelete: SetNull)
 
-  lines        InvoiceLine[]
-  receipts     CustomerReceipt[]
-  creditNotes  CreditNote[]
-  jobCardLines JobCardLine[]
+  lines          InvoiceLine[]
+  receipts       CustomerReceipt[]
+  creditNotes    CreditNote[]
+  jobCardLines   JobCardLine[]
+  stockMovements StockMovement[]
 
   @@index([companyId, invoiceDate])
   @@index([offerId])
 }
 
 model InvoiceLine {
-  id              String  @id @default(cuid())
+  id              String   @id @default(cuid())
   invoiceId       String
-  invoice         Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice         Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  // The catalogue item billed (null for payment-schedule lines and older invoices).
+  productId       String?
+  product         Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   position        Int
   title           String
   description     String?
-  quantity        Decimal @db.Decimal(12, 2)
-  unitPrice       Decimal @db.Decimal(12, 2) // excl. VAT
-  discountPercent Decimal @default(0) @db.Decimal(5, 2)
-  lineTotal       Decimal @db.Decimal(12, 2) // excl. VAT, after the discount
+  quantity        Decimal  @db.Decimal(12, 2)
+  unitPrice       Decimal  @db.Decimal(12, 2) // excl. VAT
+  discountPercent Decimal  @default(0) @db.Decimal(5, 2)
+  lineTotal       Decimal  @db.Decimal(12, 2) // excl. VAT, after the discount
 
   @@index([invoiceId])
 }

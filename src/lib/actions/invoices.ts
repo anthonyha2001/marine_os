@@ -18,7 +18,7 @@ import { payablesTag } from "@/lib/data/accounting";
 import { ledgerTag } from "@/lib/data/ledger";
 import { businessToday } from "@/lib/dates";
 import { nextInvoiceNumber, withNumberRetry } from "@/lib/invoice-numbers";
-import { createInvoiceWithLines, linesTotals } from "@/lib/invoicing";
+import { createInvoiceWithLines, invoiceStockBack, linesTotals } from "@/lib/invoicing";
 import { workshopTag } from "@/lib/data/workshop";
 import { withParams } from "@/lib/url";
 import { NOT_IN_CATALOGUE, customerNamed, existingProductIds } from "@/lib/customer-record";
@@ -278,6 +278,7 @@ export async function cancelInvoice(companySlug: string, invoiceId: string): Pro
   await prisma.$transaction(async (tx) => {
     await tx.invoice.update({ where: { id: invoiceId }, data: { status: "CANCELLED", paidAt: null } });
     await reverseEntries(tx, "INVOICE", invoiceId, todayUtc(), user.id, `Invoice ${invoice.number} cancelled`);
+    await invoiceStockBack(tx, invoiceId);
   }, TRANSACTION_OPTIONS);
   updateTag(salesTags.invoices(companyId));
   updateTag(ledgerTag(companyId));
@@ -351,7 +352,7 @@ export async function createStandaloneInvoice(companySlug: string, _prev: Custom
           reference: data.reference || null,
           notes: data.notes || null,
           applyVat: data.applyVat,
-          lines: data.lines,
+          lines: data.lines.map((l) => ({ ...l, moveStock: true })),
           vesselId: data.vesselId || null,
         }),
       TRANSACTION_OPTIONS,
@@ -446,6 +447,7 @@ export async function issueEditedInvoice(companySlug: string, _prev: CustomInvoi
           if (stillOpen !== kept.length) throw new UserError(LINES_TAKEN);
           const created = await createInvoiceWithLines(tx, {
             ...base,
+            lines: lines.map((l) => ({ ...l, moveStock: !l.jobLineId })),
             customer: job.customer
               ? { id: job.customer.id, name: job.customer.name, address: job.customer.address, email: job.customer.email, phone: job.customer.phone, taxNumber: job.customer.taxNumber, attention: job.customer.contactName }
               : { id: null, name: job.customerName },
@@ -477,8 +479,10 @@ export async function issueEditedInvoice(companySlug: string, _prev: CustomInvoi
         prisma.$transaction(async (tx) => {
           const invoiced = await lockOfferInvoiced(tx, offer.id);
           checkOfferRemaining(offer.number, totals.totalTTC - invoiced.totalTTC, amount);
+          const jobCards = await tx.jobCard.count({ where: { offerId: offer.id, status: { not: "CANCELLED" } } });
           const created = await createInvoiceWithLines(tx, {
             ...base,
+            lines: lines.map((l) => ({ ...l, moveStock: !l.fixed || jobCards === 0 })),
             customer: {
               id: offer.customerId,
               name: offer.customerName,

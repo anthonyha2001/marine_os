@@ -243,8 +243,13 @@ export async function saveJobCard(companySlug: string, jobId: string, _prev: Wor
 }
 
 async function stockOut(tx: Tx, companyId: string, jobId: string) {
+  const job = await tx.jobCard.findUniqueOrThrow({ where: { id: jobId }, select: { offerId: true } });
+  // Parts covered by the offer already left the stock if the offer was invoiced with its lines.
+  const offerMoved = job.offerId
+    ? (await tx.stockMovement.count({ where: { type: "INVOICE", invoice: { offerId: job.offerId, status: { not: "CANCELLED" } } } })) > 0
+    : false;
   const parts = await tx.jobCardLine.findMany({ where: { jobCardId: jobId, kind: "PART", productId: { not: null } }, include: { product: { select: { type: true } } } });
-  const moves = parts.filter((l) => l.product?.type === "PRODUCT" && Number(l.quantity) > 0);
+  const moves = parts.filter((l) => l.product?.type === "PRODUCT" && Number(l.quantity) > 0 && !(offerMoved && !l.billable));
   const costs = await averageCosts(companyId, tx);
   for (const l of moves) await tx.jobCardLine.update({ where: { id: l.id }, data: { unitCost: costs.get(l.productId!) ?? 0 } });
   if (moves.length) {
@@ -301,7 +306,7 @@ export async function invoiceJobCard(companySlug: string, jobId: string, _prev: 
         subject: `Job card ${job.number}${job.vessel ? ` · ${job.vessel.name}` : ""}`,
         reference: job.offerId ? "Additional work" : null,
         applyVat: job.applyVat,
-        lines: job.lines.map((l) => ({ title: l.title, description: l.description, quantity: Number(l.quantity), unitPrice: Number(l.unitPrice) })),
+        lines: job.lines.map((l) => ({ productId: l.productId, title: l.title, description: l.description, quantity: Number(l.quantity), unitPrice: Number(l.unitPrice) })),
         vesselId: job.vesselId,
         jobCardId: job.id,
       });
