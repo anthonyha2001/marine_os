@@ -48,7 +48,7 @@ export function CountSheet({ companySlug, count }: { companySlug: string; count:
   return (
     <form
       action={(fd) => {
-        fd.set("payload", JSON.stringify(count.lines.map((l) => ({ id: l.id, counted: values[l.id] === "" ? null : Math.max(0, Math.round(Number(values[l.id]))) }))));
+        fd.set("payload", JSON.stringify(count.lines.map((l) => ({ id: l.id, counted: values[l.id] === "" ? null : Math.max(0, Math.round(Number(values[l.id]) * 1000) / 1000) }))));
         return formAction(fd);
       }}
       data-save-shortcut
@@ -88,7 +88,7 @@ export function CountSheet({ companySlug, count }: { companySlug: string; count:
                     <input
                       type="number"
                       min="0"
-                      step="1"
+                      step="any"
                       value={v}
                       onChange={(e) => {
                         setDirty(true);

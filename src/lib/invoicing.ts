@@ -1,7 +1,7 @@
 import "server-only";
 import { nextInvoiceNumber } from "@/lib/invoice-numbers";
 import { postInvoice } from "@/lib/ledger/posting";
-import { VAT_RATE, round2 } from "@/lib/money";
+import { VAT_RATE, round2, roundQty } from "@/lib/money";
 import type { Tx } from "@/lib/prisma";
 import { currentLbpRate } from "@/lib/lbp-rate";
 import type { CompanySlug } from "@/lib/permissions";
@@ -107,7 +107,7 @@ async function invoiceStockOut(tx: Tx, companyId: string, invoiceId: string, lin
   const moves = moving.filter((l) => stocked.has(l.productId!));
   if (moves.length) {
     await tx.stockMovement.createMany({
-      data: moves.map((l) => ({ companyId, productId: l.productId!, quantity: -Math.round(l.quantity), type: "INVOICE", invoiceId })),
+      data: moves.map((l) => ({ companyId, productId: l.productId!, quantity: -l.quantity, type: "INVOICE", invoiceId })),
     });
   }
 }
@@ -118,7 +118,7 @@ export async function invoiceStockBack(tx: Tx, invoiceId: string) {
   const net = new Map<string, { companyId: string; quantity: number }>();
   for (const m of moves) {
     const row = net.get(m.productId) ?? { companyId: m.companyId, quantity: 0 };
-    row.quantity += m.quantity;
+    row.quantity = roundQty(row.quantity + Number(m.quantity));
     net.set(m.productId, row);
   }
   const back = [...net].filter(([, r]) => r.quantity < 0);

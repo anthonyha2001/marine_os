@@ -254,7 +254,7 @@ async function stockOut(tx: Tx, companyId: string, jobId: string) {
   for (const l of moves) await tx.jobCardLine.update({ where: { id: l.id }, data: { unitCost: costs.get(l.productId!) ?? 0 } });
   if (moves.length) {
     await tx.stockMovement.createMany({
-      data: moves.map((l) => ({ companyId, productId: l.productId!, quantity: -Math.round(Number(l.quantity)), type: "JOB_CARD", jobCardId: jobId })),
+      data: moves.map((l) => ({ companyId, productId: l.productId!, quantity: -Number(l.quantity), type: "JOB_CARD", jobCardId: jobId })),
     });
   }
 }

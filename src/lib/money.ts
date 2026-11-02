@@ -8,6 +8,11 @@ export function round2(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
+/** Round a stock quantity to 3 decimals (stock is kept in thousandths, e.g. 2.5 L). */
+export function roundQty(value: number) {
+  return Math.round((value + Number.EPSILON) * 1000) / 1000;
+}
+
 export function withVat(priceHT: number) {
   return round2(priceHT * (1 + VAT_RATE));
 }

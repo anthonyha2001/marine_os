@@ -1,0 +1,7 @@
+-- AlterTable
+ALTER TABLE "StockCountLine" ALTER COLUMN "expected" SET DATA TYPE DECIMAL(12,3),
+ALTER COLUMN "counted" SET DATA TYPE DECIMAL(12,3);
+
+-- AlterTable
+ALTER TABLE "StockMovement" ALTER COLUMN "quantity" SET DATA TYPE DECIMAL(12,3);
+

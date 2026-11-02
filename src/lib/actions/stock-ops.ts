@@ -16,7 +16,7 @@ import { averageCosts } from "@/lib/costing";
 import { TRANSACTION_OPTIONS } from "@/lib/item-codes";
 import { nextNumber } from "@/lib/ledger/numbering";
 import { postTransfer, reverseEntries } from "@/lib/ledger/posting";
-import { round2 } from "@/lib/money";
+import { round2, roundQty } from "@/lib/money";
 import { isCompanySlug } from "@/lib/permissions";
 
 export type StockFormState = { error?: string };
@@ -33,7 +33,7 @@ async function stockOf(companyId: string, productIds?: string[]) {
     where: { companyId, ...(productIds ? { productId: { in: productIds } } : {}) },
     _sum: { quantity: true },
   });
-  return new Map(rows.map((r) => [r.productId, r._sum.quantity ?? 0]));
+  return new Map(rows.map((r) => [r.productId, Number(r._sum.quantity ?? 0)]));
 }
 
 // ── Stock counts ──
@@ -68,7 +68,7 @@ export async function startStockCount(companySlug: string, _prev: StockFormState
   redirect(`/c/${slug}/inventory/counts/${id}`);
 }
 
-const countLinesSchema = z.array(z.object({ id: z.string().min(1), counted: z.number().int().min(0).nullable() }));
+const countLinesSchema = z.array(z.object({ id: z.string().min(1), counted: z.number().min(0).nullable() }));
 
 export async function saveStockCount(companySlug: string, countId: string, _prev: StockFormState, formData: FormData): Promise<StockFormState> {
   const { slug, companyId } = await ctx(companySlug);
@@ -103,8 +103,8 @@ export async function postStockCount(companySlug: string, countId: string): Prom
       if (count.status !== "DRAFT") throw new UserError("This count is already posted.");
       if (!count.lines.length) throw new UserError("Enter at least one counted quantity, then save.");
       const rows = await tx.stockMovement.groupBy({ by: ["productId"], where: { companyId, productId: { in: count.lines.map((l) => l.productId) } }, _sum: { quantity: true } });
-      const now = new Map(rows.map((r) => [r.productId, r._sum.quantity ?? 0]));
-      const moves = count.lines.map((l) => ({ productId: l.productId, quantity: (l.counted ?? 0) - (now.get(l.productId) ?? 0) })).filter((m) => m.quantity !== 0);
+      const now = new Map(rows.map((r) => [r.productId, Number(r._sum.quantity ?? 0)]));
+      const moves = count.lines.map((l) => ({ productId: l.productId, quantity: roundQty(Number(l.counted ?? 0) - (now.get(l.productId) ?? 0)) })).filter((m) => m.quantity !== 0);
       if (moves.length) await tx.stockMovement.createMany({ data: moves.map((m) => ({ companyId, productId: m.productId, quantity: m.quantity, type: "COUNT", stockCountId: countId })) });
       await tx.stockCount.update({ where: { id: countId }, data: { status: "POSTED", postedAt: new Date() } });
     }, TRANSACTION_OPTIONS);

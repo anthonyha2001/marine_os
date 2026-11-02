@@ -34,8 +34,8 @@ async function loadCounts(companyId: string) {
       code: l.product.code,
       name: l.product.name,
       priceHT: Number(l.product.priceHT),
-      expected: l.expected,
-      counted: l.counted,
+      expected: Number(l.expected),
+      counted: l.counted === null ? null : Number(l.counted),
     })),
   }));
 }

@@ -92,7 +92,7 @@ async function getStock(companyId: string): Promise<Record<string, number>> {
     where: { companyId },
     _sum: { quantity: true },
   });
-  return Object.fromEntries(rows.map((r) => [r.productId, r._sum.quantity ?? 0]));
+  return Object.fromEntries(rows.map((r) => [r.productId, Number(r._sum.quantity ?? 0)]));
 }
 
 function matches(p: CatalogueProduct, q: string) {

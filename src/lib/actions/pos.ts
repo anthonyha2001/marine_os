@@ -211,7 +211,7 @@ export async function completeSale(companySlug: string, payload: unknown): Promi
         const ids = [...new Set(lines.map((l) => l.productId))].sort();
         await tx.$queryRaw`SELECT id FROM "Product" WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`;
         const stock = await tx.stockMovement.groupBy({ by: ["productId"], where: { companyId, productId: { in: ids } }, _sum: { quantity: true } });
-        const onHand = new Map(stock.map((r) => [r.productId, r._sum.quantity ?? 0]));
+        const onHand = new Map(stock.map((r) => [r.productId, Number(r._sum.quantity ?? 0)]));
         const short = lines.find((l) => l.quantity > (onHand.get(l.productId) ?? 0));
         if (short) throw new UserError(`Only ${Math.max(0, onHand.get(short.productId) ?? 0)} of ${short.name} in stock. A manager can sell beyond the stock.`);
       }
