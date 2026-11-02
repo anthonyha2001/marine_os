@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { currentLbpRate } from "@/lib/lbp-rate";
 import { companyIdFor } from "@/lib/data/inventory";
 import { listInvoices } from "@/lib/data/sales";
-import { syncLedger } from "@/lib/ledger/posting";
 import type { CompanySlug } from "@/lib/permissions";
 import { DATA_TAG } from "@/lib/cache-tag";
 
@@ -50,8 +49,6 @@ async function loadLedger(companyId: string): Promise<Ledger> {
   "use cache";
   cacheTag(DATA_TAG, ledgerTag(companyId));
   cacheLife("hours");
-  // Make sure documents created before the ledger existed are posted.
-  await syncLedger(companyId);
   const [accounts, entries] = await Promise.all([
     prisma.ledgerAccount.findMany({ where: { companyId }, orderBy: { code: "asc" } }),
     prisma.journalEntry.findMany({

@@ -1,6 +1,5 @@
 import "server-only";
-import { prisma, type Tx } from "@/lib/prisma";
-import { TRANSACTION_OPTIONS } from "@/lib/item-codes";
+import type { Tx } from "@/lib/prisma";
 import { round2 } from "@/lib/money";
 import { UserError } from "@/lib/user-error";
 import { systemAccounts } from "./chart";
@@ -286,64 +285,6 @@ export async function postVoucher(
             { accountId: v.moneyAccountId, credit: v.amount, description: label },
           ];
   return postEntry(tx, { companyId: v.companyId, date: v.date, memo: label, sourceType: "VOUCHER", sourceId: v.id, createdById: v.createdById, lines });
-}
-
-// ── Catch-up for documents created before the ledger existed ──
-
-const synced = new Set<string>();
-
-/**
- * Post any invoice, purchase or supplier payment that has no journal entry yet. Runs once per
- * company per server start (then documents post themselves), and on demand after imports.
- */
-export async function syncLedger(companyId: string, force = false) {
-  if (synced.has(companyId) && !force) return;
-  const a = await systemAccounts(companyId);
-  const posted = new Set(
-    (await prisma.journalEntry.findMany({ where: { companyId, sourceId: { not: null } }, select: { sourceType: true, sourceId: true } })).map(
-      (e) => `${e.sourceType}:${e.sourceId}`,
-    ),
-  );
-
-  const [invoices, purchases, payments] = await Promise.all([
-    prisma.invoice.findMany({ where: { companyId } }),
-    prisma.purchase.findMany({ where: { companyId }, include: { supplier: { select: { name: true } } } }),
-    prisma.supplierPayment.findMany({
-      where: { companyId },
-      include: { purchase: { select: { invoiceNumber: true, supplierId: true, supplier: { select: { name: true } } } } },
-    }),
-  ]);
-
-  for (const inv of invoices.filter((i) => !posted.has(`INVOICE:${i.id}`))) {
-    await prisma.$transaction(async (tx) => {
-      await postInvoice(tx, {
-        id: inv.id, companyId, number: inv.number, invoiceDate: inv.invoiceDate, customerId: inv.customerId, customerName: inv.customerName,
-        totalHT: Number(inv.totalHT), vatAmount: Number(inv.vatAmount), totalTTC: Number(inv.totalTTC), createdById: inv.createdById,
-      });
-      if (inv.status === "CANCELLED") await reverseEntries(tx, "INVOICE", inv.id, inv.updatedAt, inv.createdById, `Invoice ${inv.number} cancelled`);
-    }, TRANSACTION_OPTIONS);
-  }
-  for (const p of purchases.filter((x) => !posted.has(`PURCHASE:${x.id}`))) {
-    await prisma.$transaction((tx) =>
-      postPurchase(tx, {
-        id: p.id, companyId, invoiceNumber: p.invoiceNumber, purchaseDate: p.purchaseDate, supplierId: p.supplierId, supplierName: p.supplier.name,
-        totalHT: Number(p.totalHT), vatAmount: Number(p.vatAmount), totalTTC: Number(p.totalTTC), createdById: p.createdById,
-      }),
-      TRANSACTION_OPTIONS,
-    );
-  }
-  for (const pay of payments.filter((x) => !posted.has(`SUPPLIER_PAYMENT:${x.id}`))) {
-    await prisma.$transaction(async (tx) => {
-      // Payments recorded before cash/bank accounts existed are assigned to Cash (530) if paid in cash, otherwise Bank (512).
-      const moneyAccountId = pay.moneyAccountId ?? (pay.method === "CASH" ? a.CASH : a.BANK);
-      if (!pay.moneyAccountId) await tx.supplierPayment.update({ where: { id: pay.id }, data: { moneyAccountId } });
-      await postSupplierPayment(tx, {
-        id: pay.id, companyId, amount: Number(pay.amount), paidAt: pay.paidAt, moneyAccountId,
-        supplierId: pay.purchase.supplierId, supplierName: pay.purchase.supplier.name, invoiceNumber: pay.purchase.invoiceNumber, createdById: pay.createdById,
-      });
-    }, TRANSACTION_OPTIONS);
-  }
-  synced.add(companyId);
 }
 
 /**

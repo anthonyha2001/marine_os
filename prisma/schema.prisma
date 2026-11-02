@@ -598,6 +598,8 @@ model LedgerAccount {
   @@index([companyId, kind])
 }
 
+// A partial unique index "JournalEntry_source_once" (raw SQL, migration 20261103020000) allows
+// one entry per (sourceType, sourceId), except reversals and payroll. Prisma can't declare it here.
 model JournalEntry {
   id          String   @id @default(cuid())
   companyId   String

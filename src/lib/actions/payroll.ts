@@ -243,7 +243,9 @@ export async function payPayroll(companySlug: string, runId: string, _prev: Payr
         };
         return { name: l.name, gross: lineGross(a), advance: a.advance, nssfEmployee: a.nssfEmployee, nssfEmployer: Number(l.nssfEmployer), incomeTax: a.incomeTax, net: lineNet(a) };
       });
-      await tx.payrollRun.update({ where: { id: run.id }, data: { status: "PAID", payDate: date, moneyAccountId: account.id } });
+      // Only one click can move it from Approved to Paid, so the payroll is never posted twice.
+      const marked = await tx.payrollRun.updateMany({ where: { id: run.id, status: "APPROVED" }, data: { status: "PAID", payDate: date, moneyAccountId: account.id } });
+      if (marked.count !== 1) throw new UserError("This payroll is already paid.");
       await postPayroll(tx, { id: run.id, companyId, number: run.number, label: run.label, date, moneyAccountId: account.id, lines, createdById: user.id });
     }, TRANSACTION_OPTIONS);
   } catch (e) {
@@ -260,10 +262,17 @@ export async function undoPayrollPayment(companySlug: string, runId: string): Pr
   const { user, companyId } = await ctx(companySlug);
   const run = await prisma.payrollRun.findFirst({ where: { id: runId, companyId }, select: { status: true, number: true } });
   if (!run || run.status !== "PAID") return { error: "This payroll isn't paid." };
-  await prisma.$transaction(async (tx) => {
-    await reverseEntries(tx, "PAYROLL", runId, new Date(`${businessToday()}T00:00:00Z`), user.id, `Payroll ${run.number} payment undone`);
-    await tx.payrollRun.update({ where: { id: runId }, data: { status: "APPROVED", payDate: null, moneyAccountId: null } });
-  }, TRANSACTION_OPTIONS);
+  try {
+    await prisma.$transaction(async (tx) => {
+      // Only one click can move it back from Paid, so the payment is reversed once.
+      const marked = await tx.payrollRun.updateMany({ where: { id: runId, status: "PAID" }, data: { status: "APPROVED", payDate: null, moneyAccountId: null } });
+      if (marked.count !== 1) throw new UserError("This payroll isn't paid.");
+      await reverseEntries(tx, "PAYROLL", runId, new Date(`${businessToday()}T00:00:00Z`), user.id, `Payroll ${run.number} payment undone`);
+    }, TRANSACTION_OPTIONS);
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
   updateTag(payrollTag(companyId));
   updateTag(ledgerTag(companyId));
   return {};
