@@ -67,7 +67,7 @@ export function RunActions({ companySlug, runId, status, label }: { companySlug:
           disabled={pending}
           className={`${secondaryButton} text-danger hover:bg-red-50`}
           onClick={async () => {
-            const yes = await confirm({ title: "Undo this payment?", message: "Use this only for a payment entered by mistake. Its accounting entry is removed and the payroll goes back to Approved.", confirmLabel: "Undo payment", tone: "danger" });
+            const yes = await confirm({ title: "Undo this payment?", message: "Use this only for a payment entered by mistake. A reversing accounting entry is posted today and the payroll goes back to Approved.", confirmLabel: "Undo payment", tone: "danger" });
             if (yes) run(() => undoPayrollPayment(companySlug, runId), "Payment undone.");
           }}
         >

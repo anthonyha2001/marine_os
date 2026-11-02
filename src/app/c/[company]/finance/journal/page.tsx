@@ -2,12 +2,10 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { BookOpen, Plus } from "lucide-react";
 import { requireModule } from "@/lib/auth";
-import { deleteJournalEntry } from "@/lib/actions/finance";
 import { dayFormat } from "@/lib/dates";
 import { getLedger } from "@/lib/data/ledger";
 import { formatMoney, round2 } from "@/lib/money";
-import { COMPANIES, can, isAdmin } from "@/lib/permissions";
-import { DeleteButton } from "@/components/delete-button";
+import { COMPANIES, can } from "@/lib/permissions";
 import { Modal } from "@/components/modal";
 import { Badge, ButtonLink, EmptyState, PageHeader, SearchBar, cardClass } from "@/components/ui";
 import { Amount, PeriodFilter, SOURCE_LABELS, periodFrom, sourceHref, type PeriodParams } from "../finance-ui";
@@ -22,7 +20,6 @@ async function JournalContent({ params, searchParams }: { params: Promise<{ comp
   const { user, slug } = await requireModule(company, "accounting");
   const base = `/c/${slug}/finance/journal`;
   const ledger = await getLedger(slug);
-  const admin = isAdmin(user);
   const mayReverse = can(user, "cancelEntries");
   const reversed = new Set(ledger.entries.map((e) => e.reversalOf).filter(Boolean));
   const { fromStr, toStr, period } = periodFrom(search);
@@ -107,14 +104,6 @@ async function JournalContent({ params, searchParams }: { params: Promise<{ comp
                         action={reverseJournalEntry.bind(null, slug, e.id)}
                         title="Reverse entry"
                         message={`A new entry dated today swaps the debits and credits of ${e.number}. Both stay in the journal.`}
-                      />
-                    )}
-                    {e.sourceType === "MANUAL" && admin && (
-                      <DeleteButton
-                        action={deleteJournalEntry.bind(null, slug, e.id)}
-                        confirmText={`Delete manual entry ${e.number}? It goes to the recycle bin and can be restored.`}
-                        title="Delete entry"
-                        successMessage="Entry moved to the recycle bin."
                       />
                     )}
                   </div>

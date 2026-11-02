@@ -4,7 +4,7 @@ import { RegisterSerialsDialog } from "@/components/create-dialogs";
 import { requireModule } from "@/lib/auth";
 import { getPurchase } from "@/lib/data/inventory";
 import { formatMoney, VAT_RATE } from "@/lib/money";
-import { COMPANIES, can, canAccessModule, isAdmin } from "@/lib/permissions";
+import { COMPANIES, can, canAccessModule } from "@/lib/permissions";
 import { LandedCostsSection } from "./landed-costs";
 import { PaymentsSection } from "./payments-section";
 import Link from "next/link";
@@ -66,7 +66,6 @@ async function PurchaseDetail({
         slug={slug}
         purchase={{ id: purchase.id, invoiceNumber: purchase.invoiceNumber, supplierName: purchase.supplierName, totalTTC: purchase.totalTTC, dueDate: purchase.dueDate }}
         canRecord={canAccessModule(user, slug, "accounting")}
-        admin={isAdmin(user)}
         mayCancel={can(user, "cancelEntries")}
       />
 

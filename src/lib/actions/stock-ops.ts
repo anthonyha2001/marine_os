@@ -14,7 +14,7 @@ import { stockOpsTag } from "@/lib/data/stock-ops";
 import { averageCosts } from "@/lib/costing";
 import { TRANSACTION_OPTIONS } from "@/lib/item-codes";
 import { nextNumber } from "@/lib/ledger/numbering";
-import { postTransfer, removeEntries } from "@/lib/ledger/posting";
+import { postTransfer, reverseEntries } from "@/lib/ledger/posting";
 import { round2 } from "@/lib/money";
 import { isCompanySlug } from "@/lib/permissions";
 
@@ -218,14 +218,14 @@ export async function receiveTransfer(companySlug: string, transferId: string): 
 
 /** The sender cancels a transfer not yet received: the goods and the accounting come back. */
 export async function cancelTransfer(companySlug: string, transferId: string): Promise<{ error?: string }> {
-  const { companyId } = await ctx(companySlug);
+  const { user, companyId } = await ctx(companySlug);
   try {
     await prisma.$transaction(async (tx) => {
-      const t = await tx.stockTransfer.findFirst({ where: { id: transferId, fromCompanyId: companyId }, select: { id: true, status: true } });
+      const t = await tx.stockTransfer.findFirst({ where: { id: transferId, fromCompanyId: companyId }, select: { id: true, status: true, number: true } });
       if (!t) throw new UserError("Only the company that sent it can cancel a transfer.");
       if (t.status !== "SENT") throw new UserError(t.status === "RECEIVED" ? "It was already received; send the goods back with a new transfer." : "Already cancelled.");
       await tx.stockMovement.deleteMany({ where: { transferId: t.id } });
-      await removeEntries(tx, "TRANSFER_OUT", t.id);
+      await reverseEntries(tx, "TRANSFER_OUT", t.id, today(), user.id, `Transfer ${t.number} cancelled`);
       await tx.stockTransfer.update({ where: { id: t.id }, data: { status: "CANCELLED" } });
     }, TRANSACTION_OPTIONS);
   } catch (e) {

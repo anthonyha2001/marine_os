@@ -84,11 +84,6 @@ export async function postEntry(tx: Tx, input: EntryInput) {
   });
 }
 
-/** Delete the entries of a document that is itself being deleted (e.g. a payment entered by mistake). */
-export async function removeEntries(tx: Tx, sourceType: SourceType, sourceId: string) {
-  await tx.journalEntry.deleteMany({ where: { sourceType, sourceId } });
-}
-
 /** Post the mirror image of a document's entries (cancellations keep a full audit trail). */
 export async function reverseEntries(tx: Tx, sourceType: SourceType, sourceId: string, date: Date, createdById: string, memo: string) {
   const entries = await tx.journalEntry.findMany({ where: { sourceType, sourceId }, include: { lines: true } });

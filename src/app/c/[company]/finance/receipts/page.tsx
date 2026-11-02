@@ -3,17 +3,15 @@ import { payHref } from "@/lib/url";
 import Link from "next/link";
 import { HandCoins } from "lucide-react";
 import { requireModule } from "@/lib/auth";
-import { deleteReceipt } from "@/lib/actions/finance";
 import { PAYMENT_METHODS } from "@/lib/accounting";
 import { businessToday, dayFormat } from "@/lib/dates";
 import { invoicesWithBalance, listReceipts } from "@/lib/data/ledger";
 import { formatMoney, round2 } from "@/lib/money";
 import { COMPANIES } from "@/lib/permissions";
-import { DeleteButton } from "@/components/delete-button";
 import { ButtonLink, EmptyState, PageHeader, SearchBar, StatCard, cardClass, tdClass, thClass } from "@/components/ui";
 import { CancelButton, CancelledNote } from "@/components/cancel-button";
 import { cancelReceipt } from "@/lib/actions/cancel";
-import { can, canAccessModule, isAdmin } from "@/lib/permissions";
+import { can, canAccessModule } from "@/lib/permissions";
 
 type Search = { q?: string };
 
@@ -21,7 +19,6 @@ async function ReceiptsContent({ params, searchParams }: { params: Promise<{ com
   const [{ company }, { q = "" }] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "invoices");
   const base = `/c/${slug}/finance/receipts`;
-  const admin = isAdmin(user);
   const mayCancel = can(user, "cancelEntries");
   const [receipts, open] = await Promise.all([listReceipts(slug), invoicesWithBalance(slug)]);
   const needle = q.trim().toLowerCase();
@@ -99,14 +96,6 @@ async function ReceiptsContent({ params, searchParams }: { params: Promise<{ com
                         action={cancelReceipt.bind(null, slug, r.id)}
                         title="Cancel receipt"
                         message={`Receipt ${r.number} of ${formatMoney(r.amount)} stays on record as cancelled, and a reversing entry is posted today.`}
-                      />
-                    )}
-                    {admin && (
-                      <DeleteButton
-                        action={deleteReceipt.bind(null, slug, r.id)}
-                        confirmText={`Delete receipt ${r.number} of ${formatMoney(r.amount)}? It goes to the recycle bin with its accounting entry, and can be restored.`}
-                        title="Delete receipt"
-                        successMessage="Receipt moved to the recycle bin."
                       />
                     )}
                   </td>

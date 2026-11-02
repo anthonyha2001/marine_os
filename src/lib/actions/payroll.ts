@@ -13,7 +13,8 @@ import { ledgerTag } from "@/lib/data/ledger";
 import { getPayrollRules, payrollTag } from "@/lib/data/payroll";
 import { TRANSACTION_OPTIONS } from "@/lib/item-codes";
 import { nextNumber } from "@/lib/ledger/numbering";
-import { postPayroll, removeEntries } from "@/lib/ledger/posting";
+import { postPayroll, reverseEntries } from "@/lib/ledger/posting";
+import { businessToday } from "@/lib/dates";
 import { round2 } from "@/lib/money";
 import { isPayFrequency, lineGross, lineNet, payPeriod, statutory, type PayFrequency, type PayrollRules } from "@/lib/payroll";
 
@@ -253,13 +254,13 @@ export async function payPayroll(companySlug: string, runId: string, _prev: Payr
   redirect(`/c/${slug}/payroll/${runId}?paid=1`);
 }
 
-/** Undo a payment entered by mistake: removes its accounting entry, back to Approved. */
+/** Undo a payment entered by mistake: posts a reversing entry dated today, back to Approved. */
 export async function undoPayrollPayment(companySlug: string, runId: string): Promise<{ error?: string }> {
-  const { companyId } = await ctx(companySlug);
-  const run = await prisma.payrollRun.findFirst({ where: { id: runId, companyId }, select: { status: true } });
+  const { user, companyId } = await ctx(companySlug);
+  const run = await prisma.payrollRun.findFirst({ where: { id: runId, companyId }, select: { status: true, number: true } });
   if (!run || run.status !== "PAID") return { error: "This payroll isn't paid." };
   await prisma.$transaction(async (tx) => {
-    await removeEntries(tx, "PAYROLL", runId);
+    await reverseEntries(tx, "PAYROLL", runId, new Date(`${businessToday()}T00:00:00Z`), user.id, `Payroll ${run.number} payment undone`);
     await tx.payrollRun.update({ where: { id: runId }, data: { status: "APPROVED", payDate: null, moneyAccountId: null } });
   }, TRANSACTION_OPTIONS);
   updateTag(payrollTag(companyId));

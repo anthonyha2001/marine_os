@@ -2,16 +2,13 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, ExternalLink, FileDown, HandCoins, TicketCheck, Truck } from "lucide-react";
 import { requireModule } from "@/lib/auth";
-import { deleteSupplierPayment } from "@/lib/actions/accounting";
-import { deleteReceipt, deleteVoucher } from "@/lib/actions/finance";
 import { PAYMENT_METHODS, billStatus } from "@/lib/accounting";
 import { businessToday, dayFormat, dueInWords, isOverdue } from "@/lib/dates";
 import { listBills } from "@/lib/data/accounting";
 import { listCustomers } from "@/lib/data/sales";
 import { getLedger, invoicesWithBalance, listMoneyAccounts, listVouchers } from "@/lib/data/ledger";
 import { formatMoney, round2 } from "@/lib/money";
-import { COMPANIES, can, canAccessModule, isAdmin } from "@/lib/permissions";
-import { DeleteButton } from "@/components/delete-button";
+import { COMPANIES, can, canAccessModule } from "@/lib/permissions";
 import { InvoiceDialog, PurchaseDialog } from "@/components/document-dialogs";
 import { Modal } from "@/components/modal";
 import { OpenRow } from "@/components/open-row";
@@ -27,7 +24,6 @@ import { cancelReceipt, cancelSupplierPayment, cancelVoucher } from "@/lib/actio
 type Search = { q?: string; new?: string; saved?: string; kind?: string; bill?: string; invoice?: string; viewBill?: string; viewInvoice?: string };
 
 const CANCEL = { VOUCHER: cancelVoucher, SUPPLIER_PAYMENT: cancelSupplierPayment, RECEIPT: cancelReceipt };
-const DELETE = { VOUCHER: deleteVoucher, SUPPLIER_PAYMENT: deleteSupplierPayment, RECEIPT: deleteReceipt };
 
 const KIND: Record<VoucherKind, { label: string; title: string; tone: "red" | "green" | "blue" }> = {
   PAYMENT: { label: "Payment", title: "New payment voucher (PV)", tone: "red" },
@@ -42,7 +38,6 @@ async function VouchersContent({ params, searchParams }: { params: Promise<{ com
   const base = `/c/${slug}/finance/vouchers`;
   const [vouchers, allBills] = await Promise.all([listVouchers(slug), listBills(slug)]);
   const billsTab = kind === "BILLS";
-  const admin = isAdmin(user);
   const mayCancel = can(user, "cancelEntries");
   const mayInvoices = canAccessModule(user, slug, "invoices"); // customer receipts need it to be cancelled or deleted
   const needle = q.trim().toLowerCase();
@@ -245,14 +240,6 @@ async function VouchersContent({ params, searchParams }: { params: Promise<{ com
                       >
                         <ExternalLink className="size-4" aria-hidden />
                       </Link>
-                    )}
-                    {admin && (
-                      <DeleteButton
-                        action={DELETE[v.source].bind(null, slug, v.id)}
-                        confirmText={`Delete voucher ${v.number} of ${formatMoney(v.amount)}? It goes to the recycle bin with its accounting entry, and can be restored.`}
-                        title="Delete voucher"
-                        successMessage="Voucher moved to the recycle bin."
-                      />
                     )}
                   </td>
                 </OpenRow>

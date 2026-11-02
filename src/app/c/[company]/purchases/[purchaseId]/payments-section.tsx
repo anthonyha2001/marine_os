@@ -1,12 +1,10 @@
 import Link from "next/link";
 import { payHref } from "@/lib/url";
 import { FileDown } from "lucide-react";
-import { deleteSupplierPayment } from "@/lib/actions/accounting";
 import { PAYMENT_METHODS, billStatus } from "@/lib/accounting";
 import { listPurchasePayments } from "@/lib/data/accounting";
 import { formatMoney, round2 } from "@/lib/money";
 import type { CompanySlug } from "@/lib/permissions";
-import { DeleteButton } from "@/components/delete-button";
 import { cardClass, secondaryButton, ProgressBar } from "@/components/ui";
 import { BillStatusBadge } from "../../accounting/bill-status";
 import { CancelButton, CancelledNote } from "@/components/cancel-button";
@@ -19,11 +17,9 @@ export async function PaymentsSection({
   slug,
   purchase,
   canRecord,
-  admin = false,
   mayCancel = false,
 }: {
   slug: CompanySlug;
-  admin?: boolean;
   mayCancel?: boolean;
   purchase: { id: string; invoiceNumber: string; supplierName: string; totalTTC: number; dueDate: Date };
   canRecord: boolean;
@@ -93,13 +89,6 @@ export async function PaymentsSection({
                         action={cancelSupplierPayment.bind(null, slug, p.id)}
                         title="Cancel payment"
                         message={`Payment ${p.number ?? ""} of ${formatMoney(p.amount)} stays on record as cancelled, and a reversing entry is posted today. The bill goes back to unpaid for that amount.`}
-                      />
-                    )}
-                    {admin && (
-                      <DeleteButton
-                        action={deleteSupplierPayment.bind(null, slug, p.id)}
-                        confirmText={`Delete the ${formatMoney(p.amount)} payment of ${dateFormat.format(p.paidAt)}? It goes to the recycle bin with its accounting entry, and can be restored.`}
-                        title="Delete payment"
                       />
                     )}
                   </td>

@@ -4,13 +4,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CreditNoteDialog } from "@/components/create-dialogs";
 import { requireModule } from "@/lib/auth";
-import { deleteReceipt } from "@/lib/actions/finance";
 import { PAYMENT_METHODS } from "@/lib/accounting";
 import { listCreditNotes, listReceipts } from "@/lib/data/ledger";
 import { getInvoice } from "@/lib/data/sales";
 import { formatMoney, round2, VAT_RATE } from "@/lib/money";
-import { COMPANIES, can, canAccessModule, isAdmin } from "@/lib/permissions";
-import { DeleteButton } from "@/components/delete-button";
+import { COMPANIES, can, canAccessModule } from "@/lib/permissions";
 import { Badge, PageHeader, ProgressBar, cardClass } from "@/components/ui";
 import { InvoiceStatusBadge } from "../status-badge";
 import { InvoiceActions } from "./invoice-actions";
@@ -28,7 +26,6 @@ async function InvoiceDetail({
 }) {
   const [{ company, invoiceId }, search] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "invoices");
-  const admin = isAdmin(user);
   const mayCancel = can(user, "cancelEntries");
   // Only finds invoices of this company, so another company's invoice can't be opened by URL.
   const invoice = await getInvoice(slug, invoiceId);
@@ -174,14 +171,6 @@ async function InvoiceDetail({
                           action={cancelReceipt.bind(null, slug, r.id)}
                           title="Cancel receipt"
                           message={`Receipt ${r.number} of ${formatMoney(r.amount)} stays on record as cancelled, a reversing entry is posted today, and the invoice balance goes back up.`}
-                        />
-                      )}
-                      {admin && (
-                        <DeleteButton
-                          action={deleteReceipt.bind(null, slug, r.id)}
-                          confirmText={`Delete receipt ${r.number} of ${formatMoney(r.amount)}? It goes to the recycle bin with its accounting entry, and can be restored.`}
-                          title="Delete receipt"
-                          successMessage="Receipt moved to the recycle bin."
                         />
                       )}
                     </td>
