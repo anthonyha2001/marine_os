@@ -3,6 +3,7 @@
 import { updateTag } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireModule } from "@/lib/auth";
 import { businessToday } from "@/lib/dates";
@@ -16,12 +17,12 @@ import { postPosRefund, postPosSale, postShiftDifference } from "@/lib/ledger/po
 import { VAT_RATE, round2 } from "@/lib/money";
 import { canManagePos, canSetRate, hasPos, htForShelfPrice, isRefundMethod, lbpUsdValue, refundTTC, roundLbp, rulesFor, saleTotals, settle, shelfPrice } from "@/lib/pos";
 import { customerNamed } from "@/lib/customer-record";
+import { UserError, userErrorMessage } from "@/lib/user-error";
 
 
 export type PosFormState = { error?: string; saved?: boolean };
 
 const todayDate = () => new Date(`${businessToday()}T00:00:00Z`);
-class UserError extends Error {}
 
 async function requirePos(companySlug: string) {
   const ctx = await requireModule(companySlug, "sales");
@@ -191,12 +192,6 @@ export async function completeSale(companySlug: string, payload: unknown): Promi
     const lineTotalHT = round2(round2(shelfPrice(unitPriceHT) * l.quantity) / (1 + VAT_RATE));
     return { position, productId: p.id, code: p.code, name: p.name, quantity: l.quantity, unitPriceHT, lineTotalHT, unitCost: costs.get(p.id) ?? 0 };
   });
-  if (!rules.sellOutOfStock) {
-    const stock = await prisma.stockMovement.groupBy({ by: ["productId"], where: { companyId, productId: { in: lines.map((l) => l.productId) } }, _sum: { quantity: true } });
-    const onHand = new Map(stock.map((r) => [r.productId, r._sum.quantity ?? 0]));
-    const short = lines.find((l) => l.quantity > (onHand.get(l.productId) ?? 0));
-    if (short) return { error: `Only ${Math.max(0, onHand.get(short.productId) ?? 0)} of ${short.name} in stock. A manager can sell beyond the stock.` };
-  }
   const totals = saleTotals(lines, data.discountPct);
   if (rules.customerRequiredAbove > 0 && totals.totalTTC > rules.customerRequiredAbove && !picked && !data.customerName?.trim())
     return { error: `Enter the customer's name for sales above ${rules.customerRequiredAbove} USD.` };
@@ -208,53 +203,67 @@ export async function completeSale(companySlug: string, payload: unknown): Promi
   const customer = picked ?? (data.customerName?.trim() ? await customerNamed(data.customerName, { taxNumber: data.customerTaxNumber }) : null);
   const name = customer?.name ?? "Walk-in customer";
   const date = todayDate();
-  const sale = await prisma.$transaction(async (tx) => {
-    const number = await nextNumber(tx, companyId, "POS", date.getUTCFullYear(), 5);
-    const created = await tx.posSale.create({
-      select: { id: true },
-      data: {
+  let sale: { id: string; number: string };
+  try {
+    sale = await prisma.$transaction(async (tx) => {
+      if (!rules.sellOutOfStock) {
+        // Lock the products (in a fixed order) so two tills can't both sell the last unit.
+        const ids = [...new Set(lines.map((l) => l.productId))].sort();
+        await tx.$queryRaw`SELECT id FROM "Product" WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`;
+        const stock = await tx.stockMovement.groupBy({ by: ["productId"], where: { companyId, productId: { in: ids } }, _sum: { quantity: true } });
+        const onHand = new Map(stock.map((r) => [r.productId, r._sum.quantity ?? 0]));
+        const short = lines.find((l) => l.quantity > (onHand.get(l.productId) ?? 0));
+        if (short) throw new UserError(`Only ${Math.max(0, onHand.get(short.productId) ?? 0)} of ${short.name} in stock. A manager can sell beyond the stock.`);
+      }
+      const number = await nextNumber(tx, companyId, "POS", date.getUTCFullYear(), 5);
+      const created = await tx.posSale.create({
+        select: { id: true },
+        data: {
+          companyId,
+          number,
+          shiftId: shift.id,
+          cashierId: user.id,
+          saleDate: date,
+          customerId: customer?.id ?? null,
+          customerName: name,
+          customerAddress: customer?.address ?? null,
+          customerTaxNumber: customer?.taxNumber ?? (data.customerTaxNumber || null),
+          subtotalHT: totals.subtotalHT,
+          discountPct: data.discountPct,
+          discountHT: totals.discountHT,
+          totalHT: totals.totalHT,
+          vatAmount: totals.vatAmount,
+          totalTTC: totals.totalTTC,
+          rate,
+          paidUsd: pay.paidUsd,
+          paidLbp: pay.paidLbp,
+          paidCard: pay.paidCard,
+          changeUsd: pay.changeUsd,
+          changeLbp: pay.changeLbp,
+          lines: { create: lines },
+          stockMovements: { create: lines.map((l) => ({ companyId, productId: l.productId, quantity: -l.quantity, type: "POS_SALE" })) },
+        },
+      });
+      await postPosSale(tx, {
+        id: created.id,
         companyId,
         number,
-        shiftId: shift.id,
-        cashierId: user.id,
-        saleDate: date,
+        date,
         customerId: customer?.id ?? null,
         customerName: name,
-        customerAddress: customer?.address ?? null,
-        customerTaxNumber: customer?.taxNumber ?? (data.customerTaxNumber || null),
-        subtotalHT: totals.subtotalHT,
-        discountPct: data.discountPct,
-        discountHT: totals.discountHT,
         totalHT: totals.totalHT,
         vatAmount: totals.vatAmount,
         totalTTC: totals.totalTTC,
-        rate,
-        paidUsd: pay.paidUsd,
-        paidLbp: pay.paidLbp,
-        paidCard: pay.paidCard,
-        changeUsd: pay.changeUsd,
-        changeLbp: pay.changeLbp,
-        lines: { create: lines },
-        stockMovements: { create: lines.map((l) => ({ companyId, productId: l.productId, quantity: -l.quantity, type: "POS_SALE" })) },
-      },
-    });
-    await postPosSale(tx, {
-      id: created.id,
-      companyId,
-      number,
-      date,
-      customerId: customer?.id ?? null,
-      customerName: name,
-      totalHT: totals.totalHT,
-      vatAmount: totals.vatAmount,
-      totalTTC: totals.totalTTC,
-      usdKept: round2(pay.paidUsd - pay.changeUsd),
-      lbpValue: lbpUsdValue(totals.totalTTC, pay.paidUsd, pay.changeUsd, pay.paidCard),
-      card: pay.paidCard,
-      createdById: user.id,
-    });
-    return { id: created.id, number };
-  }, TRANSACTION_OPTIONS);
+        usdKept: round2(pay.paidUsd - pay.changeUsd),
+        lbpValue: lbpUsdValue(totals.totalTTC, pay.paidUsd, pay.changeUsd, pay.paidCard),
+        card: pay.paidCard,
+        createdById: user.id,
+      });
+      return { id: created.id, number };
+    }, TRANSACTION_OPTIONS);
+  } catch (e) {
+    return { error: userErrorMessage(e) };
+  }
 
   refresh(companyId, { stock: true, ledger: true });
   return { saleId: sale.id, number: sale.number, changeUsd: pay.changeUsd, changeLbp: pay.changeLbp };
@@ -316,6 +325,8 @@ export async function refundSale(companySlug: string, saleId: string, _prev: Pos
 
   try {
     await prisma.$transaction(async (tx) => {
+      // Lock the sale so two refunds at once can't both return the same units.
+      await tx.$queryRaw`SELECT id FROM "PosSale" WHERE id = ${saleId} FOR UPDATE`;
       const sale = await tx.posSale.findFirst({
         where: { id: saleId, companyId },
         include: { lines: { include: { refundLines: { select: { quantity: true } } } }, refunds: { select: { totalTTC: true } } },

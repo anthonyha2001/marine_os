@@ -3,7 +3,7 @@
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
+import { prisma, type Tx } from "@/lib/prisma";
 import { posTag } from "@/lib/data/pos";
 import { canSetRate } from "@/lib/pos";
 import { currentLbpRate } from "@/lib/lbp-rate";
@@ -22,6 +22,7 @@ import { createInvoiceWithLines, linesTotals } from "@/lib/invoicing";
 import { workshopTag } from "@/lib/data/workshop";
 import { withParams } from "@/lib/url";
 import { NOT_IN_CATALOGUE, customerNamed, existingProductIds } from "@/lib/customer-record";
+import { UserError, userErrorMessage } from "@/lib/user-error";
 
 
 const longDate = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
@@ -50,7 +51,28 @@ async function loadOfferForInvoicing(companyId: string, offerId: string) {
   return { offer, invoiced, totals: { totalHT: Number(offer.totalHT), totalTTC: Number(offer.totalTTC) } };
 }
 
-type LoadedOffer = NonNullable<Awaited<ReturnType<typeof loadOfferForInvoicing>>>["offer"];
+/**
+ * Lock the offer row until the transaction ends, then read what is invoiced on it now, so two
+ * invoices issued at the same moment can't both bill the same remaining amount.
+ */
+async function lockOfferInvoiced(tx: Tx, offerId: string) {
+  await tx.$queryRaw`SELECT id FROM "Offer" WHERE id = ${offerId} FOR UPDATE`;
+  const invoices = await tx.invoice.findMany({ where: { offerId, status: { not: "CANCELLED" } }, select: { paymentTermId: true, totalTTC: true, totalHT: true } });
+  return {
+    terms: new Set(invoices.map((i) => i.paymentTermId).filter(Boolean)),
+    totalTTC: round2(invoices.reduce((s, i) => s + Number(i.totalTTC), 0)),
+    totalHT: round2(invoices.reduce((s, i) => s + Number(i.totalHT), 0)),
+  };
+}
+
+/** Refuse an invoice on an offer for more than what is left to invoice on it (TTC). */
+function checkOfferRemaining(offerNumber: string, left: number, amount: number) {
+  const remaining = round2(left);
+  if (remaining <= 0) throw new UserError(`Offer ${offerNumber} is already fully invoiced.`);
+  if (round2(amount) > remaining) throw new UserError(`Only ${money.format(remaining)} is left to invoice on offer ${offerNumber}.`);
+}
+
+type LoadedOffer =NonNullable<Awaited<ReturnType<typeof loadOfferForInvoicing>>>["offer"];
 
 /** Invoice fields copied from the offer (customer, references, VAT setting). */
 function fromOffer(offer: LoadedOffer) {
@@ -86,22 +108,21 @@ export async function createInvoicesFromOffer(companySlug: string, offerId: stri
   if (!loaded || loaded.offer.paymentTerms.length === 0) return;
   const { offer, totals } = loaded;
 
-  const invoicedTerms = new Set(offer.invoices.map((i) => i.paymentTermId).filter(Boolean));
-  const projected = projectedPayments(
-    offer.paymentTerms.map((t) => ({ id: t.id, amount: Number(t.amount), invoiced: invoicedTerms.has(t.id) })),
-    totals.totalTTC,
-    loaded.invoiced.totalTTC,
-  );
   const count = offer.paymentTerms.length;
-  const todo = offer.paymentTerms
-    .map((term, index) => ({ term, index, amount: projected.get(term.id) ?? 0 }))
-    .filter(({ term, amount }) => !invoicedTerms.has(term.id) && amount > 0 && (termId === null || term.id === termId));
-  if (todo.length === 0) return;
-
   const today = todayUtc();
   const created = await withNumberRetry(() =>
     prisma.$transaction(async (tx) => {
-      const running = { ...loaded.invoiced };
+      // What is left is worked out under the offer lock, so a second click can't bill it again.
+      const invoiced = await lockOfferInvoiced(tx, offer.id);
+      const projected = projectedPayments(
+        offer.paymentTerms.map((t) => ({ id: t.id, amount: Number(t.amount), invoiced: invoiced.terms.has(t.id) })),
+        totals.totalTTC,
+        invoiced.totalTTC,
+      );
+      const todo = offer.paymentTerms
+        .map((term, index) => ({ term, index, amount: projected.get(term.id) ?? 0 }))
+        .filter(({ term, amount }) => !invoiced.terms.has(term.id) && amount > 0 && (termId === null || term.id === termId));
+      const running = { totalTTC: invoiced.totalTTC, totalHT: invoiced.totalHT };
       const ids: string[] = [];
       for (const { term, index, amount } of todo) {
         const parts = invoiceVatSplit(amount, totals, running);
@@ -135,10 +156,11 @@ export async function createInvoicesFromOffer(companySlug: string, offerId: stri
         });
         ids.push(invoice.id);
       }
-      if (offer.status !== "ACCEPTED") await tx.offer.update({ where: { id: offer.id }, data: { status: "ACCEPTED" } });
+      if (ids.length && offer.status !== "ACCEPTED") await tx.offer.update({ where: { id: offer.id }, data: { status: "ACCEPTED" } });
       return ids;
     }, TRANSACTION_OPTIONS),
   );
+  if (created.length === 0) return;
 
   updateTag(salesTags.invoices(companyId));
   updateTag(ledgerTag(companyId));
@@ -181,41 +203,51 @@ export async function createCustomInvoice(
   const companyId = await companyIdFor(slug);
   const loaded = await loadOfferForInvoicing(companyId, data.offerId);
   if (!loaded) return { error: "That offer no longer exists." };
-  const { offer, totals, invoiced } = loaded;
-  const remaining = round2(totals.totalTTC - invoiced.totalTTC);
+  const { offer, totals } = loaded;
   const amount = round2(data.amount);
-  if (remaining <= 0) return { error: `Offer ${offer.number} is already fully invoiced.` };
-  if (amount > remaining) return { error: `Only ${money.format(remaining)} is left to invoice on offer ${offer.number}.` };
+  // Fast answer before the transaction; the same check is repeated under the offer lock.
+  try {
+    checkOfferRemaining(offer.number, totals.totalTTC - loaded.invoiced.totalTTC, amount);
+  } catch (e) {
+    return { error: userErrorMessage(e) };
+  }
 
   const today = todayUtc();
-  const parts = invoiceVatSplit(amount, totals, invoiced);
-  const invoiceId = await withNumberRetry(() =>
-    prisma.$transaction(async (tx) => {
-      const invoice = await tx.invoice.create({
-        select: { id: true, number: true },
-        data: {
-          ...fromOffer(offer),
-          companyId,
-          number: await nextInvoiceNumber(tx, slug, today.getUTCFullYear()),
-          lbpRate: await currentLbpRate(tx, companyId),
-          invoiceDate: today,
-          dueDate: new Date(today.getTime() + data.dueDays * 86400000),
-          notes: data.notes ?? null,
-          ...parts,
-          createdById: user.id,
-          lines: {
-            create: [{ position: 0, title: data.title, description: offerReference(offer), quantity: 1, unitPrice: parts.totalHT, lineTotal: parts.totalHT }],
+  let invoiceId: string;
+  try {
+    invoiceId = await withNumberRetry(() =>
+      prisma.$transaction(async (tx) => {
+        const invoiced = await lockOfferInvoiced(tx, offer.id);
+        checkOfferRemaining(offer.number, totals.totalTTC - invoiced.totalTTC, amount);
+        const parts = invoiceVatSplit(amount, totals, invoiced);
+        const invoice = await tx.invoice.create({
+          select: { id: true, number: true },
+          data: {
+            ...fromOffer(offer),
+            companyId,
+            number: await nextInvoiceNumber(tx, slug, today.getUTCFullYear()),
+            lbpRate: await currentLbpRate(tx, companyId),
+            invoiceDate: today,
+            dueDate: new Date(today.getTime() + data.dueDays * 86400000),
+            notes: data.notes ?? null,
+            ...parts,
+            createdById: user.id,
+            lines: {
+              create: [{ position: 0, title: data.title, description: offerReference(offer), quantity: 1, unitPrice: parts.totalHT, lineTotal: parts.totalHT }],
+            },
           },
-        },
-      });
-      await postInvoice(tx, {
-        id: invoice.id, companyId, number: invoice.number, invoiceDate: today, customerId: offer.customerId, customerName: offer.customerName,
-        totalHT: parts.totalHT, vatAmount: parts.vatAmount, totalTTC: parts.totalTTC, createdById: user.id,
-      });
-      if (offer.status !== "ACCEPTED") await tx.offer.update({ where: { id: offer.id }, data: { status: "ACCEPTED" } });
-      return invoice.id;
-    }, TRANSACTION_OPTIONS),
-  );
+        });
+        await postInvoice(tx, {
+          id: invoice.id, companyId, number: invoice.number, invoiceDate: today, customerId: offer.customerId, customerName: offer.customerName,
+          totalHT: parts.totalHT, vatAmount: parts.vatAmount, totalTTC: parts.totalTTC, createdById: user.id,
+        });
+        if (offer.status !== "ACCEPTED") await tx.offer.update({ where: { id: offer.id }, data: { status: "ACCEPTED" } });
+        return invoice.id;
+      }, TRANSACTION_OPTIONS),
+    );
+  } catch (e) {
+    return { error: userErrorMessage(e) };
+  }
 
   updateTag(salesTags.invoices(companyId));
   updateTag(ledgerTag(companyId));
@@ -365,6 +397,8 @@ const editedInvoiceSchema = z.object({
     .min(1, "Add at least one line"),
 });
 
+const LINES_TAKEN = "Some lines were invoiced meanwhile. Close and open the pop-up again.";
+
 /**
  * Issue an invoice from a job card or an offer after reviewing it in the pop-up: lines can be
  * changed, discounted, removed or added. Job card lines kept on the invoice are marked invoiced.
@@ -402,50 +436,69 @@ export async function issueEditedInvoice(companySlug: string, _prev: CustomInvoi
     if (job.status === "CANCELLED") return { error: "This job card is cancelled." };
     const open = new Set(job.lines.map((l) => l.id));
     const kept = lines.map((l) => l.jobLineId).filter((id): id is string => !!id);
-    if (kept.some((id) => !open.has(id))) return { error: "Some lines were invoiced meanwhile. Close and open the pop-up again." };
-    invoice = await withNumberRetry(() =>
-      prisma.$transaction(async (tx) => {
-        const created = await createInvoiceWithLines(tx, {
-          ...base,
-          customer: job.customer
-            ? { id: job.customer.id, name: job.customer.name, address: job.customer.address, email: job.customer.email, phone: job.customer.phone, taxNumber: job.customer.taxNumber, attention: job.customer.contactName }
-            : { id: null, name: job.customerName },
-          subject: `Job card ${job.number}${job.vessel ? ` · ${job.vessel.name}` : ""}`,
-          reference: job.offerId ? "Additional work" : null,
-          vesselId: job.vesselId,
-          jobCardId: job.id,
-        });
-        if (kept.length) await tx.jobCardLine.updateMany({ where: { id: { in: kept } }, data: { invoiceId: created.id } });
-        return created;
-      }, TRANSACTION_OPTIONS),
-    );
+    if (kept.some((id) => !open.has(id))) return { error: LINES_TAKEN };
+    try {
+      invoice = await withNumberRetry(() =>
+        prisma.$transaction(async (tx) => {
+          // Checked again under the job card lock: another invoice may have taken the lines meanwhile.
+          await tx.$queryRaw`SELECT id FROM "JobCard" WHERE id = ${job.id} FOR UPDATE`;
+          const stillOpen = await tx.jobCardLine.count({ where: { id: { in: kept }, jobCardId: job.id, billable: true, invoiceId: null } });
+          if (stillOpen !== kept.length) throw new UserError(LINES_TAKEN);
+          const created = await createInvoiceWithLines(tx, {
+            ...base,
+            customer: job.customer
+              ? { id: job.customer.id, name: job.customer.name, address: job.customer.address, email: job.customer.email, phone: job.customer.phone, taxNumber: job.customer.taxNumber, attention: job.customer.contactName }
+              : { id: null, name: job.customerName },
+            subject: `Job card ${job.number}${job.vessel ? ` · ${job.vessel.name}` : ""}`,
+            reference: job.offerId ? "Additional work" : null,
+            vesselId: job.vesselId,
+            jobCardId: job.id,
+          });
+          if (kept.length) {
+            const claimed = await tx.jobCardLine.updateMany({ where: { id: { in: kept }, invoiceId: null }, data: { invoiceId: created.id } });
+            if (claimed.count !== kept.length) throw new UserError(LINES_TAKEN);
+          }
+          return created;
+        }, TRANSACTION_OPTIONS),
+      );
+    } catch (e) {
+      return { error: userErrorMessage(e) };
+    }
     updateTag(workshopTag(companyId));
   } else {
     const loaded = await loadOfferForInvoicing(companyId, data.source.id);
     if (!loaded) return { error: "That offer no longer exists." };
-    const { offer } = loaded;
+    const { offer, totals } = loaded;
     if (offer.status === "REJECTED") return { error: `Offer ${offer.number} was declined.` };
-    invoice = await withNumberRetry(() =>
-      prisma.$transaction(async (tx) => {
-        const created = await createInvoiceWithLines(tx, {
-          ...base,
-          customer: {
-            id: offer.customerId,
-            name: offer.customerName,
-            attention: offer.customerAttention,
-            address: offer.customerAddress,
-            email: offer.customerEmail,
-            phone: offer.customerPhone,
-            taxNumber: offer.customer?.taxNumber ?? null,
-          },
-          subject: offer.subject,
-          reference: offer.reference ?? `Offer ${offer.number}`,
-          offerId: offer.id,
-        });
-        if (offer.status !== "ACCEPTED") await tx.offer.update({ where: { id: offer.id }, data: { status: "ACCEPTED" } });
-        return created;
-      }, TRANSACTION_OPTIONS),
-    );
+    const amount = linesTotals(lines, data.applyVat).totalTTC;
+    try {
+      checkOfferRemaining(offer.number, totals.totalTTC - loaded.invoiced.totalTTC, amount);
+      invoice = await withNumberRetry(() =>
+        prisma.$transaction(async (tx) => {
+          const invoiced = await lockOfferInvoiced(tx, offer.id);
+          checkOfferRemaining(offer.number, totals.totalTTC - invoiced.totalTTC, amount);
+          const created = await createInvoiceWithLines(tx, {
+            ...base,
+            customer: {
+              id: offer.customerId,
+              name: offer.customerName,
+              attention: offer.customerAttention,
+              address: offer.customerAddress,
+              email: offer.customerEmail,
+              phone: offer.customerPhone,
+              taxNumber: offer.customer?.taxNumber ?? null,
+            },
+            subject: offer.subject,
+            reference: offer.reference ?? `Offer ${offer.number}`,
+            offerId: offer.id,
+          });
+          if (offer.status !== "ACCEPTED") await tx.offer.update({ where: { id: offer.id }, data: { status: "ACCEPTED" } });
+          return created;
+        }, TRANSACTION_OPTIONS),
+      );
+    } catch (e) {
+      return { error: userErrorMessage(e) };
+    }
     updateTag(salesTags.offers(companyId));
   }
   updateTag(salesTags.invoices(companyId));
