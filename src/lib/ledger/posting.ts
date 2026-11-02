@@ -2,6 +2,7 @@ import "server-only";
 import { prisma, type Tx } from "@/lib/prisma";
 import { TRANSACTION_OPTIONS } from "@/lib/item-codes";
 import { round2 } from "@/lib/money";
+import { UserError } from "@/lib/user-error";
 import { systemAccounts } from "./chart";
 import { nextNumber } from "./numbering";
 
@@ -37,6 +38,21 @@ export type PostingLine = {
 
 export class UnbalancedEntryError extends Error {}
 
+/** Posting on or before the company's lock date (closed period). Shown to the user as-is. */
+export class PeriodLockedError extends UserError {}
+
+const lockFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+
+/** Refuse a posting dated on or before the company's lock date. */
+async function checkPeriodOpen(tx: Tx, companyId: string, date: Date) {
+  const company = await tx.company.findUnique({ where: { id: companyId }, select: { lockDate: true } });
+  if (company?.lockDate && date.getTime() <= company.lockDate.getTime()) {
+    throw new PeriodLockedError(
+      `The books are closed up to ${lockFormat.format(company.lockDate)}. Use a later date, or ask the accountant or a manager to move the lock date (Accounting → Journal).`,
+    );
+  }
+}
+
 type EntryInput = {
   companyId: string;
   date: Date;
@@ -58,6 +74,7 @@ export async function postEntry(tx: Tx, input: EntryInput) {
   if (lines.length < 2 || Math.abs(debit - credit) >= 0.005) {
     throw new UnbalancedEntryError(`Journal entry is not balanced (debit ${debit}, credit ${credit}).`);
   }
+  await checkPeriodOpen(tx, input.companyId, input.date);
   return tx.journalEntry.create({
     select: { id: true, number: true },
     data: {

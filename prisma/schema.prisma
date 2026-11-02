@@ -28,7 +28,9 @@ model Company {
   registrationNumber String? // commercial register
   bankDetails        String?
   offerTerms         String? // default terms & conditions for new offers
-  labourCostPerHour  Decimal @default(0) @db.Decimal(10, 2) // what an hour of workshop labour costs the company
+  labourCostPerHour  Decimal   @default(0) @db.Decimal(10, 2) // what an hour of workshop labour costs the company
+  // Books closed up to and including this date: nothing can be posted on or before it.
+  lockDate           DateTime? @db.Date
 
   users            User[]
   purchases        Purchase[]

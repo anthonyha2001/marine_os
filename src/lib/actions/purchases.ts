@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { UserError } from "@/lib/user-error";
 import { prisma } from "@/lib/prisma";
 import { toRecycleBin } from "@/lib/recycle-bin";
 import { deleteRefusal } from "@/lib/delete-rules";
@@ -135,6 +136,7 @@ export async function createPurchase(
       }, TRANSACTION_OPTIONS);
     }
   } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
     if (e instanceof OrderNotReceivable) {
       return { error: "This purchase order was already received or cancelled, so no stock was added." };
     }

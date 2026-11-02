@@ -3,6 +3,7 @@
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { UserError } from "@/lib/user-error";
 import { prisma } from "@/lib/prisma";
 import { toRecycleBin } from "@/lib/recycle-bin";
 import { deleteRefusal } from "@/lib/delete-rules";
@@ -20,7 +21,6 @@ import { isCompanySlug } from "@/lib/permissions";
 
 export type StockFormState = { error?: string };
 const today = () => new Date(`${businessToday()}T00:00:00Z`);
-class UserError extends Error {}
 
 async function ctx(companySlug: string) {
   const c = await requireModule(companySlug, "inventory");

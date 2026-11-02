@@ -14,6 +14,7 @@ import { TRANSACTION_OPTIONS } from "@/lib/item-codes";
 import { nextNumber } from "@/lib/ledger/numbering";
 import { postSupplierPayment } from "@/lib/ledger/posting";
 import { round2 } from "@/lib/money";
+import { userErrorMessage } from "@/lib/user-error";
 
 export type PaymentFormState = { error?: string; savedId?: string; again?: boolean }; // again: "Save & new" in a pop-up // savedId: saved in a pop-up (form sent with "stay")
 
@@ -65,38 +66,43 @@ export async function recordSupplierPayment(
   if (amount > balance) return { error: `Only ${money.format(balance)} is left to pay on this bill.` };
 
   const paidAt = new Date(`${data.paidAt}T00:00:00Z`);
-  const paymentId = await prisma.$transaction(async (tx) => {
-    // Numbered as a payment voucher (PV), in the same series as the vouchers page.
-    const number = await nextNumber(tx, companyId, "PV", paidAt.getUTCFullYear());
-    const payment = await tx.supplierPayment.create({
-      select: { id: true },
-      data: {
+  let paymentId: string;
+  try {
+    paymentId = await prisma.$transaction(async (tx) => {
+      // Numbered as a payment voucher (PV), in the same series as the vouchers page.
+      const number = await nextNumber(tx, companyId, "PV", paidAt.getUTCFullYear());
+      const payment = await tx.supplierPayment.create({
+        select: { id: true },
+        data: {
+          companyId,
+          number,
+          purchaseId,
+          amount,
+          paidAt,
+          method: data.method,
+          moneyAccountId: account.id,
+          reference: data.reference ?? null,
+          notes: data.notes ?? null,
+          createdById: user.id,
+        },
+      });
+      await postSupplierPayment(tx, {
+        id: payment.id,
         companyId,
         number,
-        purchaseId,
         amount,
         paidAt,
-        method: data.method,
         moneyAccountId: account.id,
-        reference: data.reference ?? null,
-        notes: data.notes ?? null,
+        supplierId: purchase.supplierId,
+        supplierName: purchase.supplier.name,
+        invoiceNumber: purchase.invoiceNumber,
         createdById: user.id,
-      },
-    });
-    await postSupplierPayment(tx, {
-      id: payment.id,
-      companyId,
-      number,
-      amount,
-      paidAt,
-      moneyAccountId: account.id,
-      supplierId: purchase.supplierId,
-      supplierName: purchase.supplier.name,
-      invoiceNumber: purchase.invoiceNumber,
-      createdById: user.id,
-    });
-    return payment.id;
-  }, TRANSACTION_OPTIONS);
+      });
+      return payment.id;
+    }, TRANSACTION_OPTIONS);
+  } catch (e) {
+    return { error: userErrorMessage(e) };
+  }
 
   updateTag(payablesTag(companyId));
   updateTag(ledgerTag(companyId));

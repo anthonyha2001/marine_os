@@ -3,6 +3,7 @@
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { UserError, userErrorMessage } from "@/lib/user-error";
 import { prisma } from "@/lib/prisma";
 import { requireModule } from "@/lib/auth";
 import { businessToday } from "@/lib/dates";
@@ -22,7 +23,6 @@ export type ChequeFormState = { error?: string };
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date");
 const toDate = (d: string) => new Date(`${d}T00:00:00Z`);
-class UserError extends Error {}
 
 const chequeFields = {
   chequeNumber: z.string().trim().min(1, "Enter the cheque number").max(40),
@@ -123,25 +123,29 @@ export async function issueCheque(companySlug: string, _prev: ChequeFormState, f
   const amount = round2(d.amount);
   if (amount > balance + 0.005) return { error: `Only ${money.format(balance)} is left to pay on this bill.` };
 
-  await prisma.$transaction(async (tx) => {
-    const a = await systemAccounts(companyId, tx);
-    const date = toDate(d.issueDate);
-    const number = await nextNumber(tx, companyId, "PV", date.getUTCFullYear());
-    const payment = await tx.supplierPayment.create({
-      select: { id: true },
-      data: {
-        companyId, number, purchaseId: purchase.id, amount, paidAt: date, method: "CHEQUE", moneyAccountId: a.CHEQUES_OUT,
-        reference: `Cheque ${d.chequeNumber}${d.bank ? ` · ${d.bank}` : ""} due ${d.dueDate}`, notes: d.notes, createdById: user.id,
-      },
-    });
-    await postSupplierPayment(tx, { id: payment.id, companyId, number, amount, paidAt: date, moneyAccountId: a.CHEQUES_OUT, supplierId: purchase.supplierId, supplierName: purchase.supplier.name, invoiceNumber: purchase.invoiceNumber, createdById: user.id });
-    await tx.cheque.create({
-      data: {
-        companyId, number: await nextNumber(tx, companyId, "CQ", date.getUTCFullYear()), direction: "ISSUED", chequeNumber: d.chequeNumber, bank: d.bank,
-        partyName: purchase.supplier.name, supplierId: purchase.supplierId, amount, issueDate: date, dueDate: toDate(d.dueDate), status: "ISSUED", supplierPaymentId: payment.id, notes: d.notes, createdById: user.id,
-      },
-    });
-  }, TRANSACTION_OPTIONS);
+  try {
+    await prisma.$transaction(async (tx) => {
+      const a = await systemAccounts(companyId, tx);
+      const date = toDate(d.issueDate);
+      const number = await nextNumber(tx, companyId, "PV", date.getUTCFullYear());
+      const payment = await tx.supplierPayment.create({
+        select: { id: true },
+        data: {
+          companyId, number, purchaseId: purchase.id, amount, paidAt: date, method: "CHEQUE", moneyAccountId: a.CHEQUES_OUT,
+          reference: `Cheque ${d.chequeNumber}${d.bank ? ` · ${d.bank}` : ""} due ${d.dueDate}`, notes: d.notes, createdById: user.id,
+        },
+      });
+      await postSupplierPayment(tx, { id: payment.id, companyId, number, amount, paidAt: date, moneyAccountId: a.CHEQUES_OUT, supplierId: purchase.supplierId, supplierName: purchase.supplier.name, invoiceNumber: purchase.invoiceNumber, createdById: user.id });
+      await tx.cheque.create({
+        data: {
+          companyId, number: await nextNumber(tx, companyId, "CQ", date.getUTCFullYear()), direction: "ISSUED", chequeNumber: d.chequeNumber, bank: d.bank,
+          partyName: purchase.supplier.name, supplierId: purchase.supplierId, amount, issueDate: date, dueDate: toDate(d.dueDate), status: "ISSUED", supplierPaymentId: payment.id, notes: d.notes, createdById: user.id,
+        },
+      });
+    }, TRANSACTION_OPTIONS);
+  } catch (e) {
+    return { error: userErrorMessage(e) };
+  }
   refresh(companyId);
   redirect(`/c/${slug}/finance/cheques?view=issued&saved=1`);
 }

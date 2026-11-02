@@ -5,11 +5,13 @@ import { Prisma } from "@prisma/client";
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { UserError, userErrorMessage } from "@/lib/user-error";
 import { prisma } from "@/lib/prisma";
 import { currentLbpRate } from "@/lib/lbp-rate";
 import { toRecycleBin } from "@/lib/recycle-bin";
 import { deleteRefusal } from "@/lib/delete-rules";
 import { requireModule } from "@/lib/auth";
+import { canCloseBooks } from "@/lib/permissions";
 import { isPaymentMethod } from "@/lib/accounting";
 import { businessToday } from "@/lib/dates";
 import { companyIdFor } from "@/lib/data/inventory";
@@ -171,11 +173,31 @@ export async function createVoucher(companySlug: string, _prev: FinanceFormState
   const amountHT = round2(amount - vatAmount);
   const when = toDate(data.date);
 
-  const id = await prisma.$transaction(async (tx) => {
-    const number = await nextNumber(tx, companyId, PREFIX[data.kind], when.getUTCFullYear());
-    const voucher = await tx.voucher.create({
-      select: { id: true },
-      data: {
+  let id: string;
+  try {
+    id = await prisma.$transaction(async (tx) => {
+      const number = await nextNumber(tx, companyId, PREFIX[data.kind], when.getUTCFullYear());
+      const voucher = await tx.voucher.create({
+        select: { id: true },
+        data: {
+          companyId,
+          number,
+          kind: data.kind,
+          date: when,
+          moneyAccountId: moneyAcc.id,
+          counterAccountId: counter.id,
+          partyName: data.partyName,
+          description: data.description,
+          amountHT,
+          vatAmount,
+          amount,
+          method: data.method,
+          reference: data.reference,
+          createdById: user.id,
+        },
+      });
+      await postVoucher(tx, {
+        id: voucher.id,
         companyId,
         number,
         kind: data.kind,
@@ -187,28 +209,13 @@ export async function createVoucher(companySlug: string, _prev: FinanceFormState
         amountHT,
         vatAmount,
         amount,
-        method: data.method,
-        reference: data.reference,
         createdById: user.id,
-      },
-    });
-    await postVoucher(tx, {
-      id: voucher.id,
-      companyId,
-      number,
-      kind: data.kind,
-      date: when,
-      moneyAccountId: moneyAcc.id,
-      counterAccountId: counter.id,
-      partyName: data.partyName,
-      description: data.description,
-      amountHT,
-      vatAmount,
-      amount,
-      createdById: user.id,
-    });
-    return voucher.id;
-  }, TRANSACTION_OPTIONS);
+      });
+      return voucher.id;
+    }, TRANSACTION_OPTIONS);
+  } catch (e) {
+    return { error: userErrorMessage(e) };
+  }
 
   refresh(companyId);
   if (formData.get("stay")) return { savedId: id, again: wantsAnother(formData) };
@@ -264,22 +271,27 @@ export async function createCreditNote(companySlug: string, _prev: FinanceFormSt
   const lbpRate = invoice.lbpRate ? Number(invoice.lbpRate) : await currentLbpRate(prisma, companyId);
 
   const when = toDate(data.date);
-  const id = await prisma.$transaction(async (tx) => {
-    const number = await nextNumber(tx, companyId, "CN", when.getUTCFullYear());
-    const cn = await tx.creditNote.create({
-      select: { id: true },
-      data: {
-        companyId, number, invoiceId: invoice.id, customerId: invoice.customerId, customerName: invoice.customerName,
-        customerAddress: invoice.customerAddress, customerTaxNumber: invoice.customerTaxNumber, date: when, reason: data.reason,
-        applyVat: invoice.applyVat, lbpRate, totalHT, vatAmount, totalTTC, createdById: user.id, lines: { create: lines },
-      },
-    });
-    await postCreditNote(tx, {
-      id: cn.id, companyId, number, date: when, customerId: invoice.customerId, customerName: invoice.customerName, totalHT, vatAmount, totalTTC, createdById: user.id,
-    });
-    await refreshInvoiceStatus(tx, invoice.id);
-    return cn.id;
-  }, TRANSACTION_OPTIONS);
+  let id: string;
+  try {
+    id = await prisma.$transaction(async (tx) => {
+      const number = await nextNumber(tx, companyId, "CN", when.getUTCFullYear());
+      const cn = await tx.creditNote.create({
+        select: { id: true },
+        data: {
+          companyId, number, invoiceId: invoice.id, customerId: invoice.customerId, customerName: invoice.customerName,
+          customerAddress: invoice.customerAddress, customerTaxNumber: invoice.customerTaxNumber, date: when, reason: data.reason,
+          applyVat: invoice.applyVat, lbpRate, totalHT, vatAmount, totalTTC, createdById: user.id, lines: { create: lines },
+        },
+      });
+      await postCreditNote(tx, {
+        id: cn.id, companyId, number, date: when, customerId: invoice.customerId, customerName: invoice.customerName, totalHT, vatAmount, totalTTC, createdById: user.id,
+      });
+      await refreshInvoiceStatus(tx, invoice.id);
+      return cn.id;
+    }, TRANSACTION_OPTIONS);
+  } catch (e) {
+    return { error: userErrorMessage(e) };
+  }
 
   refresh(companyId, true);
   redirect(returnTarget(slug, formData, "Credit note issued.") ?? `/c/${slug}/finance/credit-notes/${id}?saved=1`);
@@ -413,10 +425,26 @@ export async function createJournalEntry(companySlug: string, _prev: FinanceForm
     );
   } catch (e) {
     if (e instanceof UnbalancedEntryError) return { error: "Debits and credits must be equal." };
+    if (e instanceof UserError) return { error: e.message };
     throw e;
   }
   refresh(companyId);
   redirect(`/c/${slug}/finance/journal?saved=1`);
 }
 
-class UserError extends Error {}
+
+export type LockDateState = { error?: string; saved?: string };
+
+/** Close the books up to a date (nothing can be posted on or before it). Empty reopens every period. */
+export async function saveLockDate(companySlug: string, _prev: LockDateState, formData: FormData): Promise<LockDateState> {
+  const { user, slug } = await requireModule(companySlug, "accounting");
+  if (!canCloseBooks(user.role)) return { error: "Only the accountant or a manager can close the books." };
+  const raw = String(formData.get("lockDate") ?? "").trim();
+  if (raw && !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return { error: "Enter a valid date." };
+  // Before today, so documents dated today (invoices, till sales, cancellations) are never refused.
+  if (raw && raw >= businessToday()) return { error: "The lock date must be before today." };
+  const companyId = await companyIdFor(slug);
+  await prisma.company.update({ where: { id: companyId }, data: { lockDate: raw ? toDate(raw) : null } });
+  updateTag(ledgerTag(companyId));
+  return { saved: raw ? "Books closed up to this date." : "All periods are open again." };
+}

@@ -368,3 +368,16 @@ export async function listCreditableInvoices(slug: CompanySlug) {
     }))
     .filter((i) => i.creditable > 0);
 }
+
+async function loadLockDate(companyId: string) {
+  "use cache";
+  cacheTag(DATA_TAG, ledgerTag(companyId));
+  cacheLife("hours");
+  const company = await prisma.company.findUnique({ where: { id: companyId }, select: { lockDate: true } });
+  return company?.lockDate ? company.lockDate.toISOString().slice(0, 10) : null;
+}
+
+/** The date the books are closed up to (YYYY-MM-DD), or null when every period is open. */
+export async function getLockDate(slug: CompanySlug) {
+  return loadLockDate(await companyIdFor(slug));
+}

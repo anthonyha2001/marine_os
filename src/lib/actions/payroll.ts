@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { UserError } from "@/lib/user-error";
 import { prisma } from "@/lib/prisma";
 import { toRecycleBin } from "@/lib/recycle-bin";
 import { deleteRefusal } from "@/lib/delete-rules";
@@ -314,4 +315,3 @@ export async function savePayrollSettings(companySlug: string, _prev: PayrollFor
   redirect(`/c/${slug}/payroll?settingsSaved=1`);
 }
 
-class UserError extends Error {}

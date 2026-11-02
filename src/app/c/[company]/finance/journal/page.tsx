@@ -2,10 +2,11 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { BookOpen, Plus } from "lucide-react";
 import { requireModule } from "@/lib/auth";
-import { dayFormat } from "@/lib/dates";
-import { getLedger } from "@/lib/data/ledger";
+import { businessToday, dayFormat } from "@/lib/dates";
+import { getLedger, getLockDate } from "@/lib/data/ledger";
 import { formatMoney, round2 } from "@/lib/money";
-import { COMPANIES, can } from "@/lib/permissions";
+import { COMPANIES, can, canCloseBooks } from "@/lib/permissions";
+import { LockDateForm } from "./lock-date-form";
 import { Modal } from "@/components/modal";
 import { Badge, ButtonLink, EmptyState, PageHeader, SearchBar, cardClass } from "@/components/ui";
 import { Amount, PeriodFilter, SOURCE_LABELS, periodFrom, sourceHref, type PeriodParams } from "../finance-ui";
@@ -19,8 +20,10 @@ async function JournalContent({ params, searchParams }: { params: Promise<{ comp
   const [{ company }, search] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "accounting");
   const base = `/c/${slug}/finance/journal`;
-  const ledger = await getLedger(slug);
+  const [ledger, lockDate] = await Promise.all([getLedger(slug), getLockDate(slug)]);
   const mayReverse = can(user, "cancelEntries");
+  // The lock date must be before today (see saveLockDate).
+  const yesterday = new Date(Date.parse(`${businessToday()}T00:00:00Z`) - 86400000).toISOString().slice(0, 10);
   const reversed = new Set(ledger.entries.map((e) => e.reversalOf).filter(Boolean));
   const { fromStr, toStr, period } = periodFrom(search);
   const accounts = new Map(ledger.accounts.map((a) => [a.id, a]));
@@ -52,6 +55,13 @@ async function JournalContent({ params, searchParams }: { params: Promise<{ comp
           Journal entry posted.
         </p>
       )}
+      <div className={`${cardClass} mt-6 p-4`}>
+        {canCloseBooks(user.role) ? (
+          <LockDateForm companySlug={slug} current={lockDate} maxDate={yesterday} />
+        ) : (
+          <p className="text-sm text-muted">{lockDate ? `Books closed up to ${dayFormat.format(new Date(`${lockDate}T00:00:00Z`))}.` : "Every period is open."}</p>
+        )}
+      </div>
       <div className="mt-6 flex flex-wrap items-end justify-between gap-3">
         <SearchBar action={base} defaultValue={search.q} placeholder="Search by entry, description or account code" keep={{ from: fromStr, to: toStr, source: search.source }} />
         <PeriodFilter action={base} from={fromStr} to={toStr} keep={{ q: search.q }}>

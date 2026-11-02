@@ -130,6 +130,9 @@ export function modulesFor(user: Actor): ModuleKey[] {
   return user.access.modules;
 }
 
+/** Who may close the books up to a date (the lock date): the accountant, a manager or the admin. */
+export const canCloseBooks = (role: Role) => role === "ADMIN" || role === "MANAGER" || role === "ACCOUNTANT";
+
 export function can(user: Actor, cap: Capability) {
   if (user.role === "ADMIN") return true;
   return (user.access?.caps ?? ROLE_CAPS[user.role]).includes(cap);
