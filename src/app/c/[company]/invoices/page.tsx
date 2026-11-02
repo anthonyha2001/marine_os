@@ -6,10 +6,13 @@ import { canSetRate, formatRate } from "@/lib/pos";
 import { LbpRateForm } from "./lbp-rate-form";
 import Link from "next/link";
 import { requireModule } from "@/lib/auth";
-import { invoiceSettlements } from "@/lib/data/ledger";
+import { businessToday } from "@/lib/dates";
 import { listJobCards } from "@/lib/data/workshop";
 import { companyIdFor, getCatalogue } from "@/lib/data/inventory";
-import { listCustomers, listInvoices, listOffers } from "@/lib/data/sales";
+import { listCustomers, listOffers } from "@/lib/data/sales";
+import { LIST_PAGE_SIZE, invoicePage, invoiceSummary } from "@/lib/data/lists";
+import { Pager, pageFrom } from "@/components/pager";
+import { withParams } from "@/lib/url";
 import { vesselOptions } from "@/lib/data/vessels";
 import { VAT_RATE, formatMoney, round2 } from "@/lib/money";
 import { InvoiceDialog } from "@/components/document-dialogs";
@@ -33,40 +36,29 @@ async function InvoicesContent({
   searchParams,
 }: {
   params: Promise<{ company: string }>;
-  searchParams: Promise<{ q?: string; new?: string; rate?: string; rateSaved?: string; view?: string }>;
+  searchParams: Promise<{ q?: string; new?: string; rate?: string; rateSaved?: string; view?: string; page?: string }>;
 }) {
-  const [{ company }, { q = "", new: creating, rate: editingRate, rateSaved, view }] = await Promise.all([params, searchParams]);
+  const [{ company }, { q = "", new: creating, rate: editingRate, rateSaved, view, page: pageParam }] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "invoices");
   const lbpRate = await currentLbpRate(prisma, await companyIdFor(slug));
   const mayRate = canSetRate(user.role);
-  const needle = q.trim().toLowerCase();
+  const page = pageFrom(pageParam);
+  const today = businessToday();
   const custom = creating === "custom";
   const fromJob = creating === "job";
-  const [raw, offers, settled, customers, vessels, catalogue, jobs] = await Promise.all([
-    listInvoices(slug),
+  const [list, summary, offers, customers, vessels, catalogue, jobs] = await Promise.all([
+    invoicePage(slug, q, page),
+    invoiceSummary(slug, today),
     creating && !custom && !fromJob ? listOffers(slug) : [],
-    invoiceSettlements(slug),
     custom ? listCustomers() : [],
     custom ? vesselOptions() : [],
     custom ? getCatalogue() : [],
     fromJob ? listJobCards(slug) : [],
   ]);
-  const all = raw.map((i) => {
-    const s = settled.get(i.id) ?? { paid: 0, credited: 0 };
-    const done = round2(s.paid + s.credited);
-    return { ...i, settled: done, balance: i.status === "CANCELLED" ? 0 : Math.max(0, round2(i.totalTTC - done)) };
-  });
-  const invoices = all.filter(
-    (i) =>
-      !needle ||
-      i.number.toLowerCase().includes(needle) ||
-      i.customerName.toLowerCase().includes(needle) ||
-      (i.offer?.number ?? "").toLowerCase().includes(needle),
-  );
-  const today = new Date().toISOString().slice(0, 10);
-  const open = all.filter((i) => i.balance > 0);
-  const overdue = open.filter((i) => i.dueDate.toISOString().slice(0, 10) < today);
+  const invoices = list.rows;
   const base = `/c/${slug}/invoices`;
+  // This list's address (search and page), kept when a row's pop-up opens and closes.
+  const here = withParams(base, { q: q || null, page: page > 1 ? String(page) : null });
 
   return (
     <>
@@ -160,17 +152,17 @@ async function InvoicesContent({
         </Modal>
       )}
 
-      {view && <InvoiceDialog slug={slug} id={view} closeHref={q ? `${base}?q=${encodeURIComponent(q)}` : base} canReceive={canAccessModule(user, slug, "accounting")} canOpen />}
+      {view && <InvoiceDialog slug={slug} id={view} closeHref={here} canReceive={canAccessModule(user, slug, "accounting")} canOpen />}
 
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         {[
-          ["Unpaid", formatMoney(open.reduce((sum, i) => sum + i.balance, 0)), `${open.length} invoices`],
-          ["Overdue", formatMoney(overdue.reduce((sum, i) => sum + i.balance, 0)), `${overdue.length} invoices`],
-          ["Invoices issued", String(all.filter((i) => i.status !== "CANCELLED").length), "excluding cancelled"],
+          ["Unpaid", formatMoney(summary.openSum), `${summary.openCount} invoices`],
+          ["Overdue", formatMoney(summary.overdueSum), `${summary.overdueCount} invoices`],
+          ["Invoices issued", String(summary.issued), "excluding cancelled"],
         ].map(([label, value, hint]) => (
           <div key={label} className={`${cardClass} p-4`}>
             <p className="text-sm text-muted">{label}</p>
-            <p className={`mt-1 text-2xl font-semibold ${label === "Overdue" && overdue.length ? "text-danger" : "text-navy"}`}>{value}</p>
+            <p className={`mt-1 text-2xl font-semibold ${label === "Overdue" && summary.overdueCount ? "text-danger" : "text-navy"}`}>{value}</p>
             <p className="text-xs text-muted">{hint}</p>
           </div>
         ))}
@@ -202,7 +194,7 @@ async function InvoicesContent({
             </thead>
             <tbody className="divide-y divide-border">
               {invoices.map((i) => (
-                <OpenRow key={i.id} selectId={i.id} href={`${base}?${q ? `q=${encodeURIComponent(q)}&` : ""}view=${i.id}`} className={`hover:bg-background/60 ${i.status === "CANCELLED" ? "opacity-60" : ""}`}>
+                <OpenRow key={i.id} selectId={i.id} href={withParams(here, { view: i.id })} className={`hover:bg-background/60 ${i.status === "CANCELLED" ? "opacity-60" : ""}`}>
                   <td className="px-4 py-3">
                     <Link href={`${base}/${i.id}`} className="font-mono font-medium text-brand hover:underline">
                       {i.number}
@@ -234,6 +226,7 @@ async function InvoicesContent({
           </table>
         )}
       </div>
+      <Pager href={here} page={page} pageSize={LIST_PAGE_SIZE} total={list.total} />
       <InvoiceBulkBar
         companySlug={slug}
         invoices={invoices.map((i) => ({
@@ -255,7 +248,7 @@ async function InvoicesContent({
 export default function InvoicesPage({ params, searchParams }: PageProps<"/c/[company]/invoices">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading invoices…</p>}>
-      <InvoicesContent params={params} searchParams={searchParams as Promise<{ q?: string; new?: string; rate?: string; rateSaved?: string; view?: string }>} />
+      <InvoicesContent params={params} searchParams={searchParams as Promise<{ q?: string; new?: string; rate?: string; rateSaved?: string; view?: string; page?: string }>} />
     </Suspense>
   );
 }

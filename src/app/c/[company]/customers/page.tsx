@@ -2,12 +2,14 @@ import { Suspense } from "react";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { requireModule } from "@/lib/auth";
-import { customerBalances, type CustomerBalance } from "@/lib/data/ledger";
-import { listCustomers } from "@/lib/data/sales";
-import { formatMoney, round2 } from "@/lib/money";
+import { LIST_PAGE_SIZE, customerPage } from "@/lib/data/lists";
+import { businessToday } from "@/lib/dates";
+import { formatMoney } from "@/lib/money";
+import { withParams } from "@/lib/url";
+import { Pager, pageFrom } from "@/components/pager";
 import { COMPANIES, canAccessModule } from "@/lib/permissions";
 import { Modal } from "@/components/modal";
-import { ButtonLink, PageHeader, cardClass } from "@/components/ui";
+import { ButtonLink, PageHeader, SearchBar, cardClass } from "@/components/ui";
 import { CustomerForm } from "./customer-form";
 
 async function CustomersContent({
@@ -15,32 +17,19 @@ async function CustomersContent({
   searchParams,
 }: {
   params: Promise<{ company: string }>;
-  searchParams: Promise<{ new?: string; added?: string; sort?: string }>;
+  searchParams: Promise<{ new?: string; added?: string; sort?: string; q?: string; page?: string }>;
 }) {
-  const [{ company }, { new: creating, added, sort }] = await Promise.all([params, searchParams]);
+  const [{ company }, { new: creating, added, sort, q = "", page: pageParam }] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "customers");
   // Amounts due come from invoices, so only people who may see invoices see them.
   const showDue = canAccessModule(user, slug, "invoices");
-  const [customerList, balances] = await Promise.all([
-    listCustomers(),
-    showDue ? customerBalances(slug) : new Map<string, CustomerBalance>(),
-  ]);
+  const page = pageFrom(pageParam);
+  const byDue = showDue && sort === "due";
+  const list = await customerPage(slug, businessToday(), q, byDue ? "due" : "name", page);
+  const customers = list.rows;
+  const { totalDue, totalOverdue, owing } = list;
   const base = `/c/${slug}/customers`;
-
-  const balanceOf = (c: { id: string; name: string }): CustomerBalance => {
-    const byId = balances.get(c.id);
-    const byName = balances.get(`name:${c.name.trim().toLowerCase()}`);
-    return {
-      due: round2((byId?.due ?? 0) + (byName?.due ?? 0)),
-      overdue: round2((byId?.overdue ?? 0) + (byName?.overdue ?? 0)),
-      unpaidCount: (byId?.unpaidCount ?? 0) + (byName?.unpaidCount ?? 0),
-    };
-  };
-  const customers = customerList.map((c) => ({ ...c, balance: balanceOf(c) }));
-  if (sort === "due") customers.sort((a, b) => b.balance.due - a.balance.due || a.name.localeCompare(b.name));
-  const totalDue = round2(customers.reduce((sum, c) => sum + c.balance.due, 0));
-  const totalOverdue = round2(customers.reduce((sum, c) => sum + c.balance.overdue, 0));
-  const owing = customers.filter((c) => c.balance.due > 0).length;
+  const here = withParams(base, { q: q || null, sort: byDue ? "due" : null });
 
   return (
     <>
@@ -62,7 +51,7 @@ async function CustomersContent({
             {[
               ["Total due", formatMoney(totalDue), `to ${COMPANIES[slug].name}`],
               ["Overdue", formatMoney(totalOverdue), "past the due date"],
-              ["Customers owing", String(owing), `of ${customers.length}`],
+              ["Customers owing", String(owing), `of ${list.total}`],
             ].map(([label, value, hint]) => (
               <div key={label} className={`${cardClass} p-4`}>
                 <p className="text-sm text-muted">{label}</p>
@@ -73,10 +62,10 @@ async function CustomersContent({
           </div>
           <div className="mt-4 flex gap-3 text-sm">
             <span className="text-muted">Sort:</span>
-            <Link href={base} className={sort === "due" ? "text-brand hover:underline" : "font-semibold text-navy"}>
+            <Link href={withParams(here, { sort: null })} className={sort === "due" ? "text-brand hover:underline" : "font-semibold text-navy"}>
               Name
             </Link>
-            <Link href={`${base}?sort=due`} className={sort === "due" ? "font-semibold text-navy" : "text-brand hover:underline"}>
+            <Link href={withParams(here, { sort: "due" })} className={sort === "due" ? "font-semibold text-navy" : "text-brand hover:underline"}>
               Amount due
             </Link>
           </div>
@@ -91,8 +80,12 @@ async function CustomersContent({
         </Modal>
       )}
 
+      <div className="mt-6">
+        <SearchBar action={base} defaultValue={q} placeholder="Search by name, contact, phone or email" keep={{ sort: byDue ? "due" : undefined }} />
+      </div>
+
       <section className={`${cardClass} mt-4 divide-y divide-border`}>
-        {customers.length === 0 && <p className="p-10 text-center text-muted">No customers yet.</p>}
+        {customers.length === 0 && <p className="p-10 text-center text-muted">{q ? "No customers match this search." : "No customers yet."}</p>}
         {customers.map((c) => (
           <Link key={c.id} href={`${base}/${c.id}`} data-nav-row className="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5 hover:bg-background/60">
             <span>
@@ -115,6 +108,7 @@ async function CustomersContent({
           </Link>
         ))}
       </section>
+      <Pager href={here} page={page} pageSize={LIST_PAGE_SIZE} total={list.total} />
     </>
   );
 }
@@ -122,7 +116,7 @@ async function CustomersContent({
 export default function CustomersPage({ params, searchParams }: PageProps<"/c/[company]/customers">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading…</p>}>
-      <CustomersContent params={params} searchParams={searchParams as Promise<{ new?: string; added?: string; sort?: string }>} />
+      <CustomersContent params={params} searchParams={searchParams as Promise<{ new?: string; added?: string; sort?: string; q?: string; page?: string }>} />
     </Suspense>
   );
 }

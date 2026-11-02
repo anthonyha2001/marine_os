@@ -5,31 +5,27 @@ import { HandCoins } from "lucide-react";
 import { requireModule } from "@/lib/auth";
 import { PAYMENT_METHODS } from "@/lib/accounting";
 import { businessToday, dayFormat } from "@/lib/dates";
-import { invoicesWithBalance, listReceipts } from "@/lib/data/ledger";
-import { formatMoney, round2 } from "@/lib/money";
+import { LIST_PAGE_SIZE, invoiceSummary, receiptPage, receiptSummary } from "@/lib/data/lists";
+import { formatMoney } from "@/lib/money";
+import { withParams } from "@/lib/url";
+import { Pager, pageFrom } from "@/components/pager";
 import { COMPANIES } from "@/lib/permissions";
 import { ButtonLink, EmptyState, PageHeader, SearchBar, StatCard, cardClass, tdClass, thClass } from "@/components/ui";
 import { CancelButton, CancelledNote } from "@/components/cancel-button";
 import { cancelReceipt } from "@/lib/actions/cancel";
 import { can, canAccessModule } from "@/lib/permissions";
 
-type Search = { q?: string };
+type Search = { q?: string; page?: string };
 
 async function ReceiptsContent({ params, searchParams }: { params: Promise<{ company: string }>; searchParams: Promise<Search> }) {
-  const [{ company }, { q = "" }] = await Promise.all([params, searchParams]);
+  const [{ company }, { q = "", page: pageParam }] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "invoices");
   const base = `/c/${slug}/finance/receipts`;
   const mayCancel = can(user, "cancelEntries");
-  const [receipts, open] = await Promise.all([listReceipts(slug), invoicesWithBalance(slug)]);
-  const needle = q.trim().toLowerCase();
-  const shown = receipts.filter(
-    (r) => !needle || r.number.toLowerCase().includes(needle) || r.customerName.toLowerCase().includes(needle) || (r.invoice?.number ?? "").toLowerCase().includes(needle),
-  );
-  const month = businessToday().slice(0, 7);
-  const posted = receipts.filter((r) => r.status === "POSTED");
-  const thisMonth = round2(posted.filter((r) => r.receivedAt.toISOString().slice(0, 7) === month).reduce((s, r) => s + r.amount, 0));
-  const onAccount = round2(posted.filter((r) => !r.invoice).reduce((s, r) => s + r.amount, 0));
-  const toCollect = round2(open.reduce((s, i) => s + i.balance, 0));
+  const page = pageFrom(pageParam);
+  const today = businessToday();
+  const [list, received, invoices] = await Promise.all([receiptPage(slug, q, page), receiptSummary(slug, today.slice(0, 7)), invoiceSummary(slug, today)]);
+  const shown = list.rows;
 
   return (
     <>
@@ -40,9 +36,9 @@ async function ReceiptsContent({ params, searchParams }: { params: Promise<{ com
         action={canAccessModule(user, slug, "accounting") && <ButtonLink icon={HandCoins} href={payHref(`/c/${slug}/finance/receipts`, "CUSTOMER")}>Customer payment</ButtonLink>}
       />
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <StatCard label="Received this month" value={formatMoney(thisMonth)} icon={HandCoins} />
-        <StatCard label="Still to collect" value={formatMoney(toCollect)} hint={`${open.filter((i) => i.balance > 0).length} open invoices`} href={`/c/${slug}/invoices`} />
-        <StatCard label="Received on account" value={formatMoney(onAccount)} hint="advances not linked to an invoice" />
+        <StatCard label="Received this month" value={formatMoney(received.thisMonth)} icon={HandCoins} />
+        <StatCard label="Still to collect" value={formatMoney(invoices.openSum)} hint={`${invoices.openCount} open invoices`} href={`/c/${slug}/invoices`} />
+        <StatCard label="Received on account" value={formatMoney(received.onAccount)} hint="advances not linked to an invoice" />
       </div>
       <div className="mt-6">
         <SearchBar action={base} defaultValue={q} placeholder="Search by receipt, customer or invoice" />
@@ -105,6 +101,7 @@ async function ReceiptsContent({ params, searchParams }: { params: Promise<{ com
           </table>
         )}
       </div>
+      <Pager href={withParams(base, { q: q || null })} page={page} pageSize={LIST_PAGE_SIZE} total={list.total} />
     </>
   );
 }

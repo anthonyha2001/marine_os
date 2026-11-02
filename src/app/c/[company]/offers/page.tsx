@@ -5,7 +5,9 @@ import { Modal } from "@/components/modal";
 import { ClauseLibrary } from "./clause-library";
 import Link from "next/link";
 import { requireModule } from "@/lib/auth";
-import { listOffers } from "@/lib/data/sales";
+import { LIST_PAGE_SIZE, offerPage } from "@/lib/data/lists";
+import { businessToday } from "@/lib/dates";
+import { Pager, pageFrom } from "@/components/pager";
 import { formatMoney } from "@/lib/money";
 
 import { COMPANIES, can, canAccessModule, isAdmin } from "@/lib/permissions";
@@ -24,21 +26,18 @@ async function OffersContent({
   searchParams,
 }: {
   params: Promise<{ company: string }>;
-  searchParams: Promise<{ q?: string; clauses?: string; view?: string; invoice?: string }>;
+  searchParams: Promise<{ q?: string; clauses?: string; view?: string; invoice?: string; page?: string }>;
 }) {
-  const [{ company }, { q = "", clauses, view, invoice }] = await Promise.all([params, searchParams]);
+  const [{ company }, { q = "", clauses, view, invoice, page: pageParam }] = await Promise.all([params, searchParams]);
   const { user, slug } = await requireModule(company, "offers");
   const mayDelete = (status: string) => isAdmin(user) || (status === "DRAFT" && can(user, "deleteDrafts"));
-  const needle = q.trim().toLowerCase();
-  const offers = (await listOffers(slug)).filter(
-    (o) =>
-      !needle ||
-      o.number.toLowerCase().includes(needle) ||
-      o.customerName.toLowerCase().includes(needle) ||
-      (o.subject ?? "").toLowerCase().includes(needle),
-  );
+  const page = pageFrom(pageParam);
+  const list = await offerPage(slug, q, page);
+  const offers = list.rows;
   const base = `/c/${slug}/offers`;
-  const today = new Date().toISOString().slice(0, 10);
+  // This list's address (search and page), kept when a row's pop-up opens and closes.
+  const here = withParams(base, { q: q || null, page: page > 1 ? String(page) : null });
+  const today = businessToday();
 
   return (
     <>
@@ -80,7 +79,7 @@ async function OffersContent({
               {offers.map((o) => {
                 const expired = o.status !== "ACCEPTED" && o.status !== "REJECTED" && o.validUntil.toISOString().slice(0, 10) < today;
                 return (
-                  <OpenRow key={o.id} href={`${base}?${q ? `q=${encodeURIComponent(q)}&` : ""}view=${o.id}`} className="hover:bg-background/60">
+                  <OpenRow key={o.id} href={withParams(here, { view: o.id })} className="hover:bg-background/60">
                     <td className="px-4 py-3">
                       <Link href={`${base}/${o.id}`} className="font-mono font-medium text-brand hover:underline">
                         {o.number}
@@ -111,13 +110,14 @@ async function OffersContent({
           </table>
         )}
       </div>
+      <Pager href={here} page={page} pageSize={LIST_PAGE_SIZE} total={list.total} />
 
       {view && (
         <OfferDialog
           slug={slug}
           id={view}
-          closeHref={q ? `${base}?q=${encodeURIComponent(q)}` : base}
-          selfHref={withParams(base, { q: q || null, view })}
+          closeHref={here}
+          selfHref={withParams(here, { view })}
           invoicing={invoice === "1"}
           canInvoice={canAccessModule(user, slug, "invoices")}
         />
@@ -138,7 +138,7 @@ async function OffersContent({
 export default function OffersPage({ params, searchParams }: PageProps<"/c/[company]/offers">) {
   return (
     <Suspense fallback={<p className="text-muted">Loading offers…</p>}>
-      <OffersContent params={params} searchParams={searchParams as Promise<{ q?: string; clauses?: string; view?: string }>} />
+      <OffersContent params={params} searchParams={searchParams as Promise<{ q?: string; clauses?: string; view?: string; page?: string }>} />
     </Suspense>
   );
 }
