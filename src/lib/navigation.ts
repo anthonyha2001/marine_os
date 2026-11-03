@@ -12,6 +12,7 @@ export type NavIcon =
   | "marketing"
   | "website"
   | "offers"
+  | "letters"
   | "invoices"
   | "customers"
   | "purchaseOrders"
@@ -82,8 +83,10 @@ export const NAV: NavGroup[] = [
       { label: "Offers", path: "offers", module: "offers", icon: "offers" },
       { label: "Invoices", path: "invoices", module: "invoices", icon: "invoices" },
       { label: "Credit notes", path: "finance/credit-notes", module: "invoices", icon: "creditNotes" },
+      { label: "Letters", path: "letters", module: "offers", icon: "letters" },
       { label: "New offer", path: "offers/new", module: "offers", hidden: true, create: true },
       { label: "New invoice", path: "invoices?new=1", module: "invoices", hidden: true, create: true },
+      { label: "New letter", path: "letters/new", module: "offers", hidden: true, create: true },
     ],
   },
   {

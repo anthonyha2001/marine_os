@@ -17,6 +17,7 @@ const KIND: Record<string, string> = {
   JournalEntry: "Journal entry",
   LedgerAccount: "Account",
   Offer: "Offer",
+  Letter: "Letter",
   OfferClause: "Clause",
   PayrollRun: "Payroll",
   Product: "Product / service",

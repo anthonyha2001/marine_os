@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { SendButton } from "@/components/send-button";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Hammer } from "lucide-react";
+import { Hammer, Mail } from "lucide-react";
 import { requireModule } from "@/lib/auth";
 import { JobCardDialog, OfferJobsDialog } from "@/components/job-dialogs";
 import { reviseOffer } from "@/lib/actions/offers";
@@ -59,6 +59,9 @@ async function OfferPage({
               </button>
             </form>
             {offer.status !== "REJECTED" && <ShareOfferButton companySlug={slug} offerId={offer.id} />}
+            <Link href={`/c/${slug}/letters/new?offer=${offer.id}`} className={secondaryButton} title="Write an official letter about this offer">
+              <Mail className="size-4" aria-hidden /> Letter
+            </Link>
             {canWorkshop && (offerJobs.length > 0 || offer.status === "ACCEPTED") && (
               <Link href={jobsHref} scroll={false} className={secondaryButton}>
                 <Hammer className="size-4" aria-hidden /> Job cards

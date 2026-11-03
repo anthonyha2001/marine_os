@@ -36,6 +36,7 @@ model Company {
   purchases        Purchase[]
   stockMovements   StockMovement[]
   offers           Offer[]
+  letters          Letter[]
   invoices         Invoice[]
   purchaseOrders   PurchaseOrder[]
   supplierPayments SupplierPayment[]
@@ -91,6 +92,7 @@ model User {
 
   purchases        Purchase[]
   offers           Offer[]
+  letters          Letter[]
   invoices         Invoice[]
   purchaseOrders   PurchaseOrder[]
   supplierPayments SupplierPayment[]
@@ -134,6 +136,7 @@ model Customer {
   serials       ProductSerial[]
   cheques       Cheque[]
   offers        Offer[]
+  letters       Letter[]
   invoices      Invoice[]
   receipts      CustomerReceipt[]
   creditNotes   CreditNote[]
@@ -201,6 +204,7 @@ model Offer {
 
   lines         OfferLine[]
   paymentTerms  OfferPaymentTerm[]
+  letters       Letter[]
   invoices      Invoice[]
   jobCards      JobCard[]
   incoterm      String? // EXW, FCA, CIF, DAP, DDP…
@@ -1382,6 +1386,49 @@ model PayrollSettings {
   endOfService     Decimal @default(8.5) @db.Decimal(6, 3) // employer, no ceiling
   taxBrackets      String  @default("") // one per line: "<annual USD up to> <rate %>", last line may be "* <rate %>"
   defaultExemption Decimal @default(0) @db.Decimal(12, 2) // yearly tax-free amount for a new employee
+}
+
+// Official letter on the company letterhead, to a customer (optionally about an offer).
+// The customer's details are copied onto the letter so a sent letter never changes.
+model Letter {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+  number    String  @unique // e.g. XM-LT-2026-0001
+
+  customerId        String?
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  offerId           String?
+  offer             Offer?    @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  customerName      String
+  customerAttention String?
+  customerAddress   String?
+  customerEmail     String?
+  customerPhone     String?
+
+  letterDate     DateTime @db.Date
+  title          String   @default("OFFICIAL LETTER")
+  reference      String? // the customer's reference
+  subject        String?
+  salutation     String?
+  body           String
+  closing        String?
+  signatoryName  String?
+  signatoryTitle String?
+  fields         Json? // extra details printed as a table: { label, value }[]
+  enclosures     String?
+  cc             String?
+  marking        String?
+  acknowledgment Boolean  @default(false) // adds a "received by the customer" signature box
+  notes          String? // internal, never printed
+
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId, letterDate])
+  @@index([offerId])
 }
 
 /**
